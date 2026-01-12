@@ -1,0 +1,4 @@
+export const PRECISION_DECIMALS = 30;
+export const PRECISION = BigInt(10**PRECISION_DECIMALS);
+export const BASIS_POINT_DIVISOR_BIGINT = BigInt(10000);
+export const BASIS_POINT_DIVISOR = 10000;
