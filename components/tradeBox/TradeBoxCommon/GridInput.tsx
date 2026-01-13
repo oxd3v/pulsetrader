@@ -2,15 +2,7 @@
 import InfoTooltip from "./BoxTooltip";
 import { MAX_GRID_NUMBER } from "@/constants/common/order";
 
-interface DefinedTradeBoxProps {
-  tokenInfo: any;
-  chainId: number;
-  isConnected?: boolean;
-  user?: any;
-  wallets?: any[];
-  userPrevOrders?: any[];
-  addOrder?: (orderData: any) => Promise<any>;
-}
+
 
 // GridInput Component
 interface GridInputProps {
