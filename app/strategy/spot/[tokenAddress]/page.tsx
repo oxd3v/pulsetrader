@@ -1,5 +1,5 @@
 
-import DefinedSpotMain from "@/components/spot/defined/main";
+import DefinedSpotMain from "@/components/spot/defined/spotMain";
 
 export default async function SpotMain({
   params,

@@ -11,8 +11,8 @@ type IndicatorOnChartType = {
 export const store = create((set) => ({
     ordersOnChart: [],
     setOrdersOnChart: (ordersOnChart:ORDER_TYPE[]) => set({ ordersOnChart }),
-    indicatorOnChart: {indicatorName: "Relative Strength Index", period: 14, resolution: "1"},
-    setIndicatorOnChart: (ordersOnChart:IndicatorOnChartType | null) => set({ ordersOnChart })
+    indicatorOnChart: null,
+    setIndicatorOnChart: (indicatorOnChart:IndicatorOnChartType | null) => set({ indicatorOnChart })
 }))
 
 export const useChartDataStore = store;

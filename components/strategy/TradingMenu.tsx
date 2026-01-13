@@ -55,7 +55,7 @@ export default function TradingStrategyMenu() {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
-                Perpetual Trading
+                Future Trading
               </h2>
 
               <div className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm">

@@ -1,11 +1,11 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { formatUnits } from "ethers";
-import { useShallow } from "zustand/shallow";
 
 // Domain & Store Imports
 import DataFeed from "@/domain/datafeed/definedDatafeed";
 import { useChartDataStore } from "@/store/useChartData";
+import { useShallow } from "zustand/shallow";
 import {
   getDynamicChartOverrides,
   enabledFeatures,
@@ -26,10 +26,12 @@ const TradingViewAdvancedChart = React.memo(
     const [chartReady, setChartReady] = useState(false);
     const chartContainerRef = useRef(null);
     const tvWidgetRef = useRef(null);
-    
+
     // Tracking References (for cleanup)
-    const linesRef = useRef([]);      // Stores IDs of drawn order lines
-    const studyRef = useRef(null);    // Stores ID of the active indicator study
+    const linesRef = useRef([]); // Stores IDs of drawn order lines
+    const studyRef = useRef(null); // Stores ID of the active indicator study
+
+    
 
     // --- Store Data ---
     const { ordersOnChart, indicatorOnChart } = useChartDataStore(
@@ -38,6 +40,7 @@ const TradingViewAdvancedChart = React.memo(
         indicatorOnChart: state.indicatorOnChart,
       }))
     );
+    
 
     // --- Logic: Draw Order Lines ---
     const drawLineOnChart = useCallback(() => {
@@ -66,7 +69,10 @@ const TradingViewAdvancedChart = React.memo(
         // Long Orders (TP/SL)
         if (order.orderStatus === "Opened" && order.orderType === "long") {
           // Take Profit Line
-          const tpPrice = formatUnits(BigInt(order.takeProfit?.takeProfitPrice || 0), PRECISION_DECIMALS);
+          const tpPrice = formatUnits(
+            BigInt(order.takeProfit?.takeProfitPrice || 0),
+            PRECISION_DECIMALS
+          );
           const tpLine = chart
             .createPositionLine({ ...commonStyle })
             .setText(`${order.name}_TP`)
@@ -77,7 +83,10 @@ const TradingViewAdvancedChart = React.memo(
           linesRef.current.push(tpLine);
 
           // Stop Loss Line
-          const slPrice = formatUnits(BigInt(order.stopLoss?.stopLossPrice || 0), PRECISION_DECIMALS);
+          const slPrice = formatUnits(
+            BigInt(order.stopLoss?.stopLossPrice || 0),
+            PRECISION_DECIMALS
+          );
           const slLine = chart
             .createPositionLine({ ...commonStyle })
             .setText(`${order.name}_SL`)
@@ -90,7 +99,10 @@ const TradingViewAdvancedChart = React.memo(
 
         // Short/Pending Orders (Entry)
         if (order.orderStatus === "Pending" && order.orderType === "short") {
-          const entryPrice = formatUnits(BigInt(order.target?.shortTarget || 0), PRECISION_DECIMALS);
+          const entryPrice = formatUnits(
+            BigInt(order.target?.shortTarget || 0),
+            PRECISION_DECIMALS
+          );
           const entryLine = chart
             .createPositionLine({ ...commonStyle })
             .setText(`${order.name}_Entry`)
@@ -106,64 +118,75 @@ const TradingViewAdvancedChart = React.memo(
 
     // --- Logic: Add/Remove Indicators ---
     const updateIndicatorOnChart = useCallback(() => {
-      if (!chartReady || !tvWidgetRef.current) return;
+      if (!tvWidgetRef.current) return;
 
       const chart = tvWidgetRef.current.activeChart();
 
-      // 1. Remove existing study if it exists
+      // Remove existing indicator
       if (studyRef.current) {
         try {
           chart.removeEntity(studyRef.current);
-          studyRef.current = null;
         } catch (e) {
-          console.warn("Failed to remove entity:", e);
+          // Ignore errors
         }
+        studyRef.current = null;
       }
 
-      // 2. Add new study if valid data exists
-      if (
-        indicatorOnChart?.indicatorName &&
-        indicatorOnChart?.period
-      ) {
+      // Add new indicator if specified
+      if (indicatorOnChart?.indicatorName) {
+        const currentRes = tvWidgetRef.current.activeChart().resolution();
+        if (currentRes != indicatorOnChart.resolution) {
+          chart.setResolution(indicatorOnChart.resolution);
+        }
+        // const activeStudies = chart.getAllStudies();
+        // const isActive = activeStudies.find((i)=>i.name == indicatorOnChart?.indicatorName);
+        // if(!isActive)
         try {
-          // createStudy(name, forceOverlay, lock, inputs, overrides)
+          const params = indicatorOnChart.period
+            ? { length: parseInt(indicatorOnChart.period) || 14 }
+            : {};
+
           studyRef.current = chart.createStudy(
             indicatorOnChart.indicatorName,
-            false, 
             false,
-            [parseInt(indicatorOnChart.period)] 
+            false,
+            params
           );
         } catch (e) {
-          console.error("Failed to create study:", e);
+          console.error("Failed to create indicator:", e);
         }
       }
     }, [chartReady, indicatorOnChart]);
 
     // --- Effect: Handle Order Lines ---
     useEffect(() => {
-      drawLineOnChart();
+      if (ordersOnChart && ordersOnChart.length > 0 && chartReady) {
+        drawLineOnChart();
+      }
+
       // Cleanup lines when component unmounts
       return () => {
         linesRef.current.forEach((line) => line.remove && line.remove());
         linesRef.current = [];
       };
-    }, [drawLineOnChart]);
+    }, [chartReady, ordersOnChart]);
 
     // --- Effect: Handle Indicators ---
     useEffect(() => {
-      updateIndicatorOnChart();
-      // Cleanup study when component unmounts
+       
+      if (!chartReady) return;
+      
+      //   if(chartReady && indicatorOnChart && indicatorOnChart.indicatorName != undefined){
+      //     updateIndicatorOnChart()
+      //   }
+
+      // Delay to ensure chart is ready
+      const timeoutId = setTimeout(updateIndicatorOnChart, 100);
+
       return () => {
-        if (studyRef.current && tvWidgetRef.current) {
-          try {
-            tvWidgetRef.current.activeChart().removeEntity(studyRef.current);
-            studyRef.current = null;
-          } catch (e) {
-             // widget might already be destroyed, ignore
-          }
-        }
+        clearTimeout(timeoutId);
       };
-    }, [updateIndicatorOnChart]);
+    }, [chartReady, indicatorOnChart]);
 
     // --- Effect: Initialize Chart Widget ---
     useEffect(() => {
@@ -212,7 +235,7 @@ const TradingViewAdvancedChart = React.memo(
           widget.onChartReady(() => {
             setChartReady(true);
             // Optional: Force a data refresh if needed
-             // widget.activeChart().dataReady(); 
+            // widget.activeChart().dataReady();
           });
         }
       };
@@ -225,7 +248,7 @@ const TradingViewAdvancedChart = React.memo(
         if (tvWidgetRef.current) {
           try {
             tvWidgetRef.current.remove();
-          } catch(e) {
+          } catch (e) {
             console.warn("Error removing widget", e);
           }
           tvWidgetRef.current = null;
@@ -245,7 +268,7 @@ const TradingViewAdvancedChart = React.memo(
         if (tvWidgetRef.current && chartReady) {
           const newTheme = getTheme();
           tvWidgetRef.current.changeTheme(newTheme);
-          
+
           const dynamicOverrides = getDynamicChartOverrides(newTheme);
           tvWidgetRef.current.activeChart().applyOverrides(dynamicOverrides);
         }
@@ -270,7 +293,12 @@ const TradingViewAdvancedChart = React.memo(
       <div
         id="tradingview_advanced_chart"
         ref={chartContainerRef}
-        style={{ height: "100%", width: "100%", borderRadius: "10px", overflow: "hidden" }}
+        style={{
+          height: "100%",
+          width: "100%",
+          borderRadius: "10px",
+          overflow: "hidden",
+        }}
       />
     );
   }

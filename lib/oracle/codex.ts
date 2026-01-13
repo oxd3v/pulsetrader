@@ -262,6 +262,8 @@ export const fetchCodexCandleBar = async ({
   quoteToken,
   chainId,
   resolution = "1",
+  from,
+  to,
   createdAt = 1700000000,
   limit = 330,
 }: {
@@ -269,12 +271,22 @@ export const fetchCodexCandleBar = async ({
   quoteToken: string;
   chainId: number;
   resolution: string;
-  createdAt: number;
+  from?: number;
+  to?:number;
+  createdAt:number
   limit: number;
 }) => {
   let urlConfigurration = getUrlConfigurration();
-  const to = Math.floor(Date.now() / 1000);
-  let from = Math.max((to - 28512000), createdAt); // 330 days earlier
+  // Use passed 'to' or fallback to current time
+  const requestTo = to || Math.floor(Date.now() / 1000);
+  
+  // Use passed 'from' or fallback to a default (limit * resolution in seconds)
+  // Ensure we never request data older than the token's 'createdAt'
+  const requestFrom = from 
+    ? Math.max(from, createdAt) 
+    : Math.max((requestTo - 28512000), createdAt);
+  //const to = Math.floor(Date.now() / 1000);
+  //let from = Math.max((to - 28512000), createdAt); // 330 days earlier
   let response = await axiosRequest({
     ...urlConfigurration,
     method: "POST",
@@ -283,8 +295,8 @@ export const fetchCodexCandleBar = async ({
       variables: {
         symbol: `${pairAddress}:${chainId}`,
         countback: limit,
-        from,
-        to,
+        from: requestFrom,
+        to:requestTo,
         resolution,
         currencyCode: "USD",
         quoteToken,
@@ -296,15 +308,11 @@ export const fetchCodexCandleBar = async ({
   let bars = response.data.getBars;
   const sanitizeBars = bars.t.map((time: number, i: number) => ({
     time: time * 1000,
-    high: bars.h[i],
-    low: bars.l[i],
-    close: bars.c[i],
-    open: bars.o[i],
+    high: parseFloat(bars.h[i]),
+    low: parseFloat(bars.l[i]),
+    close: parseFloat(bars.c[i]),
+    open: parseFloat(bars.o[i]),
     volume: parseFloat(bars.volume[i] || 0),
-    buyVolume: parseFloat(bars.buyVolume[i] || 0),
-    sellVolume: parseFloat(bars.sellVolume[i] || 0),
-    transactions: parseFloat(bars.transactions[i] || 0),
-    traders: parseFloat(bars.traders[i] || 0),
   }));
   return {
     candles: sanitizeBars,

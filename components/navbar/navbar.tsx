@@ -1,8 +1,10 @@
 import Image from "next/image";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PROTOCOL_NAME } from "@/constants/common/frontend";
+import { FiActivity } from "react-icons/fi";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -25,7 +27,7 @@ export default function Navbar() {
       className={`z-50 transition-all duration-300  ${
         isScrolled
           ? ` backdrop-blur-lg shadow-lg`
-          : `${isHome ? "bg-gray-900" : "bg-transparent"} backdrop-blur-sm `
+          : `${isHome ? "bg-black" : "bg-transparent"} backdrop-blur-sm `
       }`}
     >
       <div className="w-full mx-auto px-4 py-1 lg:py-2">
@@ -33,17 +35,24 @@ export default function Navbar() {
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
               <div className="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full opacity-20 group-hover:opacity-30 blur transition-opacity duration-300" />
-              <Image
+              {/* <Image
                 src="/logo.svg"
                 alt="Trading Bot Logo"
                 width={36}
                 height={36}
                 className="relative transform group-hover:scale-110 transition-all duration-300"
-              />
+              /> */}
+              {/* <motion.div 
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-8 h-8 bg-blue-600 rounded-2xl flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.3)] mb-6"
+           >
+             
+           </motion.div> */}
+
             </div>
-            <span className="hidden lg:block text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              {PROTOCOL_NAME}
-            </span>
+            <FiActivity className={`w-8 h-8 ${isHome ? "text-white": "text-black dark:text-white"}`} strokeWidth={2.5} />
+            <h1 className={`text-2xl font-black tracking-tighter ${isHome ? 'text-white': 'text-black dark:text-white'}`}>PULSE<span className="text-blue-500">TRADER</span></h1>
           </Link>
           <div className="flex items-center gap-2">
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 xl:hidden" />

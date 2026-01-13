@@ -138,6 +138,8 @@ export default class DataFeed {
       quoteToken: this.quoteToken,
       chainId: this.chainId,
       resolution,
+      from,
+      to,
       createdAt: this.createdAt,
       limit: 330, // Fetch enough bars to fill the request
     });
@@ -145,10 +147,11 @@ export default class DataFeed {
     let bars = res.candles || [];
 
     // Validating bars are within the requested range
-    let filteredBars = bars.filter((bar: Bar) => {
+    let filteredBars = bars.filter((bar: Bar) => !isNaN(bar.time)).filter((bar: Bar) => {
       // Ensure bar is within the requested window (allowing a small buffer)
-      return  bar.time <= to * 1000;
+      return  bar.time >= from * 1000 && bar.time <= to * 1000;;
     });
+
     
     // Sort bars by time ascending (TradingView expects this)
     filteredBars.sort((a: Bar, b: Bar) => a.time - b.time);

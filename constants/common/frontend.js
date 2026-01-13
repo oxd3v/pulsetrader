@@ -1,5 +1,5 @@
 
-export const PROTOCOL_NAME = "PulseTrader"
+export const PROTOCOL_NAME = "PULSETRADER"
 export const PROTOCOL_MOTTO = ''
 
 
@@ -273,44 +273,44 @@ export const TradeFormPriceLowerDropdown = [
 
 export const INDICATORS_KEY = [
   // Momentum
-  { id: "RSI", name: "RSI", type: "Momentum", defaultPeriod: 14 },
+  { id: "RSI", name: "RSI", indicatorName: 'Relative Strength Index', type: "Momentum", defaultPeriod: 14 },
   //{ id: "Stochastic.K", name: "Stochastic-K", type: "Momentum" },
   //{ id: "Stochastic.D", name: "Stochastic-D", type: "Momentum" },
   //{ id: "Stochastic", name: "Stochastic", type: "Momentum" },
-  { id: "WilliamsR", name: "WilliamsR", type: "Momentum" },
-  { id: "CCI", name: "CCI", type: "Momentum" },
-  { id: "MFI", name: "MFI", type: "Momentum" },
+  { id: "WilliamsR", name: "WilliamsR", indicatorName: 'Williams %R', type: "Momentum", defaultPeriod: 14 },
+  { id: "CCI", name: "CCI", indicatorName: 'Commodity Channel Index', type: "Momentum", defaultPeriod: 20 },
+  { id: "MFI", name: "MFI", indicatorName: 'Money Flow Index', type: "Momentum", defaultPeriod: 14 },
 
   // Trend
-  { id: "MACD.Line", name: "MACD-Line", type: "Trend" },
-  { id: "MACD.Signal", name: "MACD-Signal", type: "Trend" },
-  { id: "MACD.Histogram", name: "MACD-Histogram", type: "Trend" },
-  { id: "MACD", name: "MACD", type: "Trend" },
+  { id: "MACD.Line", name: "MACD-Line", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
+  { id: "MACD.Signal", name: "MACD-Signal", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
+  { id: "MACD.Histogram", name: "MACD-Histogram", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
+  { id: "MACD", name: "MACD", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
   //{ id: "ADX.Line", name: "ADX-Line", type: "Trend" },
   //{ id: "ADX.PDI", name: "ADX-PDI", type: "Trend" },
   //{ id: "ADX.MDI", name: "ADX-MDI", type: "Trend" },
- // { id: "ADX", name: "ADX", type: "Trend" },
-  { id: "SMA", name: "SMA", type: "Trend" },
-  { id: "EMA", name: "EMA", type: "Trend" },
+  // { id: "ADX", name: "ADX", type: "Trend" },
+  { id: "SMA", name: "SMA", indicatorName: 'Moving Average', type: "Trend", defaultPeriod: 9 },
+  { id: "EMA", name: "EMA", indicatorName: 'Moving Average Exponential', type: "Trend", defaultPeriod: 9 },
 
   // Volatility
-  { id: "BollingerBands.Upper", name: "BollingerBands-Upper", type: "Volatility" },
-  { id: "BollingerBands.Middle", name: "BollingerBands-Middle", type: "Volatility" },
-  { id: "BollingerBands.Lower", name: "BollingerBands-Lower", type: "Volatility" },
+  { id: "BollingerBands.Upper", name: "BollingerBands-Upper", indicatorName: "Bollinger Bands", type: "Volatility" },
+  { id: "BollingerBands.Middle", name: "BollingerBands-Middle", indicatorName: "Bollinger Bands", type: "Volatility" },
+  { id: "BollingerBands.Lower", name: "BollingerBands-Lower", indicatorName: "Bollinger Bands", type: "Volatility" },
   //{ id: "BollingerBands", name: "BollingerBands", type: "Volatility" },
   //{ id: "ATR", name: "ATR", type: "Volatility" },
 
   // Volume
   //{ id: "OBV", name: "OBV", type: "Volume" },
-  { id: "Volume.Signal", name: "Volume-Signal", type: "Volume" },
+  { id: "Volume.Signal", name: "Volume-Signal", indicatorName: "Volume", type: "Volume" },
 
   // Price & Market Metrics
-  { id: "Price", name: "Price", type: "Price" },
+  { id: "Price", name: "Price",  type: "Price" },
   //{ id: "Price.Change", name: "Price-Change", type: "Price" },
   //{ id: "Price.High", name: "Price-High", type: "Price" },
   //{ id: "Price.Low", name: "Price-Low", type: "Price" },
   //{ id: "MarketCap", name: "MarketCap", type: "Market" },
-  { id: "Liquidity", name: "Liquidity", type: "Market" },
+  { id: "Liquidity", name: "Liquidity",  type: "Market" },
   //{ id: "Volume", name: "Volume", type: "Market" },
   //{ id: "BuyCount", name: "BuyCount", type: "Market" },
   //{ id: "SellCount", name: "SellCount", type: "Market" },
