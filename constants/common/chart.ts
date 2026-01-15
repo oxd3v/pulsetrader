@@ -102,11 +102,3 @@ export const GtResolutionAggregate : Record<string,string> = {
   ['1D']: '1'
 }
 
-export const getTokenChartPriceScale = (symbol:string, chainId:number)=>{
-   let indexToken = Object.values(Tokens[chainId]).find((t:any)=> t.symbol.toLowerCase() == symbol.toLowerCase());
-   if(indexToken && indexToken.priceDecimals != undefined){
-      return 10**indexToken.priceDecimals
-   }else{
-    return 1
-   }
-}

@@ -184,12 +184,10 @@ const WalletCard = React.memo(({
   }, [onRemove, walletData.config]);
 
   // Memoize native token info
-  const nativeToken = useMemo(() => {
+  const nativeToken : any = useMemo(() => {
     return Object.values(Tokens[chainId]).find(
       (token) =>
-        token.address === ZeroAddress ||
-        token.symbol === "ETH" ||
-        token.symbol === "SOL"
+        token.address === ZeroAddress 
     ) || Tokens[chainId][ZeroAddress];
   }, [chainId]);
 
