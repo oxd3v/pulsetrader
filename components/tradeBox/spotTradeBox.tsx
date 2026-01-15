@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo,  } from "react";
 import { ORDER_TYPE, } from "@/type/order";
 
 import { MIN_ORDER_SIZE, MAX_GRID_NUMBER } from "@/constants/common/order";
-import { Tokens } from "@/constants/common/tokens";
+import {  CollateralTokens } from "@/constants/common/tokens";
 import { SpotStrategies } from "@/constants/common/frontend";
 import { FiChevronDown, FiInfo } from "react-icons/fi";
 import { ZeroAddress } from "ethers";
@@ -118,10 +118,10 @@ export default function DefinedTradeBox({
   const [isTechnicalExit, setIsTechnicalExit] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState(SpotStrategies[0]);
   const [collateralToken, setCollateralToken] = useState<any>(
-    Tokens[chainId][ZeroAddress]
+    CollateralTokens[chainId][ZeroAddress]
   );
   const [outputToken, setOutputToken] = useState<any>(
-    Tokens[chainId][ZeroAddress]
+    CollateralTokens[chainId][ZeroAddress]
   );
   const [collateralPrice, setCollateralPrice] = useState<number>(0);
 
@@ -192,7 +192,7 @@ export default function DefinedTradeBox({
 
         // Handle Native Token (convert to Wrapped for API query)
         if (collateralToken.address === ZeroAddress) {
-          const wrappedNative = Object.values(Tokens[chainId]).find(
+          const wrappedNative = Object.values(CollateralTokens[chainId]).find(
             (t: any) => t.isWrappedNative
           ) as any;
           if (wrappedNative) {
@@ -252,7 +252,7 @@ export default function DefinedTradeBox({
 
     // Set collateral token based on strategy
     if (strategy.id === "sellToken") {
-      const tokenFromConstants = Object.values(Tokens[chainId]).find(
+      const tokenFromConstants = Object.values(CollateralTokens[chainId]).find(
         (t: any) => t.address.toLowerCase() === tokenInfo.address?.toLowerCase()
       ) as any;
 
@@ -270,7 +270,7 @@ export default function DefinedTradeBox({
       }
     } else {
       // Reset to default collateral token
-      setCollateralToken(Tokens[chainId][ZeroAddress]);
+      setCollateralToken(CollateralTokens[chainId][ZeroAddress]);
     }
   };
 
@@ -762,8 +762,7 @@ export default function DefinedTradeBox({
                     tokenInfo?.token?.launchpad == null ||
                     tokenInfo?.token?.launchpad?.graduationPercent === 100 ? (
                       <DropDown
-                        options={Object.values(Tokens[chainId])
-                          .filter((token: any) => token.isCollateral)
+                        options={Object.values(CollateralTokens[chainId])
                           .map((token: any) => ({
                             label: (
                               <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
@@ -975,8 +974,7 @@ export default function DefinedTradeBox({
             </label>
             <div className="relative">
               <DropDown
-                options={Object.values(Tokens[chainId])
-                  .filter((token: any) => token.isCollateral)
+                options={Object.values(CollateralTokens[chainId])
                   .map((token: any) => ({
                     label: (
                       <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">

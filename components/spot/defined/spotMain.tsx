@@ -154,7 +154,7 @@ export default function DefinedSpotMain({
       // Filter for valid chains
       const validToken = response?.find((t: any) =>
         Object.values(chains).includes(t.token.networkId)
-      );
+      ); 
 
       if (!validToken) {
         setError("Token not found on supported chains");
@@ -290,7 +290,7 @@ export default function DefinedSpotMain({
             <FiAlertCircle className="w-8 h-8 text-red-500" />
           </div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-            Data Unavailable
+            {error}
           </h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
           <button

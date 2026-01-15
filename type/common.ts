@@ -1,6 +1,7 @@
 export type WalletConfig = {
     _id: string,
     address: string,
+    network: 'SVM' | 'EVM'
 }
 
 export type User = {
@@ -15,7 +16,7 @@ export type User = {
     blockReason: string
 }
 
-export type History = {
+export type ACTIVITY_TYPE = {
     _id: string,
     status: string,
     user: object,

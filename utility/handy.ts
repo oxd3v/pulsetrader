@@ -76,6 +76,7 @@ export const formateAmountWithFixedDecimals = (
   let rounded = parseFloat(
     Number(formatUnits(value, decimals)).toFixed(maxDecimalToShow)
   );
+  
 
   // Convert to string and remove trailing zeros after decimal
   const [intPart, decPart] = rounded.toString().split(".");

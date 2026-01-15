@@ -57,14 +57,15 @@ export const chainConfig = {
       decimals: 18,
       address: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
     },
-    imageUrl: `https://snowscan.xyz/assets/avax/images/svg/logos/token-light.svg?v=25.10.4.0`,
+    imageUrl: `https://arbitrum.io/arb_logo_color.svg`,
     isPerpetual: false,
     isActive: true,
   },
   [chains.Solana]: {
     rpcUrls: [
       "https://solana.drpc.org",
-      "https://rpc.ankr.com/solana",
+      //"https://solana-api.projectserum.com",
+      //"https://rpc.ankr.com/solana"
     ],
     explorerUrl: "https://explorer.solana.com/",
     chainId: 1399811149,

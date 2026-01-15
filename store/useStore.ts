@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import {  User, History } from '@/type/common';
+import {  User, ACTIVITY_TYPE } from '@/type/common';
 import { ORDER_TYPE } from '@/type/order';
 
-//import { SampleOrders, mockHistoryData, mockWallets } from '@/constant/common/order';
 
+import { mockWallets } from '@/constants/common/mock';
 
 export const store = create((set) => ({
     network: 43114,
@@ -12,13 +12,13 @@ export const store = create((set) => ({
     setToken: (token:string) => set({ token }),
     userOrders: [],
     setUserOrders: (userOrders: ORDER_TYPE[]) => set({ userOrders }),
-    user: {},
+    user: { account: '0x8048fde03eEC8Aee712d667FA65f0F125fc1BBeA'},
     setUser: (user:User) => set({ user }),
-    userWallets: [],
+    userWallets: mockWallets,
     setUserWallets: (userWallets:any) => set({ userWallets }),
     userHistories: [],
-    setUserHistories: (userHistories: History[]) => set({ userHistories }),
-    isConnected: false,
+    setUserHistories: (userHistories: ACTIVITY_TYPE[]) => set({ userHistories }),
+    isConnected: true,
     setIsConnected: (isConnected:boolean) => set({ isConnected }),
     userConnectedWallet: '',
     setUserConnectedWallet: (userConnectedWallet:string) => set({ userConnectedWallet }),

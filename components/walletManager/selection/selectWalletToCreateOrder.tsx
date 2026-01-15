@@ -32,20 +32,8 @@ import {
 import { getGasFee } from "@/lib/blockchain/gas";
 import { ZeroAddress } from "ethers";
 
-export const mockWallets: any = [
-  {
-    _id: "aifygfdfc ",
-    address: "0xc4C392c5DDBa4cf987cBD584EFcFA69036D65ade",
-  },
-  {
-    _id: "wi7vygyuy7ty5y",
-    address: "0x1ecD5b2f696E50D74F7Ce64740dA5a73fe1C8013",
-  },
-  {
-    _id: "oaurhvrhgiu",
-    address: "0xfe7AB0137C85c9f05d03d69a35865277EA64DEba",
-  },
-];
+import { mockWallets } from "@/constants/common/mock";
+import { chains } from "@/constants/common/chain";
 
 // Define missing types
 type Order = ORDER_TYPE & {
@@ -489,6 +477,23 @@ const WalletSelector = ({
     return singleWalletStrategies.includes(selectedStrategy?.id);
   }, [selectedStrategy?.id]);
 
+
+
+  // Filter available wallets based on chain ID and normalize ID
+  const filteredAvailableWallets = useMemo(() => {
+    return availableWallets.filter(wallet => {
+      const network = (wallet as any).network;
+      if (chainId === chains.Solana) {
+        return network === 'SVM';
+      }
+      // Default to EVM for other chains or if network is not specified
+      return network === 'EVM' || !network;
+    }).map((w: any) => ({
+      ...w,
+      _id: w._id || w.id // Normalize ID: mock uses 'id' for SVM, '_id' for EVM
+    }));
+  }, [availableWallets, chainId]);
+
   // 1. Fetch Gas Fee
   useEffect(() => {
     const fetchGasFee = async () => {
@@ -505,7 +510,7 @@ const WalletSelector = ({
 
   // 2. Fetch Wallet Data (Balances & Existing Locks)
   const initializeWalletData = useCallback(async () => {
-    if (!availableWallets.length || loadingRef.current) return;
+    if (!filteredAvailableWallets.length || loadingRef.current) return;
 
     loadingRef.current = true;
     setIsLoading(true);
@@ -517,8 +522,8 @@ const WalletSelector = ({
       const newWalletData: Record<string, WalletData> = {};
       const batchSize = 3;
       
-      for (let i = 0; i < availableWallets.length; i += batchSize) {
-        const batch = availableWallets.slice(i, i + batchSize);
+      for (let i = 0; i < filteredAvailableWallets.length; i += batchSize) {
+        const batch = filteredAvailableWallets.slice(i, i + batchSize);
         const batchPromises = batch.map(async (wallet) => {
           if (abortControllerRef.current?.signal.aborted) return null;
 
@@ -568,15 +573,15 @@ const WalletSelector = ({
       loadingRef.current = false;
       setIsLoading(false);
     }
-  }, [availableWallets, orders, collateralToken, gasFee, chainId]);
+  }, [filteredAvailableWallets, orders, collateralToken, gasFee, chainId]);
 
   // Initial Fetch
   useEffect(() => {
-    if (availableWallets.length) {
+    if (filteredAvailableWallets.length) {
       initializeWalletData();
     }
     return () => abortControllerRef.current?.abort();
-  }, [availableWallets, orders.length, initializeWalletData]); // Depend on orders length to refetch if existing orders change
+  }, [filteredAvailableWallets, orders.length, initializeWalletData]); // Depend on orders length to refetch if existing orders change
 
   // 3. Centralized Estimation Logic (Memoized)
   // This calculates "estAmount" and "estCost" for every wallet based on `gridsByWallet`
@@ -710,11 +715,11 @@ const WalletSelector = ({
   
   // Available Wallets derivation
   const availableWalletsList = useMemo(() => {
-    return availableWallets
+    return filteredAvailableWallets
       .filter((wallet) => !selectedWallets.some((sw) => sw._id === wallet._id))
       .map((wallet) => walletDataMap[wallet.address.toLowerCase()])
       .filter(Boolean);
-  }, [availableWallets, selectedWallets, walletDataMap]);
+  }, [filteredAvailableWallets, selectedWallets, walletDataMap]);
 
   return (
     <div className="space-y-4">

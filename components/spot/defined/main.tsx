@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { fetchCodexFilterTokens, fetchCodexCandleBar } from "@/lib/oracle/codex";
+import {
+  fetchCodexFilterTokens,
+  fetchCodexCandleBar,
+} from "@/lib/oracle/codex";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiPlus, FiX, FiActivity, FiAlertCircle } from "react-icons/fi";
 import { chains } from "@/constants/common/chain";
@@ -34,19 +37,21 @@ interface DynamicTokenData {
   volume24: string;
   change24: string;
   // Add other raw fields needed by ChartBox/TradeBox
-  [key: string]: any; 
+  [key: string]: any;
 }
 
-export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) {
+export default function DefinedSpotMain({
+  tokenAddress,
+}: DefinedSpotMainProps) {
   // --- UI State ---
   const [showTokenSelectionModal, setShowTokenSelectionModal] = useState(false);
   const [isTradeBoxOpen, setIsTradeBoxOpen] = useState(false);
-  
+
   // --- Data State ---
   const [selectedAddress, setSelectedAddress] = useState(tokenAddress);
   const [staticInfo, setStaticInfo] = useState<StaticTokenInfo | null>(null);
   const [dynamicData, setDynamicData] = useState<DynamicTokenData | null>(null);
-  
+
   // --- Status State ---
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,12 +93,11 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
           filters: { change24: {} },
         },
       });
-      
 
       if (!isMountedRef.current) return;
 
       // Filter for valid chains
-      const validToken = response?.find((t: any) => 
+      const validToken = response?.find((t: any) =>
         Object.values(chains).includes(t.token.networkId)
       );
 
@@ -103,7 +107,7 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
         setDynamicData(null);
         return;
       }
-      
+
       // Set Static Info (Stable)
       setStaticInfo({
         address: validToken.token.address,
@@ -119,10 +123,9 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
 
       // Set Dynamic Data (Changeable)
       setDynamicData(validToken);
-
     } catch (err: any) {
-      console.log(err)
-      if (err.name !== 'AbortError' && isMountedRef.current) {
+      console.log(err);
+      if (err.name !== "AbortError" && isMountedRef.current) {
         console.error("Token fetch error:", err);
         setError("Failed to fetch token data");
       }
@@ -172,15 +175,18 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
     setShowTokenSelectionModal(true);
   }, []);
 
-  const handleTokenSelected = useCallback((token: string) => {
-    if (token === selectedAddress) return;
-    setSelectedAddress(token);
-    // Reset state immediately to prevent stale data flash
-    setStaticInfo(null);
-    setDynamicData(null);
-    setShowTokenSelectionModal(false);
-    setIsTradeBoxOpen(false);
-  }, [selectedAddress]);
+  const handleTokenSelected = useCallback(
+    (token: string) => {
+      if (token === selectedAddress) return;
+      setSelectedAddress(token);
+      // Reset state immediately to prevent stale data flash
+      setStaticInfo(null);
+      setDynamicData(null);
+      setShowTokenSelectionModal(false);
+      setIsTradeBoxOpen(false);
+    },
+    [selectedAddress]
+  );
 
   // --- Render Helpers ---
 
@@ -203,7 +209,7 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
         isConnected={true}
       />
     );
-  }, [combinedTokenInfo]);
+  }, [combinedTokenInfo]);  
 
   // Loading View
   if (loading && !staticInfo) {
@@ -213,7 +219,9 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
           <div className="w-16 h-16 border-4 border-blue-100 dark:border-blue-900 rounded-full"></div>
           <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
-        <p className="text-gray-500 font-medium animate-pulse">Loading market data...</p>
+        <p className="text-gray-500 font-medium animate-pulse">
+          Loading market data...
+        </p>
       </div>
     );
   }
@@ -226,7 +234,9 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
           <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <FiAlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Data Unavailable</h3>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+            Data Unavailable
+          </h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
           <button
             onClick={handleTokenSelect}
@@ -263,9 +273,12 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
       <div className="w-full h-full overflow-hidden flex flex-col">
         {/* Main Layout */}
         <div className="flex-1 flex flex-col lg:flex-row bg-gray-50 dark:bg-gray-900 gap-2 p-2 lg:p-3 overflow-hidden">
-          
           {/* Left Column: Chart & Info */}
-          <div className={`w-full lg:flex-1 h-full flex flex-col gap-2 transition-all duration-300 ${isTradeBoxOpen ? 'hidden lg:flex' : 'flex'}`}>
+          <div
+            className={`w-full lg:flex-1 h-full flex flex-col gap-2 transition-all duration-300 ${
+              isTradeBoxOpen ? "hidden lg:flex" : "flex"
+            }`}
+          >
             <div className="flex-none h-[60%] lg:h-[65%]">
               <ChartBox
                 tokenInfo={combinedTokenInfo}
@@ -273,11 +286,11 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
                 handleTokenSelect={handleTokenSelect}
               />
             </div>
-            
+
             {/* Order/Transaction List Placeholder */}
             <div className="flex-1 min-h-0 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col items-center justify-center text-gray-400">
-               <FiActivity className="w-6 h-6 mb-2 opacity-50"/>
-               <span className="text-sm">Recent Trades & Orders</span>
+              <FiActivity className="w-6 h-6 mb-2 opacity-50" />
+              <span className="text-sm">Recent Trades & Orders</span>
             </div>
           </div>
 
@@ -310,22 +323,28 @@ export default function DefinedSpotMain({ tokenAddress }: DefinedSpotMainProps) 
             >
               <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <img src={staticInfo.imageUrl} className="w-8 h-8 rounded-full" alt="Token" />
+                  <img
+                    src={staticInfo.imageUrl}
+                    className="w-8 h-8 rounded-full"
+                    alt="Token"
+                  />
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">Trade {staticInfo.symbol}</h3>
-                    <p className="text-xs text-gray-500">${Number(dynamicData?.priceUSD).toFixed(6)}</p>
+                    <h3 className="font-bold text-gray-900 dark:text-white">
+                      Trade {staticInfo.symbol}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      ${Number(dynamicData?.priceUSD).toFixed(6)}
+                    </p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsTradeBoxOpen(false)}
                   className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 rounded-full transition-colors"
                 >
                   <FiX className="w-5 h-5 dark:text-white" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {renderTradeBox}
-              </div>
+              <div className="flex-1 overflow-y-auto p-2">{renderTradeBox}</div>
             </motion.div>
           </>
         )}

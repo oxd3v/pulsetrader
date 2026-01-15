@@ -3,33 +3,37 @@ export const PROTOCOL_NAME = "PULSETRADER"
 export const PROTOCOL_MOTTO = ''
 
 
-export const homeRouteNavbarRouteList = [
-    {
-      name: "Feature",
-      href: "/feature"
-    },
-    {
-      name: "Pricing",
-      href: "/pricing"
-    },
-]
 
-export const otherRouteNavbarRouteList = [
+export const NAVBAR_ITEM_LIST = [
     {
       name: "Strategy",
-      href: "/strategy"
+      href: "/strategy",
+      type: 'private'
     },
     {
       name: "Portfolio",
-      href: "/portfolio"
+      href: "/portfolio",
+      type: 'private'
     },
     {
-      name: "Tokens",
-      href: "/tokens"
+      name: "Screener",
+      href: "/screener",
+      type: 'public'
     },
     {
       name: "Settings",
-      href: "/settings"
+      href: "/settings",
+      type: 'public'
+    },
+    {
+      name: "Feature",
+      href: "/feature",
+      type: 'public'
+    },
+    {
+      name: "Pricing",
+      href: "/pricing",
+      type: 'public'
     },
 ]
 
