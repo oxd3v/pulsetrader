@@ -7,13 +7,13 @@ export type WalletConfig = {
 export type User = {
     _id: string,
     account: string,
-    wallets: any,
-    executionSpeed: string,
+    wallets?: any,
     status: string,
     invitationCodes: string[],
     inviter?: string,
-    isBlock:boolean,
-    blockReason: string
+    invites?: [],
+    isBlock?:boolean,
+    blockReason?: string
 }
 
 export type ACTIVITY_TYPE = {

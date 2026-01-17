@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import { SiSolana, SiEthereum } from 'react-icons/si';
 import toast from "react-hot-toast";
+import QRCodeDisplay from '@/components/common/QRCode/QrCode';
 
 interface FundingModalProps {
     isOpen: boolean;
@@ -109,7 +110,7 @@ export default function FundingModal({
                                     <div className="relative bg-[#161b22] border border-white/10 rounded-2xl p-5 flex flex-col items-center gap-4">
                                         <div className="bg-white p-2 rounded-xl">
                                             <div className="w-32 h-32 bg-gray-200 flex items-center justify-center text-black font-bold text-[10px] text-center p-4">
-                                                QR CODE
+                                                <QRCodeDisplay value={wallet} size={128}/>
                                             </div>
                                         </div>
                                         <div className="w-full space-y-2">

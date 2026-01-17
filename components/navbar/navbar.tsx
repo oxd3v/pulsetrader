@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PROTOCOL_NAME } from "@/constants/common/frontend";
 import { FiActivity } from "react-icons/fi";
-import NavbarRight from "./navbarRight"
+import NavbarRight from "./navbarRightPanel"
 
 export default function Navbar() {
   const pathname = usePathname();

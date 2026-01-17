@@ -26,11 +26,6 @@ export const NAVBAR_ITEM_LIST = [
       type: 'public'
     },
     {
-      name: "Feature",
-      href: "/feature",
-      type: 'public'
-    },
-    {
       name: "Pricing",
       href: "/pricing",
       type: 'public'

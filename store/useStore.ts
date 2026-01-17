@@ -8,11 +8,15 @@ import { mockWallets } from '@/constants/common/mock';
 export const store = create((set) => ({
     network: 43114,
     setNetwork: (network: number) => set({ network }),
-    token: '',
-    setToken: (token:string) => set({ token }),
+    signature:'reuirhgtihginginxdfvnihidghutrh',
+    setSignature: (signature:string)=> set({signature}),
+    userTokens: [],
+    setUserTokens: (userTokens:string[]) => set({ userTokens }),
     userOrders: [],
     setUserOrders: (userOrders: ORDER_TYPE[]) => set({ userOrders }),
-    user: { account: '0x8048fde03eEC8Aee712d667FA65f0F125fc1BBeA'},
+    user: {
+        account: '0xfe7AB0137C85c9f05d03d69a35865277EA64DEba'
+    },
     setUser: (user:User) => set({ user }),
     userWallets: mockWallets,
     setUserWallets: (userWallets:any) => set({ userWallets }),

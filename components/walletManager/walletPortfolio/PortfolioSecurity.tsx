@@ -19,6 +19,7 @@ export default function PortfolioSecurity(){
       userConnectedWallet: state.userConnectedWallet
     }))
   );
+
  
   return (
     <div className="w-full h-full overflow-hidden">
