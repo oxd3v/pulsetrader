@@ -1,7 +1,7 @@
 export const TOKEN_EXPIRY_DATE = 86400000 * 7; // 7 days
 export const TOKEN_STORAGE_KEY = "token";
 export const ACCOUNT_STORAGE_KEY = "account";
-export const PROTOCOL_URL = "https://pulsetrader.net";
+export const PROTOCOL_URL = "https://pulsetrader-five.vercel.app/";
 export const PULSETRADER_URL = "pulsetrader.net";
 
 export const SIGN_MESSAGE = `${PULSETRADER_URL} wants you to sign in. 

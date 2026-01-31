@@ -138,7 +138,7 @@ export default function SettingsPage() {
     }
   };
 
-  const deviceLink = `${"http://192.168.0.101:3000"}/connect/device?token=${signature}`;
+  const deviceLink = `${PROTOCOL_URL}connect/device?token=${signature}`;
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-6xl">
