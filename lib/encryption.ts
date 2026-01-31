@@ -1,5 +1,6 @@
 import CryptoJS from "crypto-js";
 import { encodeBase64, decodeBase64, toUtf8Bytes, toUtf8String } from "ethers";
+import { PROTOCOL_URL } from "@/constants/config/enviroments";
 
 // Use NEXT_PUBLIC_ for frontend access (be aware this is NOT secure)
 const AUTH_TOKEN_SECURITY_PASSWORD =
@@ -44,6 +45,6 @@ export const  decodeInvitationCode =  (invitationCode: string) => {
   console.log(expireTimestamp)
   const isExpired = expireTimestamp < Date.now() ? true : false;
   const status = codeDetails.status;
-  const link = `http://192.168.0.101:3000/connect/invite?invitation=${invitationCode}`;
+  const link = `${PROTOCOL_URL}connect/invite?invitation=${invitationCode}`;
   return {to, expireTimestamp,  link, isExpired, status}
 };
