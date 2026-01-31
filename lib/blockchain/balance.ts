@@ -43,7 +43,7 @@ export const getEvmBalance = async ({
 };
 
 export const getSolanaBalance = async (walletAddress: string) => {
-  const connection = new Connection("https://solana.drpc.org", {
+  const connection = new Connection("https://solana-rpc.publicnode.com", {
     commitment: "confirmed",
     confirmTransactionInitialTimeout: 30000, // 30 seconds
     wsEndpoint: undefined, // Disable WebSocket for simple RPC calls

@@ -5,6 +5,7 @@ const API_ENDPOINTS = {
   CASH_OUT_ALL_FUND: '/cash-out-all-fund',
   GET_PRIVATE_KEY: '/get-private-key',
   CREATE_INVITATION_CODE: "/create-invitation-code",
+  DELETE_INVITATION_CODE: "/delete-invitation-code",
   CREATE_NEW_WALLET: '/create-new-wallet',
   GET_HISTORY: '/get-history',
   ADD_TOKEN: '/add-token',

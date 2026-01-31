@@ -1,16 +1,16 @@
 'use client'
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUserAuth } from '@/hooks/useAuth';
 import { useWallet } from '@/hooks/useWallet';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
 import { FiArrowRight, FiKey, FiHash, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 export default function ConnectionBox({isJoining, setIsJoining}: {isJoining: boolean, setIsJoining: (value: boolean) => void}) {
   const { isMetamaskConnected, isMetaMaskInstalled, connectToMetamask, metamaskConnectedWallet } = useWallet();
   const { connectUserByWallet, connectUserByAuth } = useUserAuth();
-  
+  const router = useRouter();
   const [isConnectByAuthToken, setIsConnectByAuthToken] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [inputAuthToken, setInputAuthToken] = useState<string>('');
@@ -20,18 +20,22 @@ export default function ConnectionBox({isJoining, setIsJoining}: {isJoining: boo
      // 2. Attempt Logic
      try {
         const result = await connectUserByWallet();
-        if (result && result.connection === false) {
+        if (result.connection === false) {
            if (result.type === "USER_NOT_FOUND") {
               toast.error("User not found. Please create an account.");
               setIsJoining(true);
            } else {
               toast.error(result.message || "Connection failed");
            }
+        }else{
+          setTimeout(() => router.push("/"), 2000);
         }
+         
      } catch (e) {
-        console.error(e);
+        //console.error(e);
      } finally {
-        setIsLoading(false);
+          
+        
      }
   };
 
@@ -43,22 +47,20 @@ export default function ConnectionBox({isJoining, setIsJoining}: {isJoining: boo
     setIsLoading(true);
     try {
       const result:any = await connectUserByAuth(inputAuthToken);
-      if (result && result.connection === false) {
-         toast.error(result.message || "Invalid Token");
+      if (result.connection === false) {
+        toast.error(result.message || "Invalid Token");
       }
     } catch (e) {
       toast.error("Connection failed");
     } finally {
       setIsLoading(false);
+      router.push('/')
     }
   };
 
   return (
     <div className="bg-white/80 dark:bg-[#161b22]/80 rounded-[32px] p-8 shadow-2xl border border-gray-100 dark:border-white/5 backdrop-blur-xl">
         <div className="text-center mb-8">
-          {/* <div className="inline-flex justify-center mb-6 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl shadow-inner">
-            <Image src={"/logo.svg"} alt="logo" width={42} height={42} className="w-10 h-10" />
-          </div> */}
           <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">
             Welcome Back
           </h1>

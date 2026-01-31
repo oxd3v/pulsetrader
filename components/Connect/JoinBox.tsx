@@ -57,7 +57,7 @@ export default function JoinBox({setIsJoining}:{setIsJoining: (value:boolean)=> 
       setIsSubmitting(true);
       await joinUser({
         account: metamaskConnectedWallet, 
-        signUpMethod: 'metamask', 
+        signUpMethod: 'GLADIATOR_STAKE_43114', 
         invitationCode: trimmedCode
       });
       // joinUser function handles success toast and state update

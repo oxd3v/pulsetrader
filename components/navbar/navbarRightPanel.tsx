@@ -10,11 +10,15 @@ import {
 import ChainSelection from "./chainSelection";
 import ThemeToggle from "./ThemeToggle";
 import { NAVBAR_ITEM_LIST } from "@/constants/common/frontend";
+import { NOTIFICATION_CONFIG } from '@/constants/config/notification';
 
+import { toast } from "react-hot-toast";
+import { useUserAuth } from "@/hooks/useAuth";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
 
 export default function NavbarRight() {
+  const { checkUser, disconnect } = useUserAuth();
   const { setNetwork, network, user, isConnected } = useStore(
     useShallow((state: any) => ({
       network: state.network,
@@ -45,6 +49,18 @@ export default function NavbarRight() {
     }
   };
 
+  useEffect(()=>{
+    let checkIn = async ()=>{
+      let checkInResult = await checkUser();
+      if(checkInResult.connected == false){
+         let tMessage = NOTIFICATION_CONFIG[checkInResult.type].message;
+         toast.error(tMessage);
+      }
+    }
+    checkIn()
+    
+  },[])
+
   return (
     <div className="flex items-center gap-2 md:gap-4">
       {/* 1. Chain Selection */}
@@ -59,7 +75,7 @@ export default function NavbarRight() {
       {isConnected ? (
         <div 
           onClick={copyAddress}
-          className="group hidden sm:flex items-center h-10 px-3 gap-2 bg-white/50 dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer hover:border-blue-400/50 transition-all active:scale-95"
+          className="group hidden sm:flex items-center h-10 px-3 gap-2 bg-gray-100 dark:bg-white/5 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer hover:border-blue-400/50 transition-all active:scale-95"
         >
           <div className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -129,7 +145,8 @@ export default function NavbarRight() {
             <div className="mt-1 pt-2 border-t border-gray-100 dark:border-white/5 px-2">
                {isConnected ? (
                 <>
-                  <div className="px-3 py-2 mb-1 flex items-center gap-3 bg-gray-50 dark:bg-white/5 rounded-xl">
+                  <div className="px-3 py-2 mb-1 flex justify-between items-center gap-3 bg-gray-50 dark:bg-white/5 rounded-xl">
+                  <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
                       <FiUser className="w-4 h-4" />
                     </div>
@@ -139,13 +156,9 @@ export default function NavbarRight() {
                         {user.account.slice(0, 6)}...{user.account.slice(-4)}
                       </span>
                     </div>
+                    </div>
+                    <FiLogOut className="w-4 h-4" onClick={disconnect}/>
                   </div>
-                  {/* <button 
-                    onClick={}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors font-semibold"
-                  >
-                    <FiLogOut className="w-4 h-4" /> Disconnect Wallet
-                  </button> */}
                 </>
               ) : (
                 <Link 

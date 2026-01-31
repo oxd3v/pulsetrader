@@ -17,7 +17,7 @@ const UserService = {
   }),
   addToken: (params:any) => ApiClient.post(API_ENDPOINTS.ADD_TOKEN, params),
   createInvitationCode: (params:any) => ApiClient.post(API_ENDPOINTS.CREATE_INVITATION_CODE, params),
-  
+  deleteInvitationCode: (params:any) => ApiClient.post(API_ENDPOINTS.DELETE_INVITATION_CODE, params),
   //order related
   getUserOrder: (params:any) =>
     ApiClient.get(API_ENDPOINTS.GET_ORDER, {

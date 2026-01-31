@@ -17,7 +17,9 @@ export const USER_LEVEL: Record<string, any> = {
     name: "Silver Access",
     benefits: {
       maxOrder: 20,
-      maxWallet: 5,
+      maxWallets: 5,
+      maxEVMWallets: 3,
+      maxSVMWallets:2,
       maxAccessAsset: 5,
       supportTrading: ["spot"],
       supportStrategy: ["limit", "scalp"],
@@ -34,7 +36,9 @@ export const USER_LEVEL: Record<string, any> = {
     name: "Gold Circle",
     benefits: {
       maxOrder: 50,
-      maxWallet: 7,
+      maxWallets: 7,
+      maxEVMWallets: 4,
+      maxSVMWallets:3,
       maxAccessAsset: 10,
       supportTrading: ["spot", "perpetual"],
       supportStrategy: ["limit", "scalp", "grid", "dca"],
@@ -51,7 +55,9 @@ export const USER_LEVEL: Record<string, any> = {
     name: "Platinum Elite",
     benefits: {
       maxOrder: 100,
-      maxWallet: 10,
+      maxWallets: 10,
+      maxEVMWallets: 6,
+      maxSVMWallets:4,
       maxAccessAsset: 50,
       supportTrading: ["spot", "perpetual"],
       supportStrategy: ["limit", "scalp", "grid", "dca", "sellToken"],
@@ -68,7 +74,9 @@ export const USER_LEVEL: Record<string, any> = {
     name: "Diamond Prestige",
     benefits: {
       maxOrder: "Unlimited",
-      maxWallet: 100,
+      maxWallets: 20,
+      maxEVMWallets: 12,
+      maxSVMWallets:8,
       maxAccessAsset: 100,
       supportTrading: ["spot", "perpetual"],
       supportStrategy: ["limit", "scalp", "grid", "dca", "sellToken", "algo"],

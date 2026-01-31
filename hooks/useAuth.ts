@@ -27,7 +27,7 @@ export const useUserAuth = () => {
     setUserWallets,
     setUserHistories,
     setIsConnected,
-    setSignature
+    setSignature,
   } = useStore(
     useShallow((state: any) => ({
       setUser: state.setUser,
@@ -35,31 +35,29 @@ export const useUserAuth = () => {
       setUserWallets: state.setUserWallets,
       setUserHistories: state.setUserHistories,
       setIsConnected: state.setIsConnected,
-      setSignature: state.setSignature
-    }))
+      setSignature: state.setSignature,
+    })),
   );
 
   // --- Internal Helper: Update Global State ---
-  const updateGlobalUserState = (userData: any) => {
-    if (!userData) return;
+  const updateGlobalUserState = (user: any) => {
+    if (!user) return;
     setUser({
-      account: userData.account,
-      status: userData.status || "silver",
-      invites: userData.invites || [],
-      inviter: userData.inviter || "",
-      invitationCodes: userData.invitationCodes || [],
-      isBlocked: userData.isBlocked || false,
+      account: user.userData.account,
+      status: user.userData.status || "silver",
+      invites: user.userData.invites || [],
+      inviter: user.userData.inviter || "",
+      invitationCodes: user.userData.invitationCodes || [],
+      isBlocked: user.userData.isBlocked || false,
     });
 
     // Safely handle arrays
-    setUserOrders(Array.isArray(userData.orders) ? userData.orders : []);
-    setUserHistories(
-      Array.isArray(userData.histories) ? userData.histories : []
-    );
-    setUserWallets(Array.isArray(userData.wallets) ? userData.wallets : []);
+    setUserOrders(Array.isArray(user.orders) ? user.orders : []);
+    setUserHistories(Array.isArray(user.histories) ? user.histories : []);
+    setUserWallets(Array.isArray(user.wallets) ? user.wallets : []);
 
     setIsConnected(true);
-    localStorage.setItem(ACCOUNT_STORAGE_KEY, userData.account);
+    localStorage.setItem(ACCOUNT_STORAGE_KEY, user.userData.account);
   };
 
   // --- Internal Helper: Get Fresh Signer ---
@@ -76,22 +74,17 @@ export const useUserAuth = () => {
   };
 
   // --- 1. Check User Session (Auto-Login) ---
-  const checkUser = async ({ userAddress }: { userAddress: string }) => {
+  const checkUser = async () => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     const storedAccount = localStorage.getItem(ACCOUNT_STORAGE_KEY);
-    let signature
-    // 1. Basic LocalStorage Validation
-    if (
-      !storedAccount ||
-      storedAccount.toLowerCase() !== userAddress.toLowerCase()
-    ) {
-      return { connected: false, type: "ACCOUNT_MISMATCH" };
-    }
-    if (!token) return { connected: false, type: "NO_TOKEN_FOUND" };
+    let signature;
+
+    if (!token || !storedAccount)
+      return { connected: false, type: "NO_TOKEN_FOUND" };
 
     // 2. Token Cryptography Validation
     try {
-      const signature = decryptAuthToken(token);
+      signature = decryptAuthToken(token);
       if (!signature)
         return { connected: false, type: "TOKEN_DECRYPTION_FAILED" };
 
@@ -103,21 +96,23 @@ export const useUserAuth = () => {
 
       // Signature Check
       const recoveredAddress = verifyMessage(SIGN_MESSAGE, decoded.signature);
-      if (recoveredAddress.toLowerCase() !== userAddress.toLowerCase()) {
+      if (recoveredAddress.toLowerCase() !== storedAccount.toLowerCase()) {
         return { connected: false, type: "INVALID_SIGNATURE" };
       }
     } catch (e) {
+      //console.log(e)
       return { connected: false, type: "INVALID_TOKEN_FORMAT" };
     }
 
     // 3. API Validation
     try {
       const apiResponse: any = await Service.checkUser({
-        userAccount: userAddress,
+        userAccount: storedAccount,
       });
+      //console.log(apiResponse);
 
-      if (!apiResponse.validation?.isValid) {
-        return { connected: false, type: "USER_NOT_FOUND_ON_SERVER" };
+      if (apiResponse.validation == false) {
+        return { connected: false, type: "USER_NOT_FOUND" };
       }
 
       if (apiResponse.user?.isBlocked) {
@@ -129,9 +124,9 @@ export const useUserAuth = () => {
       }
       setSignature(signature);
       updateGlobalUserState(apiResponse.user);
-      return { connected: true, type: "SESSION_RESTORED" };
+      return { connected: true, type: "SUCCESSFULLY_CONNECTED" };
     } catch (err: any) {
-      return { connected: false, type: "API_ERROR", message: err.message };
+      return { connected: false, type: "SERVER_ERROR", message: err.message };
     }
   };
 
@@ -148,7 +143,7 @@ export const useUserAuth = () => {
     try {
       const checkRes: any = await Service.checkUser({ userAccount: address });
 
-      if (!checkRes.validation?.isValid) {
+      if (!checkRes.validation) {
         // This specific return type tells the UI to show JoinBox
         return { connection: false, type: "USER_NOT_FOUND" };
       }
@@ -165,12 +160,11 @@ export const useUserAuth = () => {
       const toastId = toast.loading("Please sign the login request...");
       const signature = await signer
         .signMessage(SIGN_MESSAGE)
-        .catch(() => null);
-      toast.dismiss(toastId);
-
+        .catch(() => toast.error("Sign in failed.", { id: toastId }));
       if (!signature) {
         return { connection: false, type: "SIGNATURE_REJECTED" };
       }
+      toast.dismiss(toastId);
 
       // 3. Generate Token
       const tokenPayload = {
@@ -179,23 +173,25 @@ export const useUserAuth = () => {
         ExpireAt: Date.now() + TOKEN_EXPIRY_DATE,
       };
 
-      const encryptedToken = encryptAuthToken(
-        encodeText(JSON.stringify(tokenPayload))
-      );
+      const encodeSignature = encodeText(JSON.stringify(tokenPayload));
+
+      const encryptedToken = encryptAuthToken(encodeSignature);
+
       if (!encryptedToken)
-        return { connection: false, type: "ENCRYPTION_FAILED" };
+        return { connection: false, type: "TOKEN_ENCRYPTION_FAILED" };
 
       localStorage.setItem(TOKEN_STORAGE_KEY, encryptedToken);
       localStorage.setItem(ACCOUNT_STORAGE_KEY, address);
 
       // 4. Update State
-      setSignature(signature);
+
+      setSignature(encodeSignature);
       updateGlobalUserState(checkRes.user);
       toast.success("Login successful");
       return { connection: true, type: "SUCCESS" };
     } catch (err: any) {
       //console.error(err);
-      return { connection: false, type: "API_ERROR" };
+      return { connection: false, type: "SERVER_ERROR" };
     }
   };
 
@@ -217,8 +213,10 @@ export const useUserAuth = () => {
       }
 
       // 2. Check API
-      const checkRes: any = await Service.checkUser({ userAccount: address });
-      if (!checkRes.validation?.isValid) {
+      const checkRes: any = await Service.checkUser({ userAccount: address }).catch(e=>{
+        return { connection: false, type: "SERVER_ERROR" };
+      });
+      if (checkRes.validation == false) {
         return { connection: false, type: "USER_NOT_FOUND" };
       }
 
@@ -235,6 +233,7 @@ export const useUserAuth = () => {
         return { connection: true, type: "TOKEN_ENCRYPTION_FAILED" };
       }
     } catch (e) {
+      //console.log(e);
       //console.error(e);
       return { connection: false, type: "INVALID_TOKEN" };
     }
@@ -257,12 +256,14 @@ export const useUserAuth = () => {
 
     // 1. Sign
     const toastId = toast.loading("Signing registration request...");
-    const signature = await signer.signMessage(SIGN_MESSAGE).catch(() => null);
-    toast.dismiss(toastId);
+    const signature = await signer.signMessage(SIGN_MESSAGE).catch(() => {
+      toast.error("Signing message failed", { id: toastId });
+    });
 
     if (!signature) {
       return { joined: false, type: "SIGNATURE_REJECTED" };
     }
+    toast.dismiss(toastId);
 
     // 2. Create Token
     const tokenPayload = {
@@ -271,30 +272,41 @@ export const useUserAuth = () => {
       ExpireAt: Date.now() + TOKEN_EXPIRY_DATE,
     };
 
-    const encryptedToken = encryptAuthToken(
-      encodeText(JSON.stringify(tokenPayload))
-    );
+    const encodeSignature = encodeText(JSON.stringify(tokenPayload));
+
+    const encryptedToken = encryptAuthToken(encodeSignature);
 
     if (!encryptedToken) {
       return { joined: false, type: "TOKEN_ENCRYPTED_FAILED" };
     }
-
+    localStorage.setItem(TOKEN_STORAGE_KEY, encryptedToken);
     // 3. API Call
     try {
       const joinRes: any = await Service.joinUser({
-        account,
         signUpMethod,
         invitationCode,
       });
 
       if (joinRes.joining) {
-        localStorage.setItem(TOKEN_STORAGE_KEY, encryptedToken);
         localStorage.setItem(ACCOUNT_STORAGE_KEY, account);
-        setSignature(signature);
+        setSignature(encodeSignature);
         updateGlobalUserState(joinRes.user);
         return { joined: true, type: "SUCCESS" };
       } else {
-        return { joined: false, type: "JOINING_FAILED" };
+        // Clean up if API fails
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+        if (joinRes.message == "User already exist") {
+          return { joined: false, type: "USER_ALREADY_EXIST" };
+        } else if (joinRes.message == "Unauthorized account to join") {
+          return { joined: false, type: "UNAUTHORIZED_ACCOUNT" };
+        } else if (joinRes.message == "Failed to update inviter data") {
+          return { joined: false, type: "INVALID_INVITER" };
+        } else if (joinRes.message.includes("invitation")) {
+          return { joined: false, type: "INVALID_INVITATION_CODE" };
+        } else {
+          return { joined: false, type: "JOINING_FAILED" };
+        }
       }
     } catch (err: any) {
       // Clean up if API fails
@@ -304,22 +316,139 @@ export const useUserAuth = () => {
     }
   };
 
+  const withdrawBalance = async ({
+    receiver,
+    tokenAddress,
+    chainId,
+    value,
+    walletAddress,
+    tokenDecimals,
+    tokenSymbol,
+  }: {
+    receiver: string;
+    tokenAddress: string;
+    chainId: number;
+    value: string;
+    walletAddress: string;
+    tokenDecimals: number;
+    tokenSymbol: string;
+  }) => {
+    if (
+      !receiver ||
+      !tokenAddress ||
+      !chainId ||
+      !value ||
+      !walletAddress ||
+      !tokenDecimals ||
+      !tokenSymbol
+    ) {
+    }
+    try {
+      let withdrawResult: any = await Service.withdraw({
+        receiver,
+        tokenAddress,
+        chainId,
+        value,
+        walletAddress,
+        tokenDecimals,
+        tokenSymbol,
+      });
+      if (withdrawResult.success == true) {
+        return { withdraw: true, message: "WITHDRAW_SUCCESS" };
+      }
+    } catch (err:any) {
+      console.log(err)
+      if(err.data.message == 'Tx failed'){
+         return { withdraw: false, message: "TX_FAILED" };
+      }
+      return { withdraw: false, message: "WITHDRAW_FAILED" };
+      
+    }
+  };
+
+  const createNewWallet = async ({
+    evmWallets,
+    svmWallets,
+  }: {
+    evmWallets: number;
+    svmWallets: number;
+  }) => {
+    try {
+      let createWalletRes: any = await Service.createNewWallet({
+        evmWallets,
+        svmWallets,
+      });
+      setUserWallets(createWalletRes.wallets);
+      return { creation: true, message: "SUCCESSFULL" };
+    } catch (err: any) {
+      return {
+        creation: false,
+        message: "WALLET_CREATION_FAILED",
+        error: err.message,
+      };
+    }
+  };
+
+  const createInvitationCode = async ({
+    expireAt,
+    invitedTo,
+  }: {
+    expireAt: number;
+    invitedTo: string;
+  }) => {
+    try {
+      let creationResult: any = await Service.createInvitationCode({
+        invitedTo,
+        expireAt,
+        status: "silver",
+      });
+      return {
+        creation: true,
+        code: creationResult.code,
+        message: "Invitation code created successfully",
+      };
+    } catch (err: any) {
+      console.log(err);
+      return {
+        creation: false,
+        message: err.message || "Invitation code cration failed",
+      };
+    }
+  };
+
+  const removeInvitationCode = async (code: string) => {
+    try {
+      await Service.deleteInvitationCode({ code });
+      return { removed: true, message: "Invitation code removed successfully" };
+    } catch (err: any) {
+      //console.log(err)
+      return {
+        removed: false,
+        message: err.message || "Invitation code remove failed",
+      };
+    }
+  };
+
   const disconnect = () => {
-        setIsConnected(false);
-        setSignature('');
-        setUser({});
-        setUserHistories([]);
-        setUserWallets([]);
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
-        localStorage.removeItem(ACCOUNT_STORAGE_KEY);
-    };
+    setIsConnected(false);
+    setSignature("");
+    setUser({});
+    setUserHistories([]);
+    setUserWallets([]);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+  };
 
   return {
+    withdrawBalance,
+    removeInvitationCode,
+    createInvitationCode,
+    createNewWallet,
     checkUser,
     connectByToken,
     connectUserByWallet: connect,
     connectUserByAuth: connectByToken,
     joinUser: join,
-    disconnect
+    disconnect,
   };
 };

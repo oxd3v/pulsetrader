@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatTimestamp } from "@/utility/handy";
 import {
   FiFilter,
   FiSearch,
@@ -19,12 +20,13 @@ import {
 import { BiRocket, BiCoinStack } from "react-icons/bi";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
+import { chains } from "@/constants/common/chain";
 import RenderTokenFundingModal from "@/components/walletManager/modal/fundingModal";
 
 // Helper for formatting large numbers
 const formatNumber = (
   num: number,
-  type: "currency" | "number" = "currency"
+  type: "currency" | "number" = "currency",
 ) => {
   if (!num) return type === "currency" ? "$0.00" : "0";
   if (num >= 1000000)
@@ -50,7 +52,7 @@ export default function TokenExplorer({
     useShallow((state: any) => ({
       network: state.network,
       user: state.user,
-    }))
+    })),
   );
 
   // --- State ---
@@ -76,7 +78,7 @@ export default function TokenExplorer({
     minLiquidity: 1000,
     minVolume: 0,
     maxAge: 0, // 0 means any
-    minChange: -100,
+    minChange: 0,
   });
 
   // --- Fetch Logic ---
@@ -87,11 +89,14 @@ export default function TokenExplorer({
         // Convert UI filters to API query variables
         const apiFilters: any = {
           network: [network],
-          potentialScam: false,
+          //potentialScam: false,
           liquidity: { gte: filters.minLiquidity },
           volume24: { gte: filters.minVolume },
-          change24: { gte: filters.minChange },
         };
+
+        if (filters.minChange !== 0) {
+          apiFilters.change24 = { gte: filters.minChange };
+        }
 
         // Handle Age Filter (Created At)
         if (filters.maxAge > 0) {
@@ -101,6 +106,8 @@ export default function TokenExplorer({
 
         const variables = {
           filters: apiFilters,
+          creatorAddress: null,
+          statsType: "FILTERED",
           limit,
           offset: isAppend ? offset : 0,
           rankings: [
@@ -122,7 +129,7 @@ export default function TokenExplorer({
         setIsLoading(false);
       }
     },
-    [network, limit, offset, searchTerm, filters, sortConfig]
+    [network, limit, offset, searchTerm, filters, sortConfig],
   );
 
   useEffect(() => {
@@ -153,8 +160,8 @@ export default function TokenExplorer({
               {network === 1
                 ? "Ethereum"
                 : network === 139
-                ? "Solana"
-                : "Avalanche"}
+                  ? "Solana"
+                  : "Avalanche"}
             </p>
           </div>
 
@@ -368,9 +375,9 @@ export default function TokenExplorer({
               <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                 {isLoading && tokens.length === 0
                   ? [...Array(10)].map((_, i) => <SkeletonRow key={i} />)
-                  : tokens.map((token: any) => (
+                  : tokens.map((token: any, index: number) => (
                       <tr
-                        key={token.token.address}
+                        key={index}
                         className="hover:bg-blue-50/50 dark:hover:bg-white/[0.02] transition-colors group"
                       >
                         {/* Token Identity */}
@@ -389,8 +396,8 @@ export default function TokenExplorer({
                                     network === 1
                                       ? "bg-indigo-500"
                                       : network === 139
-                                      ? "bg-purple-500"
-                                      : "bg-red-500"
+                                        ? "bg-purple-500"
+                                        : "bg-red-500"
                                   }`}
                                 />
                               </div>
@@ -419,7 +426,7 @@ export default function TokenExplorer({
                         {/* Age */}
                         <td className="py-4 px-6 text-right text-xs text-gray-500 font-medium">
                           {/* Requires real logic, using placeholder logic for display */}
-                          {Math.floor(Math.random() * 24)}h ago
+                          {formatTimestamp(token.createdAt)}
                         </td>
 
                         {/* Txns */}
@@ -470,7 +477,7 @@ export default function TokenExplorer({
                               <BiCoinStack size={18} />
                             </button>
                             <Link
-                               href={`/strategy/spot/${token.token.address}`}
+                              href={`/strategy/spot/${token.token.address}`}
                               className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all"
                             >
                               <BiRocket size={18} />
@@ -486,9 +493,9 @@ export default function TokenExplorer({
 
         {/* --- Mobile Card View (Hidden on Desktop) --- */}
         <div className="md:hidden space-y-3">
-          {tokens.map((token: any) => (
+          {tokens.map((token: any, index: number) => (
             <div
-              key={token.token.address}
+              key={index}
               className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-white/5 rounded-2xl p-4 shadow-sm active:scale-[0.99] transition-transform"
             >
               <div className="flex justify-between items-start mb-3">
@@ -594,7 +601,6 @@ export default function TokenExplorer({
             chainId={network === 139 ? 139 : 1}
             isNative={false}
             user={user}
-            networkType={network === 139 ? "SVM" : "EVM"}
           />
         )}
       </div>

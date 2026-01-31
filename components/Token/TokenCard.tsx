@@ -10,7 +10,7 @@ import {
 
 // Internal Libs
 import { getWalletTokenBalance } from "@/lib/blockchain/balance";
-import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
+import { VeryLowDecimalPriceDisplay } from '@/utility/displayPrice'
 import { formateAmountWithFixedDecimals } from "@/utility/handy";
 
 // Components
@@ -25,55 +25,29 @@ interface TokenInfo {
 }
 
 const TokenCard = memo(
-  ({ tokenAddress, walletAddress, chainId, user }: any) => {
-    const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
-    const [tokenPrice, setTokenPrice] = useState<string>("0");
-    const [tokenBalance, setTokenBalance] = useState<string>("0");
-    const [isLoading, setIsLoading] = useState(true);
+  ({ tokenInfo, walletAddress, chainId, user }: any) => {
+    
+    const [tokenBalance, setTokenBalance] = useState<string>(tokenInfo.balance);
+    const [isLoading, setIsLoading] = useState(false);
     const [isOpenTokenFundModal, setIsOpenTokenFundModal] = useState(false);
 
-    const fetchData = useCallback(async () => {
+    const fetchTokenBalance = async () => {
       try {
-        const info = await fetchCodexFilterTokens({
-          variables: {
-            filters: { change24: {}, network: [chainId] },
-            rankings: [{ attribute: "marketCap", direction: "DESC" }],
-            tokens: [`${tokenAddress}:${chainId}`],
-            limit: 1,
-          },
-        });
-
-        const balance = await getWalletTokenBalance({
-          walletAddress,
-          tokenAddress,
-          chainId,
-        });
-
-        if (info && info[0]) {
-          setTokenInfo({
-            address: info[0].token.address,
-            name: info[0].token.name,
-            symbol: info[0].token.symbol,
-            decimals: info[0].token.decimals,
-            imageUrl:
-              info[0].token.imageLargeUrl ||
-              info[0].token.imageSmallUrl ||
-              info[0].token.imageThumbUrl ||
-              "/tokenLogo.png",
-          });
-          setTokenPrice(info[0]?.priceUSD || "0");
-        }
+        let balance = await getWalletTokenBalance({walletAddress, tokenAddress: tokenInfo.token.address, chainId})
         setTokenBalance(balance);
       } catch (e) {
         console.error("Error fetching token data", e);
-      } finally {
-        setIsLoading(false);
       }
-    }, [tokenAddress, walletAddress, chainId]);
+    };
+
+    const handleCloseFundingModel =  ()=>{
+        fetchTokenBalance();
+        setIsOpenTokenFundModal(false)
+    }
 
     useEffect(() => {
-      fetchData();
-    }, [fetchData]);
+      fetchTokenBalance();
+    }, [tokenInfo]);
 
     if (isLoading)
       return (
@@ -93,7 +67,7 @@ const TokenCard = memo(
             <div className="absolute inset-0 bg-blue-500/20 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
             <img
               src={tokenInfo?.imageUrl || "/placeholder-token.png"}
-              alt={tokenInfo?.symbol}
+              alt={tokenInfo?.token.symbol}
               className="relative w-12 h-12 rounded-full border-2 border-white dark:border-gray-800 shadow-sm"
             />
             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-[#0d1117] rounded-full shadow-sm" />
@@ -102,12 +76,12 @@ const TokenCard = memo(
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-black text-lg text-gray-900 dark:text-white leading-tight">
-                {tokenInfo?.symbol}
+                {tokenInfo?.token.symbol}
               </span>
               <FiTrendingUp className="w-3.5 h-3.5 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <span className="text-xs text-gray-500 font-medium truncate">
-              {tokenInfo?.name}
+              {tokenInfo?.token.name}
             </span>
           </div>
         </div>
@@ -123,7 +97,7 @@ const TokenCard = memo(
               <span className="text-base font-bold text-gray-900 dark:text-gray-100">
                 {formateAmountWithFixedDecimals(
                   tokenBalance,
-                  tokenInfo?.decimals || 18,
+                  tokenInfo?.token.decimals || 18,
                   4
                 )}
               </span>
@@ -138,9 +112,8 @@ const TokenCard = memo(
             </span>
             <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md">
               <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                ${Number(tokenPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                {VeryLowDecimalPriceDisplay(Number(tokenInfo.priceUsd))}
               </span>
-              <FiActivity className="w-3 h-3 text-blue-400 animate-pulse" />
             </div>
           </div>
         </div>
@@ -169,9 +142,9 @@ const TokenCard = memo(
           {isOpenTokenFundModal && tokenInfo && (
             <RenderTokenFundingModal
               isOpen={isOpenTokenFundModal}
-              onClose={() => setIsOpenTokenFundModal(false)}
+              onClose={handleCloseFundingModel}
               wallet={walletAddress}
-              tokenInfo={tokenInfo}
+              tokenInfo={tokenInfo.token}
               chainId={chainId}
               isNative={false}
               user={user}

@@ -71,6 +71,7 @@ export type ORDER_TYPE = {
   orderType: OrderExecutionType;
   orderStatus: OrderStatusType;
   entry:{
+    isTechnicalEntry: boolean;
     technicalLogic?: TECHNICAL_LOGICS_TYPE;
     priceLogic?: ConditionNode
   }
@@ -100,6 +101,7 @@ export type ORDER_TYPE = {
     stopLossPrice: string;
     stopLossPercentage: number;
   };
+  isTechnicalExit: boolean;
   technicalLogic?: TECHNICAL_LOGICS_TYPE
   }
   isActive: boolean;
@@ -117,7 +119,7 @@ export type ORDER_TYPE = {
     feeInUsd: string;
   };
   additional?: {
-    pnl?: string;
+    realizedPnl?: string;
     walletAddress?: string;
     entryPrice?: string;
     exitPrice?: string;

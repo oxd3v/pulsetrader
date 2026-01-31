@@ -23,7 +23,7 @@ export default function PortfolioSecurity(){
  
   return (
     <div className="w-full h-full overflow-hidden">
-        {isConnected && isConnected == true && userWallets && userWallets.length > 0 && network  ? 
+        {isConnected && isConnected == true && userWallets && network  ? 
         <PortfolioMain chainId={network} user={user} userOrders={userOrders} userWallets={userWallets} userHistories={userHistories} userConnectedWallet={userConnectedWallet}/> 
         : <SecuredPageWarning/>}
     </div>

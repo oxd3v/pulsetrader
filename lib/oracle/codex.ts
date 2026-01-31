@@ -252,6 +252,53 @@ const CODEX_TOKEN_PRICE_QUERY = `query GetTokenPrice($inputs: [GetPriceInput]) {
   }
 }`;
 
+const CODEX_WALLET_BALANCE = `
+  query GetUserBalances($input: BalancesInput!) {
+    balances(input: $input) {
+      items {
+        address
+        balance
+        firstHeldTimestamp
+        networkId
+        shiftedBalance
+        tokenAddress
+        tokenId
+        walletId
+        tokenPriceUsd
+        token {
+          address
+          createdAt
+          creatorAddress
+          decimals
+          info {
+            address
+            imageLargeUrl
+            imageSmallUrl
+            imageThumbUrl
+            name
+            networkId
+            symbol
+            totalSupply
+            circulatingSupply
+          }
+          name
+          networkId
+          socialLinks { twitter telegram discord website }
+          symbol
+          launchpad {
+            launchpadName
+            completed
+            completedAt
+            graduationPercent
+            migrated
+            migratedAt
+          }
+        }
+      }
+    }
+  }
+`;
+
 let getUrlConfigurration = () => {
  let randomIndex = Math.floor(Math.random() * handleCodexUrlParams.length);
   return handleCodexUrlParams[randomIndex];
@@ -360,4 +407,34 @@ export const fetchCodexTokenPrice = async ({
   //console.log(response);
   let tokenPrices = response.data.getTokenPrices[0];
   return tokenPrices.priceUsd;
+};
+
+export const fetchCodexWalletBalances = async ({
+  walletAddress,
+  chainId,
+  limit
+}: {
+  walletAddress: string;
+  chainId: number;
+  limit:number;
+}) => {
+  let urlConfigurration = getUrlConfigurration();
+  let response = await axiosRequest({
+    ...urlConfigurration,
+    method: "POST",
+    data: {
+      query: CODEX_WALLET_BALANCE,
+      variables: {
+      input: {
+        includeNative: true,
+        limit,
+        removeScams: true,
+        walletId: `${walletAddress}:${chainId}`
+      }
+    }
+    },
+  });
+  //console.log(response);
+  let tokenBalances = response.data.balances.items;
+  return tokenBalances;
 };

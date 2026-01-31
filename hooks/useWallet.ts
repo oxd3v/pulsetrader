@@ -1,147 +1,141 @@
-import { ethers } from "ethers"
-import { useEffect, useState } from "react"
-import toast from 'react-hot-toast'
+import { ethers } from "ethers";
+import { useEffect, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 
 export const useWallet = () => {
-    const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
-    const [isMetamaskConnected, setIsMetamaskConnected] = useState(false);
-    const [metamaskConnectedWallet, setMetamaskConnectedWallet] = useState("");
-    const [connectedNetwork, setConnectedNetwork] = useState<number>(43114);
-    const [metamaskSigner, setMetamaskSigner] = useState<ethers.Signer | null>(null);
-    const [error, setError] = useState("");
+  const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
+  const [isMetamaskConnected, setIsMetamaskConnected] = useState(false);
+  const [metamaskConnectedWallet, setMetamaskConnectedWallet] = useState("");
+  const [connectedNetwork, setConnectedNetwork] = useState<number>(0);
+  const [metamaskSigner, setMetamaskSigner] = useState<ethers.Signer | null>(
+    null
+  );
 
-    // Check if MetaMask is installed
-    const checkMetaMaskInstalled = () => {
-        return typeof window !== "undefined" && !!window.ethereum;
-    };
+  // Helper: Check if MetaMask is injected
+  const checkMetaMaskInstalled = useCallback(() => {
+    return typeof window !== "undefined" && !!window.ethereum;
+  }, []);
 
-    // Check if MetaMask is connected
-    const checkIsMetamaskConnected = async () => {
-        try {
-            if (!checkMetaMaskInstalled()) {
-                return { isConnected: false, error: "MetaMask is not installed", isMetaMaskInstalled: false };
-            }
+  // Core: Sync state with MetaMask
+  const handleMetamask = useCallback(async () => {
+    const isInstalled = checkMetaMaskInstalled();
+    setIsMetaMaskInstalled(isInstalled);
 
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const signer = await provider.getSigner();
-            const address = await signer.getAddress()
-            return { isConnected: true, address: address.toLowerCase(), signer: signer };
-
-        } catch (error: any) {
-            return { isConnected: false, error: error.message || "Metamask not connected" };
-        }
-    };
-
-    // Get MetaMask signer
-    const handleMetamask = async () => {
-        try {
-            const isInstalled = checkMetaMaskInstalled();
-            setIsMetaMaskInstalled(isInstalled);
-            
-            if (!isInstalled) {
-                return;
-            }
-            
-            // Check if MetaMask is already connected without prompting
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const accounts = await provider.listAccounts();
-            
-            if (accounts.length === 0) {
-                // MetaMask is not connected, reset states
-                setIsMetamaskConnected(false);
-                setMetamaskConnectedWallet("");
-                setMetamaskSigner(null);
-                setConnectedNetwork(0);
-                return;
-            }
-
-            // MetaMask is connected, get account details
-            const signer = await provider.getSigner();
-            const address = await signer.getAddress();
-            const network = await provider.getNetwork();
-            
-            setConnectedNetwork(Number(network.chainId));
-            setMetamaskConnectedWallet(address.toLowerCase());
-            setIsMetamaskConnected(true);
-            setMetamaskSigner(signer);
-            
-        } catch (error) {
-            setIsMetamaskConnected(false);
-            setMetamaskConnectedWallet("");
-            setMetamaskSigner(null);
-            setConnectedNetwork(0);
-        }
-    };
-
-    // Connect to MetaMask and get address
-    const connectToMetamask = async () => {
-        try {
-            if (!checkMetaMaskInstalled()) {
-                throw new Error("MetaMask is not installed");
-            }
-
-            const accounts = await window.ethereum.request({
-                method: "eth_requestAccounts",
-            });
-
-            if (accounts.length === 0) {
-                throw new Error("No accounts found");
-            }
-
-            // Update states after successful connection
-            await handleMetamask();
-            return accounts[0];
-
-        } catch (error: any) {
-            console.error("Error connecting to MetaMask:", error);
-            if (error.message == 'Already processing eth_requestAccounts. Please wait.') {
-                toast.error('Already processing. Please wait.')
-            }
-            throw error;
-        }
-    };
-
-    // Try to auto-switch network if needed
-    const handleSwitchNetwork = async (chainId: number) => {
-        if (!checkMetaMaskInstalled()) return;
-        try {
-            await window.ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x' + chainId.toString(16) }],
-            });
-            // Update states after network switch
-            await handleMetamask();
-            return { switchSuccess: true, error: '' }
-        } catch (err: any) {
-            return { switchSuccess: false, error: err.message || 'Failed to switch network. Please switch manually in your wallet.' }
-        }
-    };
-
-    // Initialize wallet state on mount and setup listeners
-    useEffect(() => {
-        handleMetamask();
-        
-        if (!checkMetaMaskInstalled()) return;
-        
-        window.ethereum.on('accountsChanged', handleMetamask);
-        window.ethereum.on('chainChanged', handleMetamask);
-        
-        return () => {
-            window.ethereum.removeListener('accountsChanged', handleMetamask);
-            window.ethereum.removeListener('chainChanged', handleMetamask);
-        };
-    }, []);
- 
-    return {
-        isMetaMaskInstalled,
-        isMetamaskConnected,
-        metamaskConnectedWallet,
-        connectedNetwork,
-        metamaskSigner,
-        error,
-        checkMetaMaskInstalled,
-        connectToMetamask,
-        handleMetamask,
-        handleSwitchNetwork
+    if (!isInstalled) {
+      setIsMetamaskConnected(false);
+      return;
     }
-}
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+
+      // Check if we are authorized without triggering a popup
+      const accounts = await provider.listAccounts();
+
+      if (accounts.length === 0) {
+        // Not connected
+        setIsMetamaskConnected(false);
+        setMetamaskConnectedWallet("");
+        setMetamaskSigner(null);
+        setConnectedNetwork(0);
+        return;
+      }
+
+      // Connected: Get details
+      const signer = await provider.getSigner();
+      const address = await signer.getAddress();
+      const network = await provider.getNetwork();
+
+      setConnectedNetwork(Number(network.chainId));
+      setMetamaskConnectedWallet(address.toLowerCase());
+      setIsMetamaskConnected(true);
+      setMetamaskSigner(signer);
+    } catch (error) {
+      console.error("MetaMask sync error:", error);
+      setIsMetamaskConnected(false);
+      setMetamaskConnectedWallet("");
+      setMetamaskSigner(null);
+    }
+  }, [checkMetaMaskInstalled]);
+
+  // Action: Trigger Wallet Connection Popup
+  const connectToMetamask = async () => {
+    if (!checkMetaMaskInstalled()) {
+      toast.error("MetaMask is not installed");
+      return;
+    }
+
+    try {
+      await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+      // State will update via the 'accountsChanged' listener or manual re-check
+      await handleMetamask();
+    } catch (error: any) {
+      console.error("Connection error:", error);
+      if (error.code === 4001) {
+        toast.error("Connection rejected by user");
+      } else if (
+        error.message &&
+        error.message.includes("Already processing")
+      ) {
+        toast.error("Request already pending. Please check your wallet.");
+      } else {
+        toast.error("Failed to connect wallet");
+      }
+      throw error;
+    }
+  };
+
+  // Action: Switch Network
+  const handleSwitchNetwork = async (chainId: number) => {
+    if (!checkMetaMaskInstalled())
+      return { switchSuccess: false, error: "No wallet" };
+
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x" + chainId.toString(16) }],
+      });
+      await handleMetamask();
+      return { switchSuccess: true, error: "" };
+    } catch (err: any) {
+      // Error code 4902 means the chain has not been added to MetaMask
+      if (err.code === 4902) {
+        toast.error("Network not added to wallet");
+      }
+      return {
+        switchSuccess: false,
+        error: err.message || "Network switch failed",
+      };
+    }
+  };
+
+  // Setup Listeners on Mount
+  useEffect(() => {
+    handleMetamask(); // Initial check
+
+    if (typeof window !== "undefined" && window.ethereum) {
+      // Listen for account changes (user switches account in wallet)
+      window.ethereum.on("accountsChanged", handleMetamask);
+      // Listen for chain changes (user switches network)
+      window.ethereum.on("chainChanged", () => window.location.reload());
+    }
+
+    return () => {
+      if (typeof window !== "undefined" && window.ethereum) {
+        window.ethereum.removeListener("accountsChanged", handleMetamask);
+      }
+    };
+  }, [handleMetamask]);
+
+  return {
+    isMetaMaskInstalled,
+    isMetamaskConnected,
+    metamaskConnectedWallet,
+    connectedNetwork,
+    metamaskSigner,
+    connectToMetamask,
+    handleSwitchNetwork,
+  };
+};

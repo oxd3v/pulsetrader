@@ -16,7 +16,7 @@ function DeviceConnectInner() {
   const router = useRouter();
   const token = searchParams.get("token");
 
-  const handleConnectionByToken = useCallback(async (authToken: string) => {
+  const handleConnectionByToken = async (authToken: string) => {
     try {
       setStatus('loading');
       const result: any = await connectByToken(authToken);
@@ -33,10 +33,11 @@ function DeviceConnectInner() {
         setTimeout(() => router.push("/"), 2000);
       }
     } catch (err) {
+      console.log(err)
       setErrorMessage("An unexpected error occurred");
       setStatus('error');
     }
-  }, [connectByToken, router]);
+  };
 
   useEffect(() => {
     if (token) {
@@ -45,7 +46,7 @@ function DeviceConnectInner() {
       setStatus('error');
       setErrorMessage("Missing authentication token");
     }
-  }, [token, handleConnectionByToken]);
+  }, [token, ]);
 
   return (
     <motion.div 

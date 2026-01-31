@@ -75,7 +75,9 @@ export const useSpotOrder = () => {
           category: "spot",
           orderType: "SELL",
           orderStatus: "PENDING",
-          entry: {},
+          entry: {
+            isTechnicalEntry: false
+          },
           orderAsset: {
             orderToken: orderToken,
             collateralToken: collateralToken,
@@ -101,6 +103,7 @@ export const useSpotOrder = () => {
               stopLossPercentage: slPercentage,
               stopLossPrice: slPrice,
             },
+            isTechnicalExit: false
           },
           isActive: true,
           isBusy: false,
@@ -157,6 +160,7 @@ export const useSpotOrder = () => {
           orderType: "SELL",
           orderStatus: "PENDING",
           entry: {
+            isTechnicalEntry: false,
             priceLogic: {
               type: "Price",
               id: "price",
@@ -189,6 +193,7 @@ export const useSpotOrder = () => {
               stopLossPercentage: Number(slBps),
               stopLossPrice: "0",
             },
+            isTechnicalExit: false
           },
           isActive: true,
           isBusy: false,
@@ -221,19 +226,18 @@ export const useSpotOrder = () => {
         orderType: isSellStrategy ? "SELL" : "BUY",
         orderStatus: "PENDING",
         entry: {
-          ...(!isSellStrategy && {
-            ...(strategy == "algo" && { technicalLogic: entryLogic }),
-            ...(strategy != "algo" && {
-              priceLogic: {
-                type: "Price",
-                id: "price",
-                operator: "LESS_THAN",
-                threshold: safeParseUnits(
-                  targetPrice,
-                  PRECISION_DECIMALS
-                ).toString(),
-              },
-            }),
+          isTechnicalEntry: !isSellStrategy && strategy == "algo" ? true : false,
+          ...(strategy == "algo" && {technicalLogic: entryLogic }),
+          ...(!isSellStrategy && strategy != "algo" && {
+            priceLogic: {
+              type: "Price",
+              id: "price",
+              operator: "LESS_THAN",
+              threshold: safeParseUnits(
+                targetPrice,
+                PRECISION_DECIMALS
+              ).toString(),
+            },
           }),
         },
         orderAsset: {
@@ -270,6 +274,7 @@ export const useSpotOrder = () => {
             stopLossPercentage: isTechnicalExit ? 0 : Number(slBps),
             stopLossPrice: "0",
           },
+          isTechnicalExit: isTechnicalExit,
           ...(isTechnicalExit && { technicalLogic: exitLogic }),
         },
         isActive: true,
