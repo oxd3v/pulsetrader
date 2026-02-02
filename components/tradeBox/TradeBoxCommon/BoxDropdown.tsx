@@ -26,7 +26,7 @@ const DropDown = ({ options, onChange, value }: DropDownProps) => {
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-between w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-900 rounded-lg text-white dark:text-black text-sm hover:bg-gray-200 transition-colors"
+                className="flex items-center justify-between w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-900 rounded-lg text-white dark:text-black text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
                 <div className="flex items-center gap-2">
                     {selectedOption?.label || "Select..."}
@@ -44,7 +44,7 @@ const DropDown = ({ options, onChange, value }: DropDownProps) => {
                                 onChange(option.value);
                                 setIsOpen(false);
                             }}
-                            className="w-full px-3 py-2 text-left text-white text-sm hover:bg-gray-200 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                            className="w-full px-3 py-2 text-left text-white text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors first:rounded-t-lg last:rounded-b-lg"
                         >
                             {option.label}
                         </button>

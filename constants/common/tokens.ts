@@ -563,6 +563,13 @@ export const CollateralTokens = {
   }
 }
 
+export const DEFAULT_SPOT_TOKENS = {
+  [chains.Avalanche]: '0x152b9d0FdC40C096757F570A51E494bd4b943E50',
+  [chains.Ethereum]: '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf',
+  [chains.Arbitrum]: '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf',
+  [chains.Solana]:'So11111111111111111111111111111111111111112'
+}
+
 export const nativeToken = {
   [chains.Avalanche]: {
     address: '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7'

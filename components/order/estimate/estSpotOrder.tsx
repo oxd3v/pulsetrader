@@ -224,7 +224,7 @@ const OrderCreationModal = ({
 
         {/* Mobile View Toggle */}
         <div className="sm:hidden p-2 border-b dark:border-gray-700 flex justify-center">
-             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+             <div className="flex bg-gray-100 dark:bg-gray-700 text-black rounded-lg p-1">
                  <button onClick={() => setViewMode("table")} className={`px-4 py-1 rounded-md text-xs font-medium ${viewMode === 'table' ? 'bg-white shadow' : 'text-gray-500'}`}>Table</button>
                  <button onClick={() => setViewMode("card")} className={`px-4 py-1 rounded-md text-xs font-medium ${viewMode === 'card' ? 'bg-white shadow' : 'text-gray-500'}`}>Card</button>
              </div>
@@ -349,10 +349,10 @@ const OrderCreationModal = ({
                                     ) : (
                                         <>
                                             <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-xs font-medium">
-                                                +{currentOrder.exit.takeProfit.takeProfitPercentage}%
+                                                +{formatUnits(currentOrder.exit.takeProfit.takeProfitPercentage, 2)}%
                                             </span>
                                             <span className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-0.5 rounded text-xs font-medium">
-                                                -{currentOrder.exit.stopLoss.stopLossPercentage}%
+                                                -{formatUnits(currentOrder.exit.stopLoss.stopLossPercentage, 2)}%
                                             </span>
                                         </>
                                     )}
@@ -479,7 +479,7 @@ const OrderCreationModal = ({
                  Total Orders: <span className="font-bold text-gray-900 dark:text-white">{estOrders.length}</span>
              </div>
              <div className="flex gap-2">
-                 <button onClick={onClose} className="px-6 py-2 bg-white border border-gray-300 shadow-sm rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Close</button>
+                 <button onClick={onClose} className="px-6 py-2 bg-white text-black border border-gray-300 shadow-sm rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Close</button>
              </div>
         </div>
 

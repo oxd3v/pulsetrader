@@ -7,12 +7,16 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { FiPlus, FiX, FiActivity, FiAlertCircle } from "react-icons/fi";
 import { chains } from "@/constants/common/chain";
+import { DEFAULT_SPOT_TOKENS } from "@/constants/common/tokens";
 
 // internal components
 import ChartBox from "./ChartBox";
-import OrderBox from "@/components/order/orderTable";
+import OrderBox from "@/components/order/dashboard/OrderList";
 import TradeBox from "@/components/tradeBox/spotTradeBox";
 import SelectTokenModal from "@/components/spot/defined/selectToken";
+
+import { useStore } from "@/store/useStore";
+import { useShallow } from "zustand/shallow";
 
 interface DefinedSpotMainProps {
   tokenAddress: string;
@@ -44,6 +48,15 @@ interface DynamicTokenData {
 export default function DefinedSpotMain({
   tokenAddress,
 }: DefinedSpotMainProps) {
+  const { user, isConnected, network, userOrders, userWallets } = useStore(
+    useShallow((state: any) => ({
+      user: state.user,
+      network: state.network,
+      userOrders: state.userOrders,
+      userWallets: state.userWallets,
+      isConnected: state.isConnected
+    })),
+  );
   // --- UI State ---
   const [showTokenSelectionModal, setShowTokenSelectionModal] = useState(false);
   const [isTradeBoxOpen, setIsTradeBoxOpen] = useState(false);
@@ -91,7 +104,7 @@ export default function DefinedSpotMain({
         if (newHeight > 20 && newHeight < 80) setTopHeight(newHeight);
       }
     },
-    [isDraggingH, isDraggingV]
+    [isDraggingH, isDraggingV],
   );
 
   const onMouseUp = useCallback(() => {
@@ -153,8 +166,8 @@ export default function DefinedSpotMain({
 
       // Filter for valid chains
       const validToken = response?.find((t: any) =>
-        Object.values(chains).includes(t.token.networkId)
-      ); 
+        Object.values(chains).includes(t.token.networkId),
+      );
 
       if (!validToken) {
         setError("Token not found on supported chains");
@@ -179,7 +192,6 @@ export default function DefinedSpotMain({
       // Set Dynamic Data (Changeable)
       setDynamicData(validToken);
     } catch (err: any) {
-      console.log(err);
       if (err.name !== "AbortError" && isMountedRef.current) {
         console.error("Token fetch error:", err);
         setError("Failed to fetch token data");
@@ -240,8 +252,14 @@ export default function DefinedSpotMain({
       setShowTokenSelectionModal(false);
       setIsTradeBoxOpen(false);
     },
-    [selectedAddress]
+    [selectedAddress],
   );
+
+  useEffect(() => {
+    if (network) {
+      setSelectedAddress(DEFAULT_SPOT_TOKENS[network]);
+    }
+  }, [network]);
 
   // --- Render Helpers ---
 
@@ -261,7 +279,10 @@ export default function DefinedSpotMain({
       <TradeBox
         chainId={combinedTokenInfo.chainId}
         tokenInfo={combinedTokenInfo}
-        isConnected={true}
+        isConnected={isConnected}
+        user={user}
+        userPrevOrders={userOrders}
+        userWallets={userWallets}
       />
     );
   }, [combinedTokenInfo]);
@@ -360,7 +381,7 @@ export default function DefinedSpotMain({
             </div> */}
 
             {/* 2. Order/Transaction List Section */}
-            <OrderBox />
+            <OrderBox network={network} userOrders={userOrders} orderCategory="spot" walletAddress="" isConnected={isConnected} tokenInfo={staticInfo}/>
           </div>
 
           {/* Horizontal Resize Handle (Between Left Column and TradeBox) */}

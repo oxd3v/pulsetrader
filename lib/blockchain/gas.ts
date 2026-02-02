@@ -7,11 +7,13 @@ import {
   GAS_BUFFER,
   GAS_LIMIT,
   DEFAULT_GAS_PRICE,
+  DEFAULT_SOLANA_PRIORITY_FEE,
+  DEFAULT_SOLANA_COMPUTE_UNITS,
   SOLANA_BASE_FEE,
 } from "@/constants/common/order";
+import { BASIS_POINT_DIVISOR_BIGINT } from "@/constants/common/utils";
 
 export async function getSolanaPriorityFeeEstimate(accounts = []) {
-  let defaultGasFee = DEFAULT_GAS_PRICE[chains.Solana];
   let priorityFee: bigint;
   try {
     const response = await fetch(chainConfig[chains.Solana].rpcUrls[0], {
@@ -26,21 +28,22 @@ export async function getSolanaPriorityFeeEstimate(accounts = []) {
     });
 
     const { result: fees } = await response.json();
-    if (!fees?.length) return defaultGasFee;
+    if (!fees?.length) return DEFAULT_SOLANA_PRIORITY_FEE;
 
     fees.sort((a: any, b: any) => a.prioritizationFee - b.prioritizationFee);
 
     priorityFee = BigInt(
       fees[Math.min(fees.length - 1, Math.floor(fees.length * 0.9))]
-        .prioritizationFee || defaultGasFee
+        .prioritizationFee || DEFAULT_SOLANA_PRIORITY_FEE
     );
   } catch (err) {
-    priorityFee = defaultGasFee;
+    priorityFee = DEFAULT_SOLANA_PRIORITY_FEE;
   }
-  let totalFee = SOLANA_BASE_FEE + priorityFee;
-  let gasBuffer =
-    (totalFee * BigInt(GAS_BUFFER[chains.Solana] || 15000)) / BigInt(10000);
-  return gasBuffer;
+  if(priorityFee == BigInt(0)){
+    priorityFee = DEFAULT_SOLANA_PRIORITY_FEE;
+  }
+  return priorityFee
+  
 }
 
 export async function getEVMSpotGasFee(chainId: number) {
@@ -48,18 +51,33 @@ export async function getEVMSpotGasFee(chainId: number) {
   try {
     let provider: any = getConnectionProvider(chainId);
     let gasObject = await provider.getFeeData();
-    gasPrice = gasObject.maxFeePerGas || gasObject.gasPrice;
+    gasPrice =  gasObject.gasPrice;
   } catch (err) {
     gasPrice = DEFAULT_GAS_PRICE[chainId];
   }
 
-  let gasFee = gasPrice * BigInt(GAS_LIMIT["SPOT"][chainId] || 0);
-  let gasBuffer =
-    (gasFee * BigInt(GAS_BUFFER[chainId] || 15000)) / BigInt(10000);
-  return gasBuffer;
+  return gasPrice;
 }
 
 export const getGasFee = async (chainId:number)=>{
   let gasFee = chainId == chains.Solana ? await getSolanaPriorityFeeEstimate([]) : await getEVMSpotGasFee(chainId);
   return gasFee;
+}
+
+
+export const spotNetworkFee = async (chainId:number)=>{
+  let networkFee = BigInt(0);
+  if(chainId == chains.Solana){
+    let priorityFee = await getSolanaPriorityFeeEstimate([]) || DEFAULT_SOLANA_PRIORITY_FEE;
+    const expFee = SOLANA_BASE_FEE + ((DEFAULT_SOLANA_COMPUTE_UNITS * priorityFee) / BigInt(1_000_000));
+    networkFee = expFee;
+  }else{
+    let gasFee = await getEVMSpotGasFee(chainId);
+    let gasLimit = GAS_LIMIT['SPOT'][chainId]
+    let fee = gasFee * gasLimit;
+    networkFee = fee;
+  }
+
+   networkFee = (networkFee * BigInt(GAS_BUFFER[chainId]))/ BASIS_POINT_DIVISOR_BIGINT;
+  return networkFee;
 }

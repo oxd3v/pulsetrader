@@ -164,13 +164,13 @@ export default function WalletOverview({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-8">
+          <div className="grid grid-cols-3 gap-1 lg:gap-4 mt-8">
             {/* Stat 1 */}
             <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
               <div className="text-xs text-gray-900 dark:text-gray-500  mb-1">
                 Portfolio
               </div>
-              <div className="text-lg font-bold text-black dark:text-white">
+              <div className="text-md lg:text-lg font-bold text-black dark:text-white">
                 $
                 {formateNumber(
                   Number(
@@ -190,7 +190,7 @@ export default function WalletOverview({
             {/* Stat 2 */}
             <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
               <div className="text-xs text-gray-500 mb-1">Spot Value</div>
-              <div className="text-lg font-bold text-emerald-400">
+              <div className="text-md lg:text-lg font-bold text-emerald-400">
                 $
                 {formateNumber(
                   Number(
@@ -207,7 +207,7 @@ export default function WalletOverview({
             {/* Stat 3 */}
             <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
               <div className="text-xs text-gray-500 mb-1">Perps Value</div>
-              <div className="text-lg font-bold text-blue-400">
+              <div className="text-md lg:text-lg font-bold text-blue-400">
                 $
                 {formateNumber(
                   Number(

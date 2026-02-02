@@ -12,10 +12,11 @@ import {
   FiChevronDown,
   FiChevronRight,
 } from "react-icons/fi";
-import { FaLock, FaGasPump } from "react-icons/fa";
+import { FaLock, FaGasPump, FaCoins } from "react-icons/fa";
 import { MdOutlineRefresh } from "react-icons/md";
 import { TbGridDots } from "react-icons/tb";
 import toast from "react-hot-toast";
+import InfoTooltip from "@/components/tradeBox/TradeBoxCommon/BoxTooltip";
 
 // Internal components
 import {
@@ -29,7 +30,8 @@ import {
   getWalletBalance,
   getWalletTokenBalance,
 } from "@/lib/blockchain/balance";
-import { getGasFee } from "@/lib/blockchain/gas";
+import { spotNetworkFee } from "@/lib/blockchain/gas";
+import { getOrderCosts, calculateExistingLockedFunds} from "@/lib/fund/fundHelper"
 import { ZeroAddress } from "ethers";
 
 import { mockWallets } from "@/constants/common/mock";
@@ -59,7 +61,7 @@ interface WalletEstimates {
 
 interface WalletSelectorProps {
   category: string;
-  availableWallets?: WalletConfig[];
+  availableWallets: WalletConfig[];
   orders: Order[];
   gridsByWallet: Record<number, WalletConfig>;
   setGridsByWallet: (gridsByWallet: Record<number, WalletConfig>) => void;
@@ -69,69 +71,10 @@ interface WalletSelectorProps {
   collateralToken: OrderTokenType;
   selectedStrategy: any;
   estOrders: Order[];
+  user:any
 }
 
-// Helper to calculate costs for a single order
-const getOrderCosts = ({
-  order,
-  collateralTokenAddress,
-  gasFee
-}: {
-  order: ORDER_TYPE;
-  collateralTokenAddress: string;
-  gasFee: bigint;
-}) => {
-  const isCollateralMatch = collateralTokenAddress.toLowerCase() ===
-    order.orderAsset.collateralToken.address.toLowerCase();
-  const isOrderTokenMatch = collateralTokenAddress.toLowerCase() ===
-    order.orderAsset.orderToken.address.toLowerCase();
 
-  let orderAmount = BigInt(0);
-  let orderGasFee = BigInt(0);
-
-  if (isCollateralMatch && order.orderType === 'BUY') {
-    orderAmount += BigInt(order.amount.orderSize);
-    orderGasFee += (gasFee * BigInt(2));
-  }
-  if (isOrderTokenMatch && order.orderType === 'SELL') {
-    orderAmount += BigInt(order.amount.tokenAmount);
-    orderGasFee = gasFee;
-  }
-
-  return { orderAmount, orderGasFee };
-};
-
-// Memoized calculation of wallet locked funds (Existing Orders)
-const calculateExistingLockedFunds = (
-  orders: ORDER_TYPE[],
-  walletId: string,
-  collateralTokenAddress: string,
-  gasFee: bigint
-) => {
-  let totalActiveOrders = 0;
-  let lockedFundBalance = BigInt(0);
-  let totalCollateralPending = BigInt(0);
-
-  orders.forEach((order) => {
-    if (order.wallet?._id === walletId && order.isActive) {
-      const costs = getOrderCosts({
-        order,
-        collateralTokenAddress,
-        gasFee
-      });
-
-      if (collateralTokenAddress !== ZeroAddress) {
-        lockedFundBalance += costs.orderGasFee;
-        totalCollateralPending += costs.orderAmount;
-      } else {
-        lockedFundBalance += costs.orderGasFee + costs.orderAmount;
-      }
-      totalActiveOrders++;
-    }
-  });
-
-  return { totalActiveOrders, lockedFundBalance, totalCollateralPending };
-};
 
 // ============================================
 // OPTIMIZED WALLET CARD COMPONENT
@@ -311,7 +254,8 @@ const WalletCard = React.memo(({
                 <div className={`p-2 rounded ${hasInsufficientBalance ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Est. Gas (New)</span>
-                    <FaGasPump className={`w-3 h-3 ${hasInsufficientBalance ? 'text-red-500' : 'text-blue-500'}`} />
+                    <InfoTooltip id="Est_networkFee" content={`Calculate network tx fee with buffer.`}/>
+                    {/* <FaGasPump className={`w-3 h-3 ${hasInsufficientBalance ? 'text-red-500' : 'text-blue-500'}`} /> */}
                   </div>
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">
                     {formatBalance(estimates.estCost, nativeToken.decimals)}
@@ -340,7 +284,7 @@ const WalletCard = React.memo(({
                       {collateralToken.symbol}
                     </span>
                   </div>
-                  <FaLock className="w-4 h-4 text-gray-400" />
+                  <FaCoins className="w-4 h-4 text-gray-400" />
                 </div>
 
                 <div className="space-y-2">
@@ -364,7 +308,8 @@ const WalletCard = React.memo(({
                   <div className={`p-2 rounded ${hasInsufficientTokens ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'}`}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Est. Amount (New)</span>
-                      <FaLock className={`w-3 h-3 ${hasInsufficientTokens ? 'text-red-500' : 'text-blue-500'}`} />
+                      <InfoTooltip id="Est_collateralAmount" content={`Calculate collateral amount with trade fee.`}/>
+                      {/* <FaCoins className={`w-3 h-3 ${hasInsufficientTokens ? 'text-red-500' : 'text-blue-500'}`} /> */}
                     </div>
                     <div className="text-sm font-semibold text-gray-900 dark:text-white">
                       {formatBalance(estimates.estAmount, collateralToken.decimals)}
@@ -447,7 +392,7 @@ WalletCard.displayName = 'WalletCard';
 
 const WalletSelector = ({
   category,
-  availableWallets = mockWallets,
+  availableWallets,
   orders,
   gridsByWallet,
   setGridsByWallet,
@@ -457,6 +402,7 @@ const WalletSelector = ({
   collateralToken,
   selectedStrategy,
   estOrders,
+  user
 }: WalletSelectorProps) => {
   const [showWalletSelector, setShowWalletSelector] = useState(false);
   const [selectedWallets, setSelectedWallets] = useState<WalletConfig[]>([]);
@@ -479,7 +425,7 @@ const WalletSelector = ({
 
   // Filter available wallets based on chain ID and normalize ID
   const filteredAvailableWallets = useMemo(() => {
-    return availableWallets.filter(wallet => {
+    return availableWallets?.filter(wallet => {
       const network = (wallet as any).network;
       if (chainId === chains.Solana) {
         return network === 'SVM';
@@ -496,7 +442,8 @@ const WalletSelector = ({
   useEffect(() => {
     const fetchGasFee = async () => {
       try {
-        const fee = await getGasFee(chainId);
+        const fee = await spotNetworkFee(chainId);
+        console.log(fee)
         setGasFee(fee);
       } catch (error) {
         //console.error("Error fetching gas fee:", error);
@@ -530,7 +477,8 @@ const WalletSelector = ({
             orders,
             wallet._id,
             collateralToken.address,
-            gasFee
+            gasFee,
+            user
           );
 
           const [balance, tokenBalance] = await Promise.all([
@@ -598,7 +546,7 @@ const WalletSelector = ({
         const address = walletConfig.address.toLowerCase();
         if (!estimates[address]) estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
 
-        const costs = getOrderCosts({ order, collateralTokenAddress: collateralToken.address, gasFee });
+        const costs = getOrderCosts({ order, collateralTokenAddress: collateralToken.address, gasFee, user });
         
         if (collateralToken.address !== ZeroAddress) {
           estimates[address].estAmount += costs.orderAmount;

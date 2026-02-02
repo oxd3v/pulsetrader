@@ -1,52 +1,83 @@
 import { ORDER_TYPE } from "@/type/order";
-import { GAS_BUFFER, GAS_LIMIT } from "@/constants/common/order";
+import { ZeroAddress } from "ethers";
+import { ORDER_TRADE_FEE } from "@/constants/common/order";
 import { BASIS_POINT_DIVISOR_BIGINT } from "@/constants/common/utils";
-import { chains } from "@/constants/common/chain";
-import { getSolanaPriorityFeeEstimate, getGasFee } from "@/lib/blockchain/gas";
 
-export const calculateFundInUse = async ({orders, chainId, gasPrice, collateralTokenAddress}:{orders: ORDER_TYPE[], chainId:number, gasPrice:bigint, collateralTokenAddress?:string})=>{
-    
-  let onlyPendingOrders = orders.filter((o:ORDER_TYPE)=>{
-    if(o.orderStatus == 'PENDING' && o.orderType == 'BUY' && o.chainId == chainId){
-        if(collateralTokenAddress){
-          if(o.orderAsset.collateralToken.address.toLowerCase() == collateralTokenAddress.toLowerCase()){
-            return true
-          }else{
-            return false;
-          }
-        }
-        return true;
-    }
-  });
+export const getTradeFee = (user:any)=>{
+   if(user.status != 'admin'){
+     return ORDER_TRADE_FEE;
+   }else{
+     return BigInt(0)
+   }
+}
+// Helper to calculate costs for a single order
+export const getOrderCosts = ({
+  order,
+  collateralTokenAddress,
+  gasFee,
+  user
+}: {
+  order: ORDER_TYPE;
+  collateralTokenAddress: string;
+  gasFee: bigint;
+  user:any
+}) => {
+  const isCollateralMatch = collateralTokenAddress.toLowerCase() ===
+    order.orderAsset.collateralToken.address.toLowerCase();
+  const isOrderTokenMatch = collateralTokenAddress.toLowerCase() ===
+    order.orderAsset.orderToken.address.toLowerCase();
+  const tradeFee = getTradeFee(user);
+
+  let orderAmount = BigInt(0);
+  let orderGasFee = BigInt(0);
+  let onlyCollateral = BigInt(0)
+
+  if (isCollateralMatch && order.orderType === 'BUY') {
+    orderAmount += BigInt(order.amount.orderSize);
+    onlyCollateral += BigInt(order.amount.orderSize);
+    orderGasFee += (gasFee * BigInt(2));
+  }
+  if (isOrderTokenMatch && order.orderType === 'SELL') {
+    orderAmount += BigInt(order.amount.tokenAmount);
+    orderGasFee = gasFee;
+  }
+
+  let tradeAmount = (onlyCollateral*tradeFee)/BASIS_POINT_DIVISOR_BIGINT;
+   orderAmount += tradeAmount;
+  return { orderAmount, orderGasFee };
+};
+
+// Memoized calculation of wallet locked funds (Existing Orders)
+export const calculateExistingLockedFunds = (
+  orders: ORDER_TYPE[],
+  walletId: string,
+  collateralTokenAddress: string,
+  gasFee: bigint,
+  user:any
+) => {
+  let totalActiveOrders = 0;
+  let lockedFundBalance = BigInt(0);
   let totalCollateralPending = BigInt(0);
-  let gasLimit:bigint = GAS_LIMIT['SPOT'][chainId];
-  let buffer:bigint = BigInt(GAS_BUFFER[chainId]);
-  let gasFee;
-  if(chainId == chains.Solana){
-    let priorityFee = await getSolanaPriorityFeeEstimate([]);
-    gasFee = ((BigInt(5000) + priorityFee)*buffer)/BASIS_POINT_DIVISOR_BIGINT;
-  }else{
-    let gasPrice = await getGasFee(chainId);
-    let gas:bigint = gasLimit*gasPrice;
-    gasFee = (gas*buffer)/BASIS_POINT_DIVISOR_BIGINT;
-  }
-  let totalCollateralGas = gasFee * BigInt(onlyPendingOrders.length);
-  onlyPendingOrders.forEach((o:ORDER_TYPE)=>{
-    totalCollateralPending += BigInt(o.amount.orderSize);
-  });
-  return {
-    gasFee: totalCollateralGas,
-    pendingBalance: totalCollateralPending,
-    orderCount: onlyPendingOrders.length,
-    collateralAddress: collateralTokenAddress
-  }
-}
+  
 
-export const calculateOrderFundInUsd = async ({order, chainId, gasFee, collateralTokenAddress}:{order:ORDER_TYPE, chainId:number, gasFee:number, collateralTokenAddress?:string})=>{
-    if(order.orderAsset.collateralToken.address.toLowerCase() == collateralTokenAddress?.toLowerCase()){
-        return {
-            
-        }
+  orders.forEach((order) => {
+    if (order.wallet?._id === walletId && order.isActive) {
+      const costs = getOrderCosts({
+        order,
+        collateralTokenAddress,
+        gasFee,
+        user
+      });
+
+      if (collateralTokenAddress !== ZeroAddress) {
+        lockedFundBalance += costs.orderGasFee;
+        totalCollateralPending += costs.orderAmount;
+      } else {
+        lockedFundBalance += costs.orderGasFee + costs.orderAmount;
+      }
+      totalActiveOrders++;
     }
-}
+  });
 
+  return { totalActiveOrders, lockedFundBalance, totalCollateralPending };
+};

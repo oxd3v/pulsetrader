@@ -1,19 +1,19 @@
-import { useState, useEffect, useMemo,  } from "react";
-import { ORDER_TYPE, } from "@/type/order";
+import { useState, useEffect, useMemo } from "react";
+import { ORDER_TYPE } from "@/type/order";
 
 import { MIN_ORDER_SIZE, MAX_GRID_NUMBER } from "@/constants/common/order";
-import {  CollateralTokens } from "@/constants/common/tokens";
+import { CollateralTokens } from "@/constants/common/tokens";
 import { SpotStrategies } from "@/constants/common/frontend";
 import { FiChevronDown, FiInfo } from "react-icons/fi";
 import { ZeroAddress } from "ethers";
 
-
 //components
+import { toast } from "react-hot-toast";
 import TechnicalEntry from "./TradeBoxCommon/TechnicalEntry";
 import InfoTooltip from "./TradeBoxCommon/BoxTooltip";
 import DropDown from "./TradeBoxCommon/BoxDropdown";
 import TakeProfitInput from "./TradeBoxCommon/TakeProfit";
-import StopLossInput from "./TradeBoxCommon/StopLoss";
+import StopLossInput from "./TradeBoxCommon/stopLoss2";
 import SlippageInput from "./TradeBoxCommon/SlippageTolarence";
 import ReEntranceInput from "./TradeBoxCommon/ReEntrance";
 import OrderPriority from "./TradeBoxCommon/OrderPriority";
@@ -23,6 +23,7 @@ import GridInput from "./TradeBoxCommon/GridInput";
 import NumberInput from "./TradeBoxCommon/NumberInput";
 import EstSpotOrders from "@/components/order/estimate/estSpotOrder";
 import SelectWallet from "@/components/walletManager/selection/selectWalletToCreateOrder";
+import ConfirmationModal from "../common/Confirmation/ConfirmationBox";
 
 // hook
 import { useSpotOrder } from "@/hooks/useSpotOrder";
@@ -42,8 +43,6 @@ const GRID_MULTIPLIER_OPTIONS = [
 interface GridsByWallet {
   [walletIndex: number]: any;
 }
-
-
 
 const RenderingTechnicalExit = ({
   isTechnicalExit,
@@ -91,23 +90,22 @@ const RenderingTechnicalExit = ({
 interface DefinedTradeBoxProps {
   tokenInfo: any;
   chainId: number;
-  isConnected?: boolean;
+  isConnected: boolean;
   user?: any;
-  wallets?: any[];
+  userWallets?: any[];
   userPrevOrders?: any[];
-  addOrder?: (orderData: any) => Promise<any>;
 }
 
 export default function DefinedTradeBox({
   tokenInfo,
   chainId,
-  isConnected = false,
+  isConnected,
   user,
-  wallets = [],
+  userWallets = [],
   userPrevOrders = [],
-  addOrder,
 }: DefinedTradeBoxProps) {
-  const { configureOrder } = useSpotOrder();
+  const { configureOrder, addOrder } = useSpotOrder();
+
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
   const [openEstOrderModal, setOpenEstimatedOrderModal] = useState(false);
@@ -118,10 +116,10 @@ export default function DefinedTradeBox({
   const [isTechnicalExit, setIsTechnicalExit] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState(SpotStrategies[0]);
   const [collateralToken, setCollateralToken] = useState<any>(
-    CollateralTokens[chainId][ZeroAddress]
+    CollateralTokens[chainId][ZeroAddress],
   );
   const [outputToken, setOutputToken] = useState<any>(
-    CollateralTokens[chainId][ZeroAddress]
+    CollateralTokens[chainId][ZeroAddress],
   );
   const [collateralPrice, setCollateralPrice] = useState<number>(0);
 
@@ -134,7 +132,6 @@ export default function DefinedTradeBox({
   const [orderName, setOrderName] = useState<string>("");
   const [slippage, setSlippage] = useState<number>(1);
 
-
   // Grid Configuration State
   const [gridNumber, setGridNumber] = useState<number>(1);
   const [gridDistance, setGridDistance] = useState<number>(1);
@@ -144,6 +141,8 @@ export default function DefinedTradeBox({
   // Risk Management State
   const [tpPercentage, setTpPercentage] = useState<number>(10);
   const [slPercentage, setSlPercentage] = useState<number>(30);
+  const [isActiveStopLoss, setIsActiveStopLoss] = useState<boolean>(false);
+
   const [isTrailingMode, setIsTrailingMode] = useState<boolean>(false);
   const [isReEntrance, setIsReEntrance] = useState<boolean>(false);
   const [reEntrancePercentage, setReEntrancePercentage] = useState<number>(1);
@@ -193,7 +192,7 @@ export default function DefinedTradeBox({
         // Handle Native Token (convert to Wrapped for API query)
         if (collateralToken.address === ZeroAddress) {
           const wrappedNative = Object.values(CollateralTokens[chainId]).find(
-            (t: any) => t.isWrappedNative
+            (t: any) => t.isWrappedNative,
           ) as any;
           if (wrappedNative) {
             queryAddress = wrappedNative.address;
@@ -201,8 +200,8 @@ export default function DefinedTradeBox({
         }
 
         const price = await fetchCodexTokenPrice({
-          tokenAddress:queryAddress,
-          chainId
+          tokenAddress: queryAddress,
+          chainId,
         });
         if (price) {
           setCollateralPrice(price);
@@ -237,7 +236,7 @@ export default function DefinedTradeBox({
     //   const numValue = Math.abs(parseFloat(value));
     //   setInitialOrderSize(numValue.toString());
     // }
-    setInitialOrderSize(value)
+    setInitialOrderSize(value);
   };
 
   const handleStrategyChange = (strategy: (typeof SpotStrategies)[0]) => {
@@ -253,7 +252,8 @@ export default function DefinedTradeBox({
     // Set collateral token based on strategy
     if (strategy.id === "sellToken") {
       const tokenFromConstants = Object.values(CollateralTokens[chainId]).find(
-        (t: any) => t.address.toLowerCase() === tokenInfo.address?.toLowerCase()
+        (t: any) =>
+          t.address.toLowerCase() === tokenInfo.address?.toLowerCase(),
       ) as any;
 
       if (tokenFromConstants) {
@@ -390,13 +390,13 @@ export default function DefinedTradeBox({
       prev.map((order, index) => {
         // Handle both ID formats used in EstSpotOrders component
         const idFromTable = order._id || `temp-${order.sl}-${index}`; // Used in table view
-        const idFromEdit = order._id || `temp-${order.sl}`;           // Used in edit mode
-        
+        const idFromEdit = order._id || `temp-${order.sl}`; // Used in edit mode
+
         if (idFromTable === orderId || idFromEdit === orderId) {
           return updatedOrder;
         }
         return order;
-      })
+      }),
     );
   };
 
@@ -406,86 +406,51 @@ export default function DefinedTradeBox({
         const idFromTable = order._id || `temp-${order.sl}-${index}`;
         const idFromEdit = order._id || `temp-${order.sl}`;
         return idFromTable !== orderId && idFromEdit !== orderId;
-      })
+      }),
     );
   };
-
-  
 
   // ========================================================================
   // Order Submission
   // ========================================================================
 
-  //   const handleOrderSubmit = async () => {
-  //     if (!addOrder || !configureOrder) return;
+  const handleOrderSubmit = async () => {
+    setCreationPending(true);
 
-  //     setCreationPending(true);
+    try {
+      const submitOrder = await addOrder({
+        estOrders,
+        areWalletsReady,
+        gridsByWallet,
+        chainId,
+        name: orderName,
+        strategy: selectedStrategy.id,
+        indexToken: tokenInfo.address,
+        category: "Spot",
+        user,
+      });
+      console.log(submitOrder)
 
-  //     try {
-  //       // Create order configuration
-  //       const orderConfig: CreateOrderConfig = {
-  //         gridNumber,
-  //         entryPrice,
-  //         technicalEntry: technicalEntry || undefined,
-  //         orderSizeMultiplier,
-  //         initialOrderSize,
-  //         gridMultiplier,
-  //         gridDistance,
-  //         category: "spot",
-  //         strategy: selectedStrategy.id,
-  //         selectedStrategy,
-  //         orderName,
-  //         collateralToken,
-  //         outputToken,
-  //         isTrailingMode,
-  //         tpPercentage,
-  //         slPercentage,
-  //         isReEntrance,
-  //         reEntrancePercentage,
-  //         slippage,
-  //         priority,
-  //         executionSpeed,
-  //         chainId,
-  //         orderToken: {
-  //           address: tokenInfo.address,
-  //           decimals: tokenInfo.decimals,
-  //           symbol: tokenInfo.symbol,
-  //           pairAddress: tokenInfo.pairAddress,
-  //         },
-  //       };
-
-  //       // Configure orders
-  //       const configuredOrders = configureOrder(orderConfig);
-  //       setEstOrders(configuredOrders);
-
-  //       const submitOrder = await addOrder({
-  //         estOrders: configuredOrders,
-  //         areWalletsReady,
-  //         gridsByWallet,
-  //         chainId,
-  //         name: orderName,
-  //         strategy: selectedStrategy.id,
-  //         indexToken: selectedMarket,
-  //         category: "spot" as const,
-  //         protocol: tokenInfo?.token?.launchpad?.launchpadName || "",
-  //       });
-
-  //       if (submitOrder) {
-  //         // Reset form
-  //         setGridNumber(1);
-  //         setEstOrders([]);
-  //         setInitialOrderSize("");
-  //         setOrderName("");
-  //         setTechnicalEntry(null);
-  //         setIsConfirmationOpen(false);
-  //         setIsOrderNameValidate(false);
-  //       }
-  //     } catch (error) {
-  //       console.error("Order submission failed:", error);
-  //     } finally {
-  //       setCreationPending(false);
-  //     }
-  //   };
+      if (submitOrder.added == true) {
+        toast.success("Successfully created order");
+        // Reset form
+        setGridNumber(1);
+        setEstOrders([]);
+        setInitialOrderSize("");
+        setOrderName("");
+        setTechnicalEntry(null);
+        setIsConfirmationOpen(false);
+        setIsOrderNameValidate(false);
+      } else {
+        toast.error(submitOrder.message);
+      }
+    } catch (error) {
+      toast.error("Failed to creat order");
+      //console.error("Order submission failed:", error);
+    } finally {
+      setCreationPending(false);
+    }
+  };
 
   // ========================================================================
   // Order Configuration Effect
@@ -610,8 +575,8 @@ export default function DefinedTradeBox({
                       selectedStrategy.type === "Basic"
                         ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                         : selectedStrategy.type === "Premium"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                        : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                          : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                     }`}
                   >
                     {selectedStrategy.type}
@@ -655,8 +620,8 @@ export default function DefinedTradeBox({
                           strategy.type === "Basic"
                             ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                             : strategy.type === "Premium"
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                            : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                         }`}
                       >
                         {strategy.type}
@@ -711,9 +676,9 @@ export default function DefinedTradeBox({
             <div>
               {selectedStrategy.id === "algo" ? (
                 <TechnicalEntry
-                 technicalEntries={technicalEntry}
-                 setTechnicalEntries={setTechnicalEntry}
-                 title={"Technical Entry condition"}
+                  technicalEntries={technicalEntry}
+                  setTechnicalEntries={setTechnicalEntry}
+                  title={"Technical Entry condition"}
                 />
               ) : (
                 <EntryPriceRendering
@@ -763,6 +728,11 @@ export default function DefinedTradeBox({
                     tokenInfo?.token?.launchpad?.graduationPercent === 100 ? (
                       <DropDown
                         options={Object.values(CollateralTokens[chainId])
+                          .filter(
+                            (t) =>
+                              t.address.toLowerCase() !=
+                              tokenInfo.address.toLowerCase(),
+                          )
                           .map((token: any) => ({
                             label: (
                               <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
@@ -923,9 +893,11 @@ export default function DefinedTradeBox({
 
           {selectedStrategy.id != "sellToken" && (
             <StopLossInput
+              isActive={isActiveStopLoss}
+              setIsActive={setIsActiveStopLoss}
               isTrailingMode={isTrailingMode}
-              value={slPercentage}
-              onChange={setSlPercentage}
+              stopLossPercentage={slPercentage}
+              setStopLossPercentage={setSlPercentage}
               notValid={isTrailingMode && slPercentage === 0}
             />
           )}
@@ -974,8 +946,8 @@ export default function DefinedTradeBox({
             </label>
             <div className="relative">
               <DropDown
-                options={Object.values(CollateralTokens[chainId])
-                  .map((token: any) => ({
+                options={Object.values(CollateralTokens[chainId]).map(
+                  (token: any) => ({
                     label: (
                       <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
                         <img
@@ -987,7 +959,8 @@ export default function DefinedTradeBox({
                       </div>
                     ),
                     value: token,
-                  }))}
+                  }),
+                )}
                 onChange={setOutputToken}
                 value={outputToken}
               />
@@ -1019,10 +992,11 @@ export default function DefinedTradeBox({
         </div>
       </div>
 
-      {estOrders.length > 0 && (
+      {estOrders.length > 0 && user.account && (
         <SelectWallet
           category="spot"
           orders={[]}
+          availableWallets={userWallets}
           gridsByWallet={gridsByWallet}
           setGridsByWallet={setGridsByWallet}
           areWalletsReady={areWalletsReady}
@@ -1031,6 +1005,7 @@ export default function DefinedTradeBox({
           collateralToken={collateralToken}
           selectedStrategy={selectedStrategy}
           estOrders={estOrders}
+          user={user}
         />
       )}
 
@@ -1038,7 +1013,7 @@ export default function DefinedTradeBox({
       {/* Action Buttons */}
       {/* ============================================================ */}
 
-      {!isConnected ? (
+      {isConnected == false ? (
         <div className="flex gap-0.5 items-center">
           {estOrders.length > 0 && (
             <button
@@ -1105,33 +1080,9 @@ export default function DefinedTradeBox({
       )}
 
       {/* Confirmation Modal */}
-      {isConfirmationOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-              Confirm Order Creation
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
-              Are you sure you want to create this order? This action cannot be
-              undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setIsConfirmationOpen(false)}
-                className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => console.log("called")}
-                className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* {isConfirmationOpen && (
+        <ConfirmationModal isOpen={isConfirmationOpen} onClose={()=>setIsConfirmationOpen(false)} onConfirm={handleOrderSubmit} title="Create order" description='' confirmText="Successfully create order" cancelText=""/>
+      )} */}
     </div>
   );
 }
