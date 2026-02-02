@@ -1080,9 +1080,9 @@ export default function DefinedTradeBox({
       )}
 
       {/* Confirmation Modal */}
-      {/* {isConfirmationOpen && (
+      {isConfirmationOpen && (
         <ConfirmationModal isOpen={isConfirmationOpen} onClose={()=>setIsConfirmationOpen(false)} onConfirm={handleOrderSubmit} title="Create order" description='' confirmText="Successfully create order" cancelText=""/>
-      )} */}
+      )}
     </div>
   );
 }
