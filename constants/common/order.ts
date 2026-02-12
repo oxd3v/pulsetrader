@@ -1,4 +1,4 @@
-export const MIN_ORDER_SIZE = 5;
+export const MIN_ORDER_SIZE = 2;
 export const MAX_GRID_NUMBER = 5;
 
 import { chains } from "./chain";

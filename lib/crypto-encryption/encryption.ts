@@ -2,9 +2,6 @@ import CryptoJS from "crypto-js";
 import { encodeBase64, decodeBase64, toUtf8Bytes, toUtf8String } from "ethers";
 import { PROTOCOL_URL } from "@/constants/config/enviroments";
 
-// Use NEXT_PUBLIC_ for frontend access (be aware this is NOT secure)
-const AUTH_TOKEN_SECURITY_PASSWORD =
-  process.env.NEXT_PUBLIC_AUTH_TOKEN_SECURITY_PASSWORD;
 
 export function encrypt(text: string, password: string) {
   // CryptoJS works in the browser environment
@@ -26,23 +23,12 @@ export const decodeText = (signature: string) => {
   return toUtf8String(decodeBase64(signature));
 };
 
-export const encryptAuthToken = (text: string) => {
-  if (AUTH_TOKEN_SECURITY_PASSWORD) {
-    return encrypt(text, AUTH_TOKEN_SECURITY_PASSWORD);
-  }
-};
 
-export const decryptAuthToken = (encryptedText: string) => {
-  if (AUTH_TOKEN_SECURITY_PASSWORD) {
-    return decrypt(encryptedText, AUTH_TOKEN_SECURITY_PASSWORD);
-  }
-};
 
 export const  decodeInvitationCode =  (invitationCode: string) => {
   const codeDetails = JSON.parse(decodeText(invitationCode));
   const to = codeDetails.to;
   const expireTimestamp = codeDetails.expireAt;
-  console.log(expireTimestamp)
   const isExpired = expireTimestamp < Date.now() ? true : false;
   const status = codeDetails.status;
   const link = `${PROTOCOL_URL}connect/invite?invitation=${invitationCode}`;

@@ -64,28 +64,13 @@ export default function OrderList({
   // Filtering Logic
   // ------------------------------------------------------------------
   const filteredOrders = userOrders.filter((order: ORDER_TYPE) => {
-    // 1. Network Filter
     if (order.chainId !== network) return false;
-
-    // 2. Category Filter
     if (categoryFilter !== 'all') {
         if (order.category !== categoryFilter) return false;
     }
-    
-
-    // 3. Market Filter (Optional specific market match)
-    // Note: Adjust logic if selectedMarket is an object or string
-    // if (selectedMarket) {
-    //    const marketAddr = typeof selectedMarket === 'string' ? selectedMarket : selectedMarket.indexTokenAddress;
-    //    if (order.orderAsset?.orderToken?.address?.toLowerCase() !== marketAddr?.toLowerCase()) return false;
-    // }
-
-    // 4. Status Filter
     if (statusFilter !== 'all') {
         if (order.orderStatus !== statusFilter) return false;
     }
-
-    // 5. Search Term (Name or ID)
     if (searchTerm) {
         const term = searchTerm.toLowerCase();
         return (
@@ -193,7 +178,6 @@ export default function OrderList({
                 <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-1">
                     <button 
                         onClick={() => setIsTableOrder(false)}
-                        disabled
                         className={`p-1.5 rounded ${!isTableOrder ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'text-gray-500'}`}
                         title="Group View"
                     >
@@ -290,7 +274,7 @@ export default function OrderList({
 
           {sortedOrders.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-full mb-3">
+                  <div className="p-1 lg:p-4 bg-gray-50 dark:bg-gray-800 rounded-full mb-3">
                       <FiSearch className="w-8 h-8 opacity-50" />
                   </div>
                   <p>No orders found matching your filters.</p>

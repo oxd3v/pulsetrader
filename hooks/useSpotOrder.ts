@@ -344,8 +344,8 @@ export const useSpotOrder = () => {
           message: "Please selects wallet and create order properly",
         };
       }
-      
-      let userAddedAssetes= user.assetes || []
+
+      let userAddedAssetes = user.assetes || [];
       let userTokens = [...userAddedAssetes, ...userDeafultTokens]
         .filter((t) => t.split(":")[1] == chainId)
         .map((t) => t.split(":")[0].toLowerCase());
@@ -412,22 +412,21 @@ export const useSpotOrder = () => {
       }).catch((err) => {
         //console.log(err)
         let message = err.response.data.message || "Failed to create Order.";
-        if(message == 'EXIST_ORDER_NAME'){
-          throw new Error('Order name already exist')
-        }else if ("ORDERS_WALLET_NOT_MATCHED" == message){
-          throw new Error('Insufficient wallet selection')
-        }else if(message = 'No valid wallets selected'){
-          throw new Error('Invalid wallet selection')
-        }else if (message == 'ONLY_SINGLE_WALLET'){
-          throw new Error('Only single wallet can select')
-        }else if(message == 'ASSET_NOT_ADDED'){
-          throw new Error('Asset not add by user')
-        }else if(message == 'EXCEED_ORDER_LIMIT'){
-          throw new Error('Exceed order limit')
-        }else{
-          throw new Error("Failed to create Order.")
+        if (message == "EXIST_ORDER_NAME") {
+          throw new Error("Order name already exist");
+        } else if ("ORDERS_WALLET_NOT_MATCHED" == message) {
+          throw new Error("Insufficient wallet selection");
+        } else if ((message = "No valid wallets selected")) {
+          throw new Error("Invalid wallet selection");
+        } else if (message == "ONLY_SINGLE_WALLET") {
+          throw new Error("Only single wallet can select");
+        } else if (message == "ASSET_NOT_ADDED") {
+          throw new Error("Asset not add by user");
+        } else if (message == "EXCEED_ORDER_LIMIT") {
+          throw new Error("Exceed order limit");
+        } else {
+          throw new Error("Failed to create Order.");
         }
-        ;
       });
 
       setUserOrders(response.allOrders);
@@ -444,29 +443,88 @@ export const useSpotOrder = () => {
     }
   };
 
-  const deleteOrder = async (order:ORDER_TYPE)=>{
-    console.log(order)
-  }
-
-  const closeOrder = async (order:ORDER_TYPE)=>{
-    console.log(order)
-  }
-
-  const closeStrategy = async ({strategyName, category, strategy}:{strategyName:string, category: string, strategy:string})=>{
-
-  }
-  const deleteStrategy = async ({strategyName, category, strategy}:{strategyName:string, category: string, strategy:string})=>{
-    
-  }
-
-  const getOrders = async ()=>{
-    try{
-      let orders = await OrderService.getOrder({});
-      
-    }catch(err){
-
+  const deleteOrder = async (order: ORDER_TYPE) => {
+    try {
+      let deleteResult = await OrderService.deleteOrde({
+        orderId: order._id,
+      }).catch((err: any) => {
+        let errorMessage =
+          err.response.data.message || "Failed to delete Order";
+        if (errorMessage == "ORDER_NOT_EXIST") {
+          throw new Error("Order not exist");
+        } else if (errorMessage == "ORDER_IN_USE") {
+          throw new Error("Order in process. Cant delete now.");
+        } else {
+          throw new Error("Failed to delete order");
+        }
+      });
+      return { delete: true };
+    } catch (err: any) {
+      return {
+        delete: false,
+        message: err.message || "failed to delete order",
+      };
     }
-  }
+  };
 
-  return { configureOrder, addOrder, closeOrder, deleteOrder, getOrders, deleteStrategy,  closeStrategy};
+  const closeOrder = async (order: ORDER_TYPE) => {
+    try {
+      let closeResult = await OrderService.closeOrder({
+        orderId: order._id,
+      }).catch((err: any) => {
+        let errorMessage =
+          err.response.data.message || "Failed to delete Order";
+        if (errorMessage == "ORDER_NOT_EXIST") {
+          throw new Error("Order not exist");
+        } else if (errorMessage == "ORDER_IN_USE") {
+          throw new Error("Order in process. Cant delete now.");
+        } else if (errorMessage == 'INVALID_ORDER'){
+          throw new Error("Invalid order");
+        } else {
+          throw new Error("Failed to delete order");
+        }
+      });
+      return { closed: true };
+    } catch (err: any) {
+      return {
+        closed: false,
+        message: err.message || "failed to delete order",
+      };
+    }
+  };
+
+  const closeStrategy = async ({
+    strategyName,
+    category,
+    strategy,
+  }: {
+    strategyName: string;
+    category: string;
+    strategy: string;
+  }) => {};
+  const deleteStrategy = async ({
+    strategyName,
+    category,
+    strategy,
+  }: {
+    strategyName: string;
+    category: string;
+    strategy: string;
+  }) => {};
+
+  const getOrders = async () => {
+    try {
+      let orders = await OrderService.getOrder({});
+    } catch (err) {}
+  };
+
+  return {
+    configureOrder,
+    addOrder,
+    closeOrder,
+    deleteOrder,
+    getOrders,
+    deleteStrategy,
+    closeStrategy,
+  };
 };

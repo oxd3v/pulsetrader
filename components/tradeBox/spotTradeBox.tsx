@@ -176,8 +176,7 @@ export default function DefinedTradeBox({
       // 2. If collateral matches the current page token (assuming tokenInfo has current price)
       if (
         collateralToken.address.toLowerCase() ===
-          tokenInfo?.address?.toLowerCase() ||
-        (collateralToken.address === ZeroAddress && tokenInfo?.isWrappedNative)
+          tokenInfo?.address?.toLowerCase() 
       ) {
         if (tokenInfo?.priceUsd) {
           setCollateralPrice(Number(tokenInfo.priceUsd));
@@ -429,7 +428,6 @@ export default function DefinedTradeBox({
         category: "Spot",
         user,
       });
-      console.log(submitOrder)
 
       if (submitOrder.added == true) {
         toast.success("Successfully created order");
@@ -995,7 +993,7 @@ export default function DefinedTradeBox({
       {estOrders.length > 0 && user.account && (
         <SelectWallet
           category="spot"
-          orders={[]}
+          orders={userPrevOrders}
           availableWallets={userWallets}
           gridsByWallet={gridsByWallet}
           setGridsByWallet={setGridsByWallet}

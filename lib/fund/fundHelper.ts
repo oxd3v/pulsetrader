@@ -61,13 +61,14 @@ export const calculateExistingLockedFunds = (
   
 
   orders.forEach((order) => {
-    if (order.wallet?._id === walletId && order.isActive) {
+    if (order.wallet?._id === walletId && order.isActive == true) {
       const costs = getOrderCosts({
         order,
         collateralTokenAddress,
         gasFee,
         user
       });
+      console.log(costs)
 
       if (collateralTokenAddress !== ZeroAddress) {
         lockedFundBalance += costs.orderGasFee;

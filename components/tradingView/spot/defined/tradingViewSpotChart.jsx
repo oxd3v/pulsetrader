@@ -31,16 +31,13 @@ const TradingViewAdvancedChart = React.memo(
     const linesRef = useRef([]); // Stores IDs of drawn order lines
     const studyRef = useRef(null); // Stores ID of the active indicator study
 
-    
-
     // --- Store Data ---
     const { ordersOnChart, indicatorOnChart } = useChartDataStore(
       useShallow((state) => ({
         ordersOnChart: state.ordersOnChart,
         indicatorOnChart: state.indicatorOnChart,
-      }))
+      })),
     );
-    
 
     // --- Logic: Draw Order Lines ---
     const drawLineOnChart = useCallback(() => {
@@ -67,41 +64,61 @@ const TradingViewAdvancedChart = React.memo(
         };
 
         // Long Orders (TP/SL)
-        if (order.orderStatus === "Opened" && order.orderType === "long") {
+        if (
+          order.orderStatus === "OPENED" &&
+          order.orderType === "SELL" &&
+          !order.exit.isTechnicalExit
+        ) {
           // Take Profit Line
-          const tpPrice = formatUnits(
-            BigInt(order.takeProfit?.takeProfitPrice || 0),
-            PRECISION_DECIMALS
-          );
-          const tpLine = chart
-            .createPositionLine({ ...commonStyle })
-            .setText(`${order.name}_TP`)
-            .setPrice(tpPrice)
-            .setLineColor("#278404")
-            .setBodyBackgroundColor("#278404")
-            .setBodyBorderColor("#60f000");
-          linesRef.current.push(tpLine);
+          if (
+            order.exit.takeProfit?.takeProfitPrice &&
+            order.exit.takeProfit?.takeProfitPrice != 0
+          ) {
+            const tpPrice = formatUnits(
+              BigInt(order.exit.takeProfit?.takeProfitPrice || 0),
+              PRECISION_DECIMALS,
+            );
+            const tpLine = chart
+              .createPositionLine({ ...commonStyle })
+              .setText(`${order.name}_TP`)
+              .setPrice(tpPrice)
+              .setLineColor("#05aa58")
+              .setBodyBackgroundColor("#21ee21")
+              .setBodyBorderColor("#04915b");
+            linesRef.current.push(tpLine);
+          }
 
-          // Stop Loss Line
-          const slPrice = formatUnits(
-            BigInt(order.stopLoss?.stopLossPrice || 0),
-            PRECISION_DECIMALS
-          );
-          const slLine = chart
-            .createPositionLine({ ...commonStyle })
-            .setText(`${order.name}_SL`)
-            .setPrice(slPrice)
-            .setLineColor("#e3090d")
-            .setBodyBackgroundColor("#e3090d")
-            .setBodyBorderColor("#e3090d");
-          linesRef.current.push(slLine);
+          // Take Profit Line
+          if (
+            order.exit.stopLoss?.stopLossPrice &&
+            order.exit.stopLoss?.stopLossPrice != 0
+          ) {
+            const tpPrice = formatUnits(
+              BigInt(order.exit.stopLoss?.stopLossPrice || 0),
+              PRECISION_DECIMALS,
+            );
+            const tpLine = chart
+              .createPositionLine({ ...commonStyle })
+              .setText(`${order.name}_TP`)
+              .setPrice(tpPrice)
+              .setLineColor("#aa0573")
+              .setBodyBackgroundColor("#ee214d")
+              .setBodyBorderColor("#91042e");
+            linesRef.current.push(tpLine);
+          }
         }
 
         // Short/Pending Orders (Entry)
-        if (order.orderStatus === "Pending" && order.orderType === "short") {
+        if (
+          order.orderStatus === "PENDING" &&
+          order.orderType === "BUY" &&
+          !order.entry.isTechnicalEntry &&
+          order.entry.priceLogic?.threshold &&
+          order.entry.priceLogic?.threshold != "0"
+        ) {
           const entryPrice = formatUnits(
-            BigInt(order.target?.shortTarget || 0),
-            PRECISION_DECIMALS
+            BigInt(order.entry.priceLogic?.threshold),
+            PRECISION_DECIMALS,
           );
           const entryLine = chart
             .createPositionLine({ ...commonStyle })
@@ -150,7 +167,7 @@ const TradingViewAdvancedChart = React.memo(
             indicatorOnChart.indicatorName,
             false,
             false,
-            params
+            params,
           );
         } catch (e) {
           console.error("Failed to create indicator:", e);
@@ -173,9 +190,8 @@ const TradingViewAdvancedChart = React.memo(
 
     // --- Effect: Handle Indicators ---
     useEffect(() => {
-       
       if (!chartReady) return;
-      
+
       //   if(chartReady && indicatorOnChart && indicatorOnChart.indicatorName != undefined){
       //     updateIndicatorOnChart()
       //   }
@@ -203,7 +219,7 @@ const TradingViewAdvancedChart = React.memo(
             address,
             pairAddress,
             quoteToken,
-            createdAt
+            createdAt,
           );
           const currentTheme = getTheme();
           const dynamicOverrides = getDynamicChartOverrides(currentTheme);
@@ -301,7 +317,7 @@ const TradingViewAdvancedChart = React.memo(
         }}
       />
     );
-  }
+  },
 );
 
 export default TradingViewAdvancedChart;

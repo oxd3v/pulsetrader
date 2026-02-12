@@ -1,5 +1,7 @@
 const API_ENDPOINTS = {
   JOIN: '/join-user',
+  CONNECT: '/connect',
+  DISCONNECT: '/disconnect',
   CHECK_USER: '/check-user',
   WITHDRAW_FUND: '/withdraw-fund',
   CASH_OUT_ALL_FUND: '/cash-out-all-fund',

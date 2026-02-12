@@ -28,7 +28,6 @@ export const chainConfig = {
     rpcUrls: [
       "https://api.avax.network/ext/bc/C/rpc",
       "https://avalanche-c-chain-rpc.publicnode.com",
-      "https://rpc-avalanche.lfj.gg",
     ],
     explorerUrl: "https://snowscan.xyz",
     chainId: 43114,

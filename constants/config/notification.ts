@@ -104,10 +104,15 @@ export const NOTIFICATION_CONFIG: Record<string, { title: string; message: strin
         title: 'Registration Failed',
         message: 'We could not create your account. Please try again.'
     },
+    ['DISCONNECT_USER']:{
+        title: 'Disconnect user',
+        message: 'Disconnect existing user first.'
+    },
     ['JOIN_SUCCESS']: {
         title: 'Welcome!',
         message: 'Account created successfully.'
     },
+    
 
     // --- Features (Withdraw/Wallets) ---
     ['WITHDRAW_SUCCESS']: {
@@ -141,5 +146,19 @@ export const NOTIFICATION_CONFIG: Record<string, { title: string; message: strin
     ['INVITATION_REMOVE_FAILED']: {
         title: 'Deletion Failed',
         message: 'Could not remove the invitation code.'
+    },
+
+    //token addition
+    ['TOKEN_ADDED']:{
+        title: 'Succesfully token add',
+        message: 'Spot asset added successfully'
+    },
+    ['TOKEN_ALREADY_ADDED']:{
+        title: 'Asset already added',
+        message: 'Spot asset already in whitelist'
+    },
+    ['MAX_ACCED_ASSET_ACCESS']:{
+        title: 'Asset max exceed',
+        message: 'Spot asset exceed max limit of tier'
     }
 };

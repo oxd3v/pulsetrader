@@ -8,6 +8,7 @@ const ApiClient = axios.create({
   //   encode: parse as any,
   //   serialize: stringify as any, // or (params) => Qs.stringify(params, {arrayFormat: 'brackets'})
   // },
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },

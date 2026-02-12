@@ -39,7 +39,7 @@ export default function ConfirmationModal({
 
     setIsInternalLoading(true);
     try {
-      await onConfirm();
+      return await onConfirm();
     } catch (error) {
       console.error("Confirmation action failed", error);
     } finally {

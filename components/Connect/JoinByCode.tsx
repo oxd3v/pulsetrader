@@ -14,14 +14,15 @@ import {
   FiDownload,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
-import { decodeInvitationCode } from "@/lib/encryption";
+import { decodeInvitationCode } from "@/lib/crypto-encryption/encryption";
 
 function JoinByCodeInner() {
-  const { isMetamaskConnected, metamaskConnectedWallet, connectToMetamask } = useWallet();
+  const { isMetamaskConnected, metamaskConnectedWallet, connectToMetamask } =
+    useWallet();
   const searchParams = useSearchParams();
   const { joinUser } = useUserAuth();
   const router = useRouter();
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invitationData, setInvitationData] = useState<any>(null);
@@ -47,7 +48,9 @@ function JoinByCodeInner() {
   // 2. Check Wallet Compatibility
   const isCorrectWallet = useMemo(() => {
     if (!metamaskConnectedWallet || !invitationData) return false;
-    return metamaskConnectedWallet.toLowerCase() === invitationData.to.toLowerCase();
+    return (
+      metamaskConnectedWallet.toLowerCase() === invitationData.to.toLowerCase()
+    );
   }, [metamaskConnectedWallet, invitationData]);
 
   const handleJoinProtocol = async () => {
@@ -61,18 +64,14 @@ function JoinByCodeInner() {
       // Logic for joining the user into the system
       const result = await joinUser({
         account: metamaskConnectedWallet,
-        signUpMethod: 'INVITATION_CODE',
+        signUpMethod: "INVITATION_CODE",
         invitationCode: invitationCode || undefined,
       });
 
       if (result.joined) {
-        toast.success("Welcome to the Protocol!");
         router.push("/");
-      } else {
-        toast.error(result.message || "Failed to join.");
       }
     } catch (e) {
-      toast.error("An unexpected error occurred.");
     } finally {
       setIsSubmitting(false);
     }
@@ -109,21 +108,29 @@ function JoinByCodeInner() {
         ) : (
           <motion.div className="space-y-4 mb-8">
             <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
-              <div className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Intended Recipient</div>
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">
+                Intended Recipient
+              </div>
               <div className="text-sm font-mono font-bold text-gray-700 dark:text-gray-200 truncate">
                 {invitationData?.to || "Loading..."}
               </div>
             </div>
-            
+
             <div className="flex gap-4">
-               <div className="flex-1 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
-                  <div className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Status</div>
-                  <div className="text-sm font-bold text-emerald-500 capitalize">{invitationData?.status || "Silver"}</div>
-               </div>
-               <div className="flex-1 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
-                  <div className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Network</div>
-                  <div className="text-sm font-bold text-blue-500">Mainnet</div>
-               </div>
+              <div className="flex-1 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
+                <div className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">
+                  Status
+                </div>
+                <div className="text-sm font-bold text-emerald-500 capitalize">
+                  {invitationData?.status || "Silver"}
+                </div>
+              </div>
+              <div className="flex-1 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
+                <div className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">
+                  Network
+                </div>
+                <div className="text-sm font-bold text-blue-500">Mainnet</div>
+              </div>
             </div>
           </motion.div>
         )}
@@ -151,12 +158,20 @@ function JoinByCodeInner() {
             disabled={!isCorrectWallet || isSubmitting}
             onClick={handleJoinProtocol}
             className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg
-              ${isCorrectWallet 
-                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20" 
-                : "bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed"}`}
+              ${
+                isCorrectWallet
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                  : "bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed"
+              }`}
           >
-            {isSubmitting ? <FiLoader className="animate-spin" /> : <FiCheckCircle />}
-            {isCorrectWallet ? "Accept & Join Protocol" : "Wrong Wallet Connected"}
+            {isSubmitting ? (
+              <FiLoader className="animate-spin" />
+            ) : (
+              <FiCheckCircle />
+            )}
+            {isCorrectWallet
+              ? "Accept & Join Protocol"
+              : "Wrong Wallet Connected"}
           </button>
         )}
 
@@ -164,7 +179,8 @@ function JoinByCodeInner() {
           <div className="text-center">
             <span className="text-[10px] text-gray-500">Connected: </span>
             <span className="text-[10px] font-mono font-bold text-gray-400">
-              {metamaskConnectedWallet?.slice(0, 6)}...{metamaskConnectedWallet?.slice(-4)}
+              {metamaskConnectedWallet?.slice(0, 6)}...
+              {metamaskConnectedWallet?.slice(-4)}
             </span>
           </div>
         )}
@@ -180,7 +196,9 @@ function JoinByCodeInner() {
 export default function JoinByInvitationCode() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#050505] p-4">
-      <Suspense fallback={<FiLoader className="animate-spin text-blue-500 w-10 h-10" />}>
+      <Suspense
+        fallback={<FiLoader className="animate-spin text-blue-500 w-10 h-10" />}
+      >
         <JoinByCodeInner />
       </Suspense>
     </div>

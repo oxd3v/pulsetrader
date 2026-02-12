@@ -51,11 +51,7 @@ export default function NavbarRight() {
 
   useEffect(()=>{
     let checkIn = async ()=>{
-      let checkInResult = await checkUser();
-      if(checkInResult.connected == false){
-         let tMessage = NOTIFICATION_CONFIG[checkInResult.type].message;
-         toast.error(tMessage);
-      }
+      await checkUser();
     }
     checkIn()
     

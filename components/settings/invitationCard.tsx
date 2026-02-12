@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FiCopy, FiExternalLink, FiClock, FiUser, FiAlertCircle } from "react-icons/fi";
 import { RiDeleteBin7Line } from "react-icons/ri";
-import { decodeInvitationCode } from "@/lib/encryption";
+import { decodeInvitationCode } from "@/lib/crypto-encryption/encryption";
 import { handleCopy } from "@/lib/utils";
+
 
 interface InvitationCardProps {
   code: string;

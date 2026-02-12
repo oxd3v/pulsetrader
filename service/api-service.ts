@@ -9,6 +9,8 @@ const UserService = {
         ...params,
       },
   }),
+  connect:(params:any) => ApiClient.post(API_ENDPOINTS.CONNECT, params),
+  disconnect:(params:any) => ApiClient.post(API_ENDPOINTS.DISCONNECT, params),
   joinUser: (params:any) => ApiClient.post(API_ENDPOINTS.JOIN, params),
   getHistory: (params:any) => ApiClient.get(API_ENDPOINTS.GET_HISTORY, {
     params: {

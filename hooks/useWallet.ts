@@ -8,7 +8,7 @@ export const useWallet = () => {
   const [metamaskConnectedWallet, setMetamaskConnectedWallet] = useState("");
   const [connectedNetwork, setConnectedNetwork] = useState<number>(0);
   const [metamaskSigner, setMetamaskSigner] = useState<ethers.Signer | null>(
-    null
+    null,
   );
 
   // Helper: Check if MetaMask is injected
@@ -51,7 +51,7 @@ export const useWallet = () => {
       setIsMetamaskConnected(true);
       setMetamaskSigner(signer);
     } catch (error) {
-      console.error("MetaMask sync error:", error);
+      //console.error("MetaMask sync error:", error);
       setIsMetamaskConnected(false);
       setMetamaskConnectedWallet("");
       setMetamaskSigner(null);
@@ -72,7 +72,7 @@ export const useWallet = () => {
       // State will update via the 'accountsChanged' listener or manual re-check
       await handleMetamask();
     } catch (error: any) {
-      console.error("Connection error:", error);
+      //console.error("Connection error:", error);
       if (error.code === 4001) {
         toast.error("Connection rejected by user");
       } else if (

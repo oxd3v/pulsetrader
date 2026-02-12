@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   FiCopy,
   FiLogOut,
@@ -17,6 +18,7 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Hooks & Store
+import { encodeText } from "@/lib/crypto-encryption/encryption";
 import { isValidEVMWalletAddress } from "@/lib/utils";
 import { useUserAuth } from "@/hooks/useAuth";
 import { useStore } from "@/store/useStore";
@@ -94,29 +96,33 @@ export default function SettingsPage() {
 
   const handleCreateInvitationCode = async () => {
     try {
-      if (!isValidEVMWalletAddress(recipientAddress))
-        return toast.error("Invalid Ethereum address");
-      if (!expireAt) return toast.error("Select an expiration date");
+      if (!isValidEVMWalletAddress(recipientAddress)) {
+        toast.error("Invalid Ethereum address");
+        return;
+      }
+      if (!expireAt) {
+        toast.error("Select an expiration date");
+        return;
+      }
 
       const expiresMs = new Date(expireAt).getTime();
-      if (expiresMs <= Date.now())
-        return toast.error("Expiration must be in the future");
+      if (expiresMs <= Date.now()) {
+        toast.error("Expiration must be in the future");
+        return;
+      }
 
       setIsCreatingCode(true);
       const result: any = await createInvitationCode({
         invitedTo: recipientAddress,
         expireAt: expiresMs,
       });
-      if (result?.creation == true && result.code) {
-        toast.success("Invitation generated");
-        setInvitationCodes((c) => [...c, result.code]);
+      if (result?.created == true && result.code) {
+        //setInvitationCodes((c) => [...c, result.code]);
         setRecipientAddress("");
         setExpireAt("");
-      } else {
-        toast.error(result?.message || "Generation failed");
       }
     } catch (e: any) {
-      toast.error("Unexpected error");
+      //toast.error("Unexpected error");
     } finally {
       setIsCreatingCode(false);
     }
@@ -126,19 +132,15 @@ export default function SettingsPage() {
   const handleRemoveInvitationCode = async (code: string) => {
     try {
       const removeResult = await removeInvitationCode(code);
-      if (removeResult.removed === false) {
-        toast.error("Failed to remove code. Try again");
-      } else {
-        // FIX: Correctly filter out the removed code from the local state
-        setInvitationCodes((prev) => prev.filter((c) => c !== code));
-        toast.success("Invitation removed");
-      }
+      // if (removeResult.removed === true) {
+      //   //setInvitationCodes((prev) => prev.filter((c) => c !== code));
+      // }
     } catch (err) {
-      toast.error("An error occurred while removing the code");
+      //toast.error("An error occurred while removing the code");
     }
   };
 
-  const deviceLink = `${PROTOCOL_URL}connect/device?token=${signature}`;
+  const deviceLink = `${PROTOCOL_URL}connect/device?token=${encodeText(JSON.stringify({ signature, address: user.account, expireAt: Date.now() + 86400000 }))}`;
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-6xl">
@@ -247,9 +249,13 @@ export default function SettingsPage() {
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">
                     Auth URL
                   </p>
-                  <p className="text-xs font-mono break-all text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
+                  <Link
+                    href={deviceLink}
+                    target="_blank"
+                    className="text-xs font-mono break-all text-gray-600 dark:text-gray-300 mb-4 line-clamp-2"
+                  >
                     {signature ? deviceLink : "No active session token"}
-                  </p>
+                  </Link>
                   <button
                     disabled={!signature}
                     onClick={() => handleCopy(deviceLink, "Sync link")}

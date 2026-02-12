@@ -10,6 +10,7 @@ import React, {
 import Link from "next/link";
 // constants
 import { chainConfig } from "@/constants/common/chain";
+import { userDeafultTokens } from "@/constants/common/tokens";
 
 // lib
 import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
@@ -19,13 +20,14 @@ import { formateNumberInUnit } from "@/utility/handy";
 import { motion, AnimatePresence } from "framer-motion";
 
 // icons
-import { FiSearch, FiX, FiPlus, FiInfo } from "react-icons/fi";
+import { FiSearch, FiX, FiPlus, FiInfo, FiBookmark } from "react-icons/fi";
 import { BiCoinStack } from "react-icons/bi";
 import { BsArrowUpRight } from "react-icons/bs";
 
 // store
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
+import { useUserAuth } from "@/hooks/useAuth";
 
 // --- Types ---
 interface TokenSelectionParams {
@@ -66,12 +68,29 @@ const TokenRow = memo(
     isSelected: boolean;
     isAlreadyAdded: boolean;
     onSelect: (address: string) => void;
-    onAdd: (address: string) => void;
+    onAdd:  (address: string) => void;
   }) => {
+    const [isLoading,setIsLoading] = useState(false)
     const { priceUSD, liquidity, marketCap } = tokenInfo;
     const imageSrc = tokenInfo.token.info?.imageSmallUrl || "/tokenLogo.png";
     const symbol =
       tokenInfo.token.info?.symbol || tokenInfo.token.symbol || "Unknown";
+
+    const handleAddToken = async ()=>{
+      setIsLoading(true);
+      try{
+        let res:any = await onAdd(tokenInfo.token.address)
+        if(res.success){
+          isAlreadyAdded = true;
+          onSelect(tokenInfo.token.address);
+        }
+      }catch(err){
+
+      }finally{
+        setIsLoading(false)
+      }
+      
+    }
 
     return (
       <motion.div
@@ -79,7 +98,7 @@ const TokenRow = memo(
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className={`w-full flex items-center p-3 xl:p-4 rounded-xl hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg transition-all duration-200 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 ${
-          isSelected
+          isLoading ? "opacity-50 pointer-events-none" :isSelected
             ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
             : ""
         }`}
@@ -119,18 +138,24 @@ const TokenRow = memo(
           </div>
         </div>
         <div className="flex-shrink-0 flex gap-2 items-center ml-2">
-          {!isAlreadyAdded && (
+          {!isAlreadyAdded ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onAdd(tokenInfo.token.address);
+                handleAddToken();
               }}
               className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
               title="Add to Watchlist"
             >
               <FiPlus className="w-5 h-5" />
             </button>
-          )}
+          ) : (<button
+              
+              className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
+              title="Add to Watchlist"
+            >
+              <FiBookmark className="w-5 h-5" />
+            </button>)}
           <button
             onClick={() => onSelect(tokenInfo.token.address)}
             className="px-3 py-2 text-sm border border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg font-medium transition-colors inline-flex items-center gap-2"
@@ -141,7 +166,7 @@ const TokenRow = memo(
         </div>
       </motion.div>
     );
-  }
+  },
 );
 
 TokenRow.displayName = "TokenRow";
@@ -152,15 +177,16 @@ const TokenSelection = ({
   onClose,
   selectedToken,
   setSelectedToken,
-  addToken,
 }: TokenSelectionParams) => {
   const { chainId, user, isConnected } = useStore(
     useShallow((state: any) => ({
       chainId: state.network,
       user: state.user,
       isConnected: state.isConnected,
-    }))
+    })),
   );
+
+  const { addToken } = useUserAuth()
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -173,22 +199,27 @@ const TokenSelection = ({
   // 1. Memoize already added tokens (User Watchlist)
   // Fix: Ensure we fallback to chain defaults correctly if available
   const alreadyAddedTokens = useMemo(() => {
-    const defaults: any[] = [];
-    //chainConfig[chainId]?.defaultTokens?.map((t: string) => t.toLowerCase()) || [];
-
-    if (!isConnected || !user?.tokens?.length) {
-      return defaults;
+    let userTokensByNetwork = [];
+    console.log(user.assetes)
+    if (isConnected && user?.assetes?.length > 0) {
+      userTokensByNetwork = user.assetes
+        .filter((token: string) => {
+          const parts = token.split(":");
+          // Safety check if token string is malformed
+          return parts.length > 1 && parts[1] === String(chainId);
+        })
+        .map((token: string) => token);
     }
 
-    const userTokensByNetwork = user.tokens
+    const defaultTokens = userDeafultTokens
       .filter((token: string) => {
         const parts = token.split(":");
         // Safety check if token string is malformed
         return parts.length > 1 && parts[1] === String(chainId);
       })
-      .map((token: string) => token.split(":")[0].toLowerCase());
+      .map((token: string) => token);
 
-    return Array.from(new Set([...defaults, ...userTokensByNetwork]));
+    return Array.from(new Set([...defaultTokens, ...userTokensByNetwork]));
   }, [isConnected, user, chainId]);
 
   // 2. Debounce Effect
@@ -293,16 +324,16 @@ const TokenSelection = ({
       setSelectedToken(tokenAddress);
       onClose();
     },
-    [setSelectedToken, onClose]
+    [setSelectedToken, onClose],
   );
 
   const handleAddToken = useCallback(
-    (tokenAddress: string) => {
+    async (tokenAddress: string) => {
       if (chainId) {
-        addToken({ chainId, token: tokenAddress });
+        await addToken({tokenAddress, chainId});
       }
     },
-    [addToken, chainId]
+    [addToken, chainId],
   );
 
   // Render Helpers
@@ -350,24 +381,23 @@ const TokenSelection = ({
       );
     }
 
-
     return (
       <div className="space-y-2 px-4 pb-4">
-        {filteredTokens.filter((t:any)=>t.token.networkId == chainId).map((tokenInfo) => (
-          <TokenRow
-            key={tokenInfo.token.address}
-            tokenInfo={tokenInfo}
-            isSelected={
-              selectedToken.toLowerCase() ===
-              tokenInfo.token.address.toLowerCase()
-            }
-            isAlreadyAdded={alreadyAddedTokens.includes(
-              tokenInfo.token.address.toLowerCase()
-            )}
-            onSelect={handleTokenSelect}
-            onAdd={handleAddToken}
-          />
-        ))}
+        {filteredTokens
+          .filter((t: any) => t.token.networkId == chainId)
+          .map((tokenInfo) => (
+            <TokenRow
+              key={tokenInfo.token.address}
+              tokenInfo={tokenInfo}
+              isSelected={
+                selectedToken.toLowerCase() ===
+                tokenInfo.token.address.toLowerCase()
+              }
+              isAlreadyAdded={alreadyAddedTokens.map(t=>t.toLowerCase()).includes(`${tokenInfo.token.address.toLowerCase()}:${chainId}`)}
+              onSelect={handleTokenSelect}
+              onAdd={handleAddToken}
+            />
+          ))}
       </div>
     );
   };
@@ -437,7 +467,7 @@ const TokenSelection = ({
           {/* Footer */}
           <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
             <Link
-              href="/tokens"
+              href="/screener"
               className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
             >
               <FiPlus className="w-5 h-5" />

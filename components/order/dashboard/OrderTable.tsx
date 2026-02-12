@@ -15,7 +15,8 @@ import { displayNumber } from "@/utility/displayPrice";
 import { handleCopy } from "@/lib/utils";
 
 import OrderActions from "./OrderAction";
-import { formateAmountWithFixedDecimals } from "@/utility/handy";
+import { formateAmountWithFixedDecimals, safeFormatNumber } from "@/utility/handy";
+import { PRECISION_DECIMALS } from "@/constants/common/utils";
 
 interface OrderTableProps {
   orders: ORDER_TYPE[];
@@ -53,7 +54,7 @@ export default function OrderTable({
       <div className={`text-xs flex gap-1 ${options.color || ""}`}>
         <span className="text-gray-400 mr-1">{label}:</span>
         {options.prefix}
-        {displayNumber(Number(value))}
+        {displayNumber(Number(safeFormatNumber(value.toString(), PRECISION_DECIMALS,4)))}
         {options.suffix}
       </div>
     );
@@ -152,8 +153,12 @@ export default function OrderTable({
                         </div>
                       </div>
                     ) : (
-                      `$${displayNumber(Number(order.entry.priceLogic?.threshold || 0))}`
-                    )}
+                          renderPriceField(
+                            "Entry Price",
+                            order.entry.priceLogic?.threshold || 0,
+                            { color: "text-green-600" },
+                          )
+                        )}
                   </td>
 
                   {/* TP / SL */}
@@ -169,7 +174,7 @@ export default function OrderTable({
                       </div>
                     ) : (
                       <div className="flex flex-col gap-1">
-                        {order.exit.takeProfit.takeProfitPrice != '0' ? (
+                        {order.exit.takeProfit.takeProfitPrice != "0" ? (
                           renderPriceField(
                             "TP",
                             order.exit.takeProfit.takeProfitPrice,
@@ -177,12 +182,18 @@ export default function OrderTable({
                           )
                         ) : (
                           <div className="text-xs text-green-600 flex gap-1">
-                            TP: {(formateAmountWithFixedDecimals(order.exit.takeProfit.takeProfitPercentage, 2, 2))}%
+                            TP:{" "}
+                            {formateAmountWithFixedDecimals(
+                              order.exit.takeProfit.takeProfitPercentage,
+                              2,
+                              2,
+                            )}
+                            %
                           </div>
                         )}
 
                         {order.exit.stopLoss.isActive &&
-                          (order.exit.stopLoss.stopLossPrice != '0' ? (
+                          (order.exit.stopLoss.stopLossPrice != "0" ? (
                             renderPriceField(
                               "SL",
                               order.exit.stopLoss.stopLossPrice,
@@ -190,7 +201,13 @@ export default function OrderTable({
                             )
                           ) : (
                             <div className="text-xs text-red-600 flex gap-1">
-                              SL: {(formateAmountWithFixedDecimals(order.exit.stopLoss.stopLossPercentage, 2, 2))}%
+                              SL:{" "}
+                              {formateAmountWithFixedDecimals(
+                                order.exit.stopLoss.stopLossPercentage,
+                                2,
+                                2,
+                              )}
+                              %
                             </div>
                           ))}
                       </div>

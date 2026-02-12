@@ -100,17 +100,36 @@ const OrderActions = React.memo(({ order }: OrderActionProps) => {
 
   const handleDeleteOrder = () => setShowDeleteModal(true);
   const confirmDelete = async () => {
-    await deleteOrder(order);
-    setShowDeleteModal(false);
-    setShowActions(false);
+    try {
+      let deleteResult = await deleteOrder(order);
+      if (deleteResult.delete == false) {
+        toast.error(deleteResult.message);
+      } else {
+        toast.success("Order deleted");
+      }
+      setShowDeleteModal(false);
+      setShowActions(false);
+    } catch (err) {
+      toast.error("failed to delete order");
+    }
+  };
+
+  const confirmClose = async () => {
+    try {
+      let closeResult: any = await deleteOrder(order);
+      if (closeResult.closed == false) {
+        toast.error(closeResult.message);
+      } else {
+        toast.success("Order deleted");
+      }
+      setShowCloseModal(false);
+      setShowActions(false);
+    } catch (err) {
+      toast.error("failed to delete order");
+    }
   };
 
   const handleCloseOrder = () => setShowCloseModal(true);
-  const confirmClose = async () => {
-    await closeOrder(order);
-    setShowCloseModal(false);
-    setShowActions(false);
-  };
 
   const isOrderOnChart = (orderId: string) => {
     return ordersOnChart?.some((o: ORDER_TYPE) => o._id === orderId);
@@ -197,10 +216,7 @@ const OrderActions = React.memo(({ order }: OrderActionProps) => {
                 </button>
               )}
 
-              {(order.orderStatus === "PENDING" ||
-                order.orderStatus === "REVERTED" ||
-                order.orderStatus === "CANCELLED") && (
-                <button
+              <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteOrder();
@@ -210,7 +226,6 @@ const OrderActions = React.memo(({ order }: OrderActionProps) => {
                   <FiTrash2 className="w-4 h-4" />
                   Delete Order
                 </button>
-              )}
 
               {/* <button
                   onClick={(e) => {
