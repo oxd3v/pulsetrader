@@ -192,6 +192,7 @@ export const useUserAuth = () => {
         return { connection: false, type: "SIGNATURE_REJECTED" };
       }
       let encryptedToken = await encryptAuthToken(signature);
+      console.log(encryptedToken)
       if (!encryptedToken) {
         notify("error", "TOKEN_ENCRYPTION_FAILED");
         toast.dismiss(toastId);
@@ -204,6 +205,8 @@ export const useUserAuth = () => {
         account: address,
         encryptedToken,
       });
+
+      console.log(connectRes);
 
       if (!connectRes?.connect || !connectRes?.user) {
         const key = normalizeNotificationKey(
@@ -237,6 +240,7 @@ export const useUserAuth = () => {
 
       return { connection: true, message: "Successfully connect the user" };
     } catch (err: any) {
+      console.log(err)
       const key = normalizeNotificationKey(resolveErrorKey(err));
       notify("error", key);
       return {

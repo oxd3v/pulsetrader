@@ -107,6 +107,7 @@ const LogicNode = React.memo<LogicNodeProps>(
             type: e.target.value,
           };
           if (sel?.defaultPeriod) newNode.period = sel.defaultPeriod;
+          if(sel?.buyThreshold) newNode.threshold = sel.buyThreshold;
           onChange(newNode);
         }
       },

@@ -271,49 +271,29 @@ export const TradeFormPriceLowerDropdown = [
 
 
 export const INDICATORS_KEY = [
-  // Momentum
-  { id: "RSI", name: "RSI", indicatorName: 'Relative Strength Index', type: "Momentum", defaultPeriod: 14 },
-  //{ id: "Stochastic.K", name: "Stochastic-K", type: "Momentum" },
-  //{ id: "Stochastic.D", name: "Stochastic-D", type: "Momentum" },
-  //{ id: "Stochastic", name: "Stochastic", type: "Momentum" },
-  { id: "WilliamsR", name: "WilliamsR", indicatorName: 'Williams %R', type: "Momentum", defaultPeriod: 14 },
-  { id: "CCI", name: "CCI", indicatorName: 'Commodity Channel Index', type: "Momentum", defaultPeriod: 20 },
-  { id: "MFI", name: "MFI", indicatorName: 'Money Flow Index', type: "Momentum", defaultPeriod: 14 },
+  // Momentum - Typically "Buy" when oversold or crossing up
+  { id: "RSI", name: "RSI", indicatorName: 'Relative Strength Index', type: "Momentum", defaultPeriod: 14, buyThreshold: 30 }, 
+  { id: "WilliamsR", name: "WilliamsR", indicatorName: 'Williams %R', type: "Momentum", defaultPeriod: 14, buyThreshold: -80 },
+  { id: "CCI", name: "CCI", indicatorName: 'Commodity Channel Index', type: "Momentum", defaultPeriod: 20, buyThreshold: -100 },
+  { id: "MFI", name: "MFI", indicatorName: 'Money Flow Index', type: "Momentum", defaultPeriod: 14, buyThreshold: 20 },
 
-  // Trend
-  { id: "MACD.Line", name: "MACD-Line", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
-  { id: "MACD.Signal", name: "MACD-Signal", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
-  { id: "MACD.Histogram", name: "MACD-Histogram", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
-  { id: "MACD", name: "MACD", indicatorName: 'Moving Average Convergence Divergence', type: "Trend" },
-  //{ id: "ADX.Line", name: "ADX-Line", type: "Trend" },
-  //{ id: "ADX.PDI", name: "ADX-PDI", type: "Trend" },
-  //{ id: "ADX.MDI", name: "ADX-MDI", type: "Trend" },
-  // { id: "ADX", name: "ADX", type: "Trend" },
-  { id: "SMA", name: "SMA", indicatorName: 'Moving Average', type: "Trend", defaultPeriod: 9 },
-  { id: "EMA", name: "EMA", indicatorName: 'Moving Average Exponential', type: "Trend", defaultPeriod: 9 },
+  // Trend - Typically "Buy" on bullish crossovers
+  { id: "MACD.Line", name: "MACD-Line", indicatorName: 'MACD', type: "Trend", buyThreshold: 0 },
+  { id: "MACD.Signal", name: "MACD-Signal", indicatorName: 'MACD', type: "Trend", buyThreshold: 0 },
+  { id: "MACD.Histogram", name: "MACD-Histogram", indicatorName: 'MACD', type: "Trend", buyThreshold: 0 },
+  { id: "SMA", name: "SMA", indicatorName: 'Simple Moving Average', type: "Trend", defaultPeriod: 9, buyThreshold: null },
+  { id: "EMA", name: "EMA", indicatorName: 'Exponential Moving Average', type: "Trend", defaultPeriod: 9, buyThreshold: null },
 
-  // Volatility
-  { id: "BollingerBands.Upper", name: "BollingerBands-Upper", indicatorName: "Bollinger Bands", type: "Volatility" },
-  { id: "BollingerBands.Middle", name: "BollingerBands-Middle", indicatorName: "Bollinger Bands", type: "Volatility" },
-  { id: "BollingerBands.Lower", name: "BollingerBands-Lower", indicatorName: "Bollinger Bands", type: "Volatility" },
-  //{ id: "BollingerBands", name: "BollingerBands", type: "Volatility" },
-  //{ id: "ATR", name: "ATR", type: "Volatility" },
+  // Volatility - Typically "Buy" when price touches/crosses the lower band
+  { id: "BollingerBands.Upper", name: "BollingerBands-Upper", indicatorName: "Bollinger Bands", type: "Volatility", buyThreshold: null },
+  { id: "BollingerBands.Middle", name: "BollingerBands-Middle", indicatorName: "Bollinger Bands", type: "Volatility", buyThreshold: null },
+  { id: "BollingerBands.Lower", name: "BollingerBands-Lower", indicatorName: "Bollinger Bands", type: "Volatility", buyThreshold: null },
 
-  // Volume
-  //{ id: "OBV", name: "OBV", type: "Volume" },
-  { id: "Volume.Signal", name: "Volume-Signal", indicatorName: "Volume", type: "Volume" },
-
-  // Price & Market Metrics
-  { id: "Price", name: "Price",  type: "Price" },
-  //{ id: "Price.Change", name: "Price-Change", type: "Price" },
-  //{ id: "Price.High", name: "Price-High", type: "Price" },
-  //{ id: "Price.Low", name: "Price-Low", type: "Price" },
-  //{ id: "MarketCap", name: "MarketCap", type: "Market" },
-  { id: "Liquidity", name: "Liquidity",  type: "Market" },
-  //{ id: "Volume", name: "Volume", type: "Market" },
-  //{ id: "BuyCount", name: "BuyCount", type: "Market" },
-  //{ id: "SellCount", name: "SellCount", type: "Market" },
-  { id: "Holders", name: "Holders", type: "Market" }
+  // Volume & Market
+  { id: "Volume.Signal", name: "Volume-Signal", indicatorName: "Volume", type: "Volume", buyThreshold: 0 },
+  { id: "Price", name: "Price", indicatorName: "Current Price", type: "Price", buyThreshold: 0 },
+  { id: "Liquidity", name: "Liquidity", indicatorName: "Market Liquidity", type: "Market", buyThreshold: 0 }, 
+  { id: "Holders", name: "Holders", indicatorName: "Token Holders", type: "Market", buyThreshold: 0 } 
 ];
 
 export const TECHNICAL_INDICATORS = [

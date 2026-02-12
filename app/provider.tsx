@@ -41,7 +41,7 @@ export default function Provider({ children }: Props) {
             },
           }}
         />
-        <div className="w-full h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+        <div className="w-full h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-200">
           <Navbar />
           <main className="grow overflow-y-auto">{children}</main>
         </div>

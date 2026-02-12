@@ -11,7 +11,7 @@ export default function TradingStrategyMenu() {
   const router = useRouter();
 
   return (
-    <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100  dark:bg-gradient-to-br dark:from-slate-900  dark:to-slate-900 p-8">
+    <div className="h-full  p-8">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-300 mb-6">
