@@ -186,6 +186,25 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
 
             {/* Order Size Display */}
 
+            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                    {order.entry.isTechnicalEntry == true  ? (
+                      <div className="flex flex-col gap-1 max-w-[240px]">
+                        <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-500">
+                          <FiActivity /> Technical
+                        </span>
+                        <div className="overflow-x-auto pb-1 scrollbar-thin">
+                          <LogicSummary node={order.entry.technicalLogic!} />
+                        </div>
+                      </div>
+                    ) : (
+                          renderPriceField(
+                            "Entry Price",
+                            order.entry.priceLogic?.threshold || 0,
+                            { color: "text-green-600" },
+                          )
+                        )}
+                  </td>
+
             <div>
               <span className="text-xs text-gray-500">Size</span>
               <div className="text-sm font-medium flex items-center gap-1">
