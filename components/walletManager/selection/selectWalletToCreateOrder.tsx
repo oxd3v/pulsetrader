@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 // Types
 import { ORDER_TYPE, OrderTokenType } from "@/type/order";
 import { WalletConfig } from "@/type/common";
@@ -31,7 +37,10 @@ import {
   getWalletTokenBalance,
 } from "@/lib/blockchain/balance";
 import { spotNetworkFee } from "@/lib/blockchain/gas";
-import { getOrderCosts, calculateExistingLockedFunds} from "@/lib/fund/fundHelper"
+import {
+  getOrderCosts,
+  calculateExistingLockedFunds,
+} from "@/lib/fund/fundHelper";
 import { ZeroAddress } from "ethers";
 
 import { mockWallets } from "@/constants/common/mock";
@@ -56,7 +65,7 @@ interface WalletData {
 
 interface WalletEstimates {
   estAmount: bigint; // From NEW orders
-  estCost: bigint;   // From NEW orders
+  estCost: bigint; // From NEW orders
 }
 
 interface WalletSelectorProps {
@@ -71,10 +80,8 @@ interface WalletSelectorProps {
   collateralToken: OrderTokenType;
   selectedStrategy: any;
   estOrders: Order[];
-  user:any
+  user: any;
 }
-
-
 
 // ============================================
 // OPTIMIZED WALLET CARD COMPONENT
@@ -93,205 +100,190 @@ interface WalletCardProps {
   chainId: number;
 }
 
-const WalletCard = React.memo(({
-  walletData,
-  estimates,
-  isSelected,
-  onSelect,
-  onRemove,
-  collateralToken,
-  estOrders,
-  selectedGrids,
-  selectGrid,
-  chainId,
-}: WalletCardProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const WalletCard = React.memo(
+  ({
+    walletData,
+    estimates,
+    isSelected,
+    onSelect,
+    onRemove,
+    collateralToken,
+    estOrders,
+    selectedGrids,
+    selectGrid,
+    chainId,
+  }: WalletCardProps) => {
+    const [isExpanded, setIsExpanded] = useState(false);
 
-  // Derived state for validation
-  const { availableBalance, availableTokens, hasInsufficientBalance, hasInsufficientTokens } = useMemo(() => {
-    const availableBalance = walletData.balance - walletData.lockedFundBalance;
-    const availableTokens = walletData.tokenBalance - walletData.totalCollateralPending;
-    
-    const hasInsufficientBalance = availableBalance < (estimates.estCost || BigInt(0));
-    const hasInsufficientTokens = availableTokens < (estimates.estAmount || BigInt(0));
+    // Derived state for validation
+    const {
+      availableBalance,
+      availableTokens,
+      hasInsufficientBalance,
+      hasInsufficientTokens,
+    } = useMemo(() => {
+      const availableBalance =
+        walletData.balance - walletData.lockedFundBalance;
+      const availableTokens =
+        walletData.tokenBalance - walletData.totalCollateralPending;
 
-    return { availableBalance, availableTokens, hasInsufficientBalance, hasInsufficientTokens };
-  }, [walletData, estimates]);
+      const hasInsufficientBalance =
+        availableBalance < (estimates.estCost || BigInt(0));
+      const hasInsufficientTokens =
+        availableTokens < (estimates.estAmount || BigInt(0));
 
-  const handleSelectWallet = useCallback(() => {
-    onSelect?.(walletData.config);
-  }, [onSelect, walletData.config]);
+      return {
+        availableBalance,
+        availableTokens,
+        hasInsufficientBalance,
+        hasInsufficientTokens,
+      };
+    }, [walletData, estimates]);
 
-  const handleRemoveWallet = useCallback(() => {
-    onRemove(walletData.config);
-  }, [onRemove, walletData.config]);
+    const handleSelectWallet = useCallback(() => {
+      onSelect?.(walletData.config);
+    }, [onSelect, walletData.config]);
 
-  // Memoize native token info
-  const nativeToken : any = useMemo(() => {
-    return Object.values(Tokens[chainId]).find(
-      (token) =>
-        token.address === ZeroAddress 
-    ) || Tokens[chainId][ZeroAddress];
-  }, [chainId]);
+    const handleRemoveWallet = useCallback(() => {
+      onRemove(walletData.config);
+    }, [onRemove, walletData.config]);
 
-  const formatBalance = useCallback((balance: bigint, decimals: number) => {
-    return formateAmountWithFixedDecimals(balance, decimals, 4);
-  }, []);
+    const handleCopy = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(walletData.config.address);
+        toast.success("Address copied!");
+      },
+      [walletData.config.address],
+    );
 
-  return (
-    <div className={`rounded-lg border transition-all ${isSelected ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'} ${(hasInsufficientBalance || hasInsufficientTokens) && isSelected ? 'border-red-300 dark:border-red-500' : ''}`}>
-      {/* Header */}
+    const handleToggleExpand = useCallback((e: React.MouseEvent) => {
+      e.stopPropagation();
+      setIsExpanded((prev) => !prev);
+    }, []);
+
+    // Memoize native token info
+    const nativeToken : any = useMemo(() => {
+        return Object.values(Tokens[chainId]).find(
+          (token) =>
+            token.address === ZeroAddress 
+        ) || Tokens[chainId][ZeroAddress];
+      }, [chainId]);
+
+    const formatBalance = useCallback((balance: bigint, decimals: number) => {
+      return formateAmountWithFixedDecimals(balance, decimals, 4);
+    }, []);
+
+    return (
       <div
-        className={`flex items-center justify-between p-3 cursor-pointer ${!isSelected && "hover:bg-gray-50 dark:hover:bg-gray-800"}`}
-        onClick={!isSelected ? handleSelectWallet : undefined}
+        className={`rounded-lg border transition-all ${isSelected ? "border-blue-500 bg-blue-50/30 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700 hover:border-blue-300"} ${(hasInsufficientBalance || hasInsufficientTokens) && isSelected ? "border-red-300 dark:border-red-500" : ""}`}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className={`p-1.5 rounded ${isSelected ? "bg-blue-100 dark:bg-blue-900" : "bg-gray-100 dark:bg-gray-800"}`}>
-            <HiWallet className={`w-4 h-4 ${isSelected ? "text-blue-600 dark:text-blue-300" : "text-gray-600 dark:text-gray-300"}`} />
+        {/* Header */}
+        <div
+          className={`flex items-center justify-between p-3 cursor-pointer ${!isSelected && "hover:bg-gray-50 dark:hover:bg-gray-800"}`}
+          onClick={!isSelected ? handleSelectWallet : undefined}
+        >
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div
+              className={`p-1.5 rounded ${isSelected ? "bg-blue-100 dark:bg-blue-900" : "bg-gray-100 dark:bg-gray-800"}`}
+            >
+              <HiWallet
+                className={`w-4 h-4 ${isSelected ? "text-blue-600 dark:text-blue-300" : "text-gray-600 dark:text-gray-300"}`}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                  {walletData.config.address.slice(0, 6)}...
+                  {walletData.config.address.slice(-4)}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(walletData.config.address);
+                    toast.success("Address copied!");
+                  }}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                >
+                  <FiCopy className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
+              {walletData.totalActiveOrders > 0 && (
+                <span className="inline-block px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-1">
+                  {walletData.totalActiveOrders} active
+                </span>
+              )}
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                {walletData.config.address.slice(0, 6)}...{walletData.config.address.slice(-4)}
-              </span>
+
+          <div className="flex items-center gap-2">
+            {isSelected ? (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveWallet();
+                  }}
+                  className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                >
+                  <FiX className="w-4 h-4 text-red-500" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(!isExpanded);
+                  }}
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                >
+                  {isExpanded ? (
+                    <FiChevronDown className="w-4 h-4 text-gray-500" />
+                  ) : (
+                    <FiChevronRight className="w-4 h-4 text-gray-500" />
+                  )}
+                </button>
+              </>
+            ) : (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigator.clipboard.writeText(walletData.config.address);
-                  toast.success("Address copied!");
+                  onSelect && onSelect(walletData.config);
                 }}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
               >
-                <FiCopy className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+                <FiCheck className="w-4 h-4 text-blue-500" />
               </button>
-            </div>
-            {walletData.totalActiveOrders > 0 && (
-              <span className="inline-block px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 mt-1">
-                {walletData.totalActiveOrders} active
-              </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {isSelected ? (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveWallet();
-                }}
-                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-              >
-                <FiX className="w-4 h-4 text-red-500" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsExpanded(!isExpanded);
-                }}
-                className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              >
-                {isExpanded ?
-                  <FiChevronDown className="w-4 h-4 text-gray-500" /> :
-                  <FiChevronRight className="w-4 h-4 text-gray-500" />
-                }
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelect && onSelect(walletData.config);
-              }}
-              className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
-            >
-              <FiCheck className="w-4 h-4 text-blue-500" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Expanded Content */}
-      {isSelected && isExpanded && (
-        <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-3">
-          {/* Balance Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-            {/* Native Token Balance */}
-            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={nativeToken.imageUrl}
-                    className="w-5 h-5 rounded-full"
-                    alt={nativeToken.symbol}
-                  />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {nativeToken.symbol}
-                  </span>
-                </div>
-                <FaGasPump className="w-4 h-4 text-gray-400" />
-              </div>
-
-              <div className="space-y-2">
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Balance</div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {formatBalance(walletData.balance, nativeToken.decimals)}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                    <FaLock className="w-3 h-3 text-red-400" />
-                    Locked Balance
-                  </div>
-                  <div className="text-sm font-semibold text-red-600 dark:text-red-400">
-                    {formatBalance(walletData.lockedFundBalance, nativeToken.decimals)}
-                  </div>
-                </div>
-
-                <div className={`p-2 rounded ${hasInsufficientBalance ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Est. Gas (New)</span>
-                    <InfoTooltip id="Est_networkFee" content={`Calculate network tx fee with buffer.`}/>
-                    {/* <FaGasPump className={`w-3 h-3 ${hasInsufficientBalance ? 'text-red-500' : 'text-blue-500'}`} /> */}
-                  </div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {formatBalance(estimates.estCost, nativeToken.decimals)}
-                  </div>
-                  {hasInsufficientBalance && (
-                    <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
-                      <FiAlertCircle className="w-3 h-3" />
-                      <span>Insufficient for gas</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Collateral Token Balance */}
-            {collateralToken.address !== ZeroAddress && (
+        {/* Expanded Content */}
+        {isSelected && isExpanded && (
+          <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+            {/* Balance Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              {/* Native Token Balance */}
               <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <img
-                      src={collateralToken.imageUrl}
+                      src={nativeToken.imageUrl}
                       className="w-5 h-5 rounded-full"
-                      alt={collateralToken.symbol}
+                      alt={nativeToken.symbol}
                     />
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {collateralToken.symbol}
+                      {nativeToken.symbol}
                     </span>
                   </div>
-                  <FaCoins className="w-4 h-4 text-gray-400" />
+                  <FaGasPump className="w-4 h-4 text-gray-400" />
                 </div>
 
                 <div className="space-y-2">
                   <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Balance</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Total Balance
+                    </div>
                     <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatBalance(walletData.tokenBalance, collateralToken.decimals)}
+                      {formatBalance(walletData.balance, nativeToken.decimals)}
                     </div>
                   </div>
 
@@ -301,90 +293,178 @@ const WalletCard = React.memo(({
                       Locked Balance
                     </div>
                     <div className="text-sm font-semibold text-red-600 dark:text-red-400">
-                      {formatBalance(walletData.totalCollateralPending, collateralToken.decimals)}
+                      {formatBalance(
+                        walletData.lockedFundBalance,
+                        nativeToken.decimals,
+                      )}
                     </div>
                   </div>
 
-                  <div className={`p-2 rounded ${hasInsufficientTokens ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'}`}>
+                  <div
+                    className={`p-2 rounded ${hasInsufficientBalance ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"}`}
+                  >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Est. Amount (New)</span>
-                      <InfoTooltip id="Est_collateralAmount" content={`Calculate collateral amount with trade fee.`}/>
-                      {/* <FaCoins className={`w-3 h-3 ${hasInsufficientTokens ? 'text-red-500' : 'text-blue-500'}`} /> */}
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        Est. Gas (New)
+                      </span>
+                      <InfoTooltip
+                        id="Est_networkFee"
+                        content={`Calculate network tx fee with buffer.`}
+                      />
+                      {/* <FaGasPump className={`w-3 h-3 ${hasInsufficientBalance ? 'text-red-500' : 'text-blue-500'}`} /> */}
                     </div>
                     <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatBalance(estimates.estAmount, collateralToken.decimals)}
+                      {formatBalance(estimates.estCost, nativeToken.decimals)}
                     </div>
-                    {hasInsufficientTokens && (
+                    {hasInsufficientBalance && (
                       <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
                         <FiAlertCircle className="w-3 h-3" />
-                        <span>Insufficient tokens</span>
+                        <span>Insufficient for gas</span>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Grid Selection */}
-          {estOrders.length > 0 && selectedGrids.length > 0 && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <TbGridDots className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Selected Grids
+              {/* Collateral Token Balance */}
+              {collateralToken.address !== ZeroAddress && (
+                <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={collateralToken.imageUrl}
+                        className="w-5 h-5 rounded-full"
+                        alt={collateralToken.symbol}
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {collateralToken.symbol}
+                      </span>
+                    </div>
+                    <FaCoins className="w-4 h-4 text-gray-400" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        Total Balance
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatBalance(
+                          walletData.tokenBalance,
+                          collateralToken.decimals,
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
+                        <FaLock className="w-3 h-3 text-red-400" />
+                        Locked Balance
+                      </div>
+                      <div className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        {formatBalance(
+                          walletData.totalCollateralPending,
+                          collateralToken.decimals,
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      className={`p-2 rounded ${hasInsufficientTokens ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          Est. Amount (New)
+                        </span>
+                        <InfoTooltip
+                          id="Est_collateralAmount"
+                          content={`Calculate collateral amount with trade fee.`}
+                        />
+                        {/* <FaCoins className={`w-3 h-3 ${hasInsufficientTokens ? 'text-red-500' : 'text-blue-500'}`} /> */}
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatBalance(
+                          estimates.estAmount,
+                          collateralToken.decimals,
+                        )}
+                      </div>
+                      {hasInsufficientTokens && (
+                        <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
+                          <FiAlertCircle className="w-3 h-3" />
+                          <span>Insufficient tokens</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Grid Selection */}
+            {estOrders.length > 0 && selectedGrids.length > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <TbGridDots className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Selected Grids
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {selectedGrids.length}/{estOrders.length}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500">
-                  {selectedGrids.length}/{estOrders.length}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {estOrders.map((order, index) => (
-                  <button
-                    key={order._id || index}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (selectGrid && !selectedGrids.includes(order.sl)) {
-                        selectGrid(walletData.config, order);
-                      }
-                    }}
-                    className={`
+                <div className="flex flex-wrap gap-1">
+                  {estOrders.map((order, index) => (
+                    <button
+                      key={order._id || index}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (selectGrid && !selectedGrids.includes(order.sl)) {
+                          selectGrid(walletData.config, order);
+                        }
+                      }}
+                      className={`
                       px-2 py-1 text-xs rounded-lg transition-all
-                      ${selectedGrids.includes(order.sl)
-                        ? "bg-blue-500 text-white shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      ${
+                        selectedGrids.includes(order.sl)
+                          ? "bg-blue-500 text-white shadow-sm"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                       }
                     `}
-                  >
-                    Grid #{order.sl}
-                  </button>
-                ))}
+                    >
+                      Grid #{order.sl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Warning indicator when collapsed */}
+        {isSelected &&
+          !isExpanded &&
+          (hasInsufficientBalance || hasInsufficientTokens) && (
+            <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-2">
+              <div className="flex items-center gap-2 text-xs text-red-500">
+                <FiAlertCircle className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">
+                  Insufficient {hasInsufficientBalance ? "gas" : ""}
+                  {hasInsufficientBalance && hasInsufficientTokens
+                    ? " and "
+                    : ""}
+                  {hasInsufficientTokens ? "tokens" : ""}
+                </span>
               </div>
             </div>
           )}
-        </div>
-      )}
+      </div>
+    );
+  },
+);
 
-      {/* Warning indicator when collapsed */}
-      {isSelected && !isExpanded && (hasInsufficientBalance || hasInsufficientTokens) && (
-        <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-2">
-          <div className="flex items-center gap-2 text-xs text-red-500">
-            <FiAlertCircle className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate">
-              Insufficient {hasInsufficientBalance ? 'gas' : ''}
-              {hasInsufficientBalance && hasInsufficientTokens ? ' and ' : ''}
-              {hasInsufficientTokens ? 'tokens' : ''}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-});
-
-WalletCard.displayName = 'WalletCard';
+WalletCard.displayName = "WalletCard";
 
 // ============================================
 // OPTIMIZED WALLET SELECTOR COMPONENT
@@ -402,14 +482,16 @@ const WalletSelector = ({
   collateralToken,
   selectedStrategy,
   estOrders,
-  user
+  user,
 }: WalletSelectorProps) => {
   const [showWalletSelector, setShowWalletSelector] = useState(false);
   const [selectedWallets, setSelectedWallets] = useState<WalletConfig[]>([]);
-  
+
   // Store fetched data (balances, locks) separately from UI estimates
-  const [walletDataMap, setWalletDataMap] = useState<Record<string, WalletData>>({});
-  
+  const [walletDataMap, setWalletDataMap] = useState<
+    Record<string, WalletData>
+  >({});
+
   const [gasFee, setGasFee] = useState<bigint>(BigInt(0));
   const [isLoading, setIsLoading] = useState(false);
   const loadingRef = useRef(false);
@@ -421,21 +503,21 @@ const WalletSelector = ({
     return singleWalletStrategies.includes(selectedStrategy?.id);
   }, [selectedStrategy?.id]);
 
-
-
   // Filter available wallets based on chain ID and normalize ID
   const filteredAvailableWallets = useMemo(() => {
-    return availableWallets?.filter(wallet => {
-      const network = (wallet as any).network;
-      if (chainId === chains.Solana) {
-        return network === 'SVM';
-      }
-      // Default to EVM for other chains or if network is not specified
-      return network === 'EVM' || !network;
-    }).map((w: any) => ({
-      ...w,
-      _id: w._id || w.id // Normalize ID: mock uses 'id' for SVM, '_id' for EVM
-    }));
+    return availableWallets
+      ?.filter((wallet) => {
+        const network = (wallet as any).network;
+        if (chainId === chains.Solana) {
+          return network === "SVM";
+        }
+        // Default to EVM for other chains or if network is not specified
+        return network === "EVM" || !network;
+      })
+      .map((w: any) => ({
+        ...w,
+        _id: w._id,
+      }));
   }, [availableWallets, chainId]);
 
   // 1. Fetch Gas Fee
@@ -443,7 +525,6 @@ const WalletSelector = ({
     const fetchGasFee = async () => {
       try {
         const fee = await spotNetworkFee(chainId);
-        console.log(fee)
         setGasFee(fee);
       } catch (error) {
         //console.error("Error fetching gas fee:", error);
@@ -453,7 +534,20 @@ const WalletSelector = ({
     fetchGasFee();
   }, [chainId]);
 
-  // 2. Fetch Wallet Data (Balances & Existing Locks)
+  // OPTIMIZATION: Pre-group orders by wallet to avoid O(n*m) loops
+  const ordersByWallet = useMemo(() => {
+    const map = new Map<string, ORDER_TYPE[]>();
+    orders.forEach((order) => {
+      if (order.wallet) {
+        const walletId = order.wallet.toString();
+        if (!map.has(walletId)) map.set(walletId, []);
+        map.get(walletId)!.push(order);
+      }
+    });
+    return map;
+  }, [orders]);
+
+  // Fetch wallet data (balances & existing locks) – batched and set once
   const initializeWalletData = useCallback(async () => {
     if (!filteredAvailableWallets.length || loadingRef.current) return;
 
@@ -462,23 +556,29 @@ const WalletSelector = ({
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     try {
       const newWalletData: Record<string, WalletData> = {};
       const batchSize = 3;
-      
+
       for (let i = 0; i < filteredAvailableWallets.length; i += batchSize) {
+        if (signal.aborted) break;
+
         const batch = filteredAvailableWallets.slice(i, i + batchSize);
         const batchPromises = batch.map(async (wallet) => {
-          if (abortControllerRef.current?.signal.aborted) return null;
+          if (signal.aborted) return null;
 
-          // Calculate locks from EXISTING orders
+          // Use pre-grouped orders for this wallet
+          const walletOrders = ordersByWallet.get(wallet._id) || [];
+
+          // Calculate locks from EXISTING orders for this wallet only
           const lockedFunds = calculateExistingLockedFunds(
-            orders,
+            walletOrders, // Only pass relevant orders
             wallet._id,
             collateralToken.address,
             gasFee,
-            user
+            user,
           );
 
           const [balance, tokenBalance] = await Promise.all([
@@ -497,29 +597,47 @@ const WalletSelector = ({
             data: {
               config: wallet,
               ...lockedFunds,
-              balance: typeof balance === "string" ? safeParseUnits(balance, 18) : BigInt(balance),
-              tokenBalance: typeof tokenBalance === "string" ? safeParseUnits(tokenBalance, collateralToken.decimals) : BigInt(tokenBalance),
-            }
+              balance:
+                typeof balance === "string"
+                  ? safeParseUnits(balance, 18)
+                  : BigInt(balance),
+              tokenBalance:
+                typeof tokenBalance === "string"
+                  ? safeParseUnits(tokenBalance, collateralToken.decimals)
+                  : BigInt(tokenBalance),
+            },
           };
         });
 
         const batchResults = await Promise.all(batchPromises);
-        batchResults.forEach(result => {
+        batchResults.forEach((result) => {
           if (result) newWalletData[result.address] = result.data;
         });
 
-        setWalletDataMap(prev => ({ ...prev, ...newWalletData }));
+        // OPTIMIZATION: Update state only once after all batches are done
+        // But we can't set state inside loop if we want to avoid multiple renders.
+        // Instead, accumulate all and set at the end.
+      }
+
+      if (!signal.aborted) {
+        setWalletDataMap(newWalletData); // Single state update
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        //console.error("Error initializing wallet data:", error);
+      if (error.name !== "AbortError") {
         toast.error("Failed to fetch wallet balances");
       }
     } finally {
       loadingRef.current = false;
       setIsLoading(false);
     }
-  }, [filteredAvailableWallets, orders, collateralToken, gasFee, chainId]);
+  }, [
+    filteredAvailableWallets,
+    ordersByWallet,
+    collateralToken,
+    gasFee,
+    chainId,
+    user,
+  ]);
 
   // Initial Fetch
   useEffect(() => {
@@ -535,30 +653,42 @@ const WalletSelector = ({
     const estimates: Record<string, WalletEstimates> = {};
 
     // Initialize zero estimates for all known wallets
-    Object.keys(walletDataMap).forEach(address => {
+    Object.keys(walletDataMap).forEach((address) => {
       estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
     });
 
     // Iterate through assigned grids and sum up costs
     Object.entries(gridsByWallet).forEach(([gridSl, walletConfig]) => {
-      const order = estOrders.find(o => o.sl === Number(gridSl));
+      const order = estOrders.find((o) => o.sl === Number(gridSl));
       if (order && walletConfig && walletConfig.address) {
         const address = walletConfig.address.toLowerCase();
-        if (!estimates[address]) estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
+        if (!estimates[address])
+          estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
 
-        const costs = getOrderCosts({ order, collateralTokenAddress: collateralToken.address, gasFee, user });
-        
+        const costs = getOrderCosts({
+          order,
+          collateralTokenAddress: collateralToken.address,
+          gasFee,
+          user,
+        });
+
         if (collateralToken.address !== ZeroAddress) {
           estimates[address].estAmount += costs.orderAmount;
           estimates[address].estCost += costs.orderGasFee;
         } else {
-          estimates[address].estCost += (costs.orderGasFee + costs.orderAmount);
+          estimates[address].estCost += costs.orderGasFee + costs.orderAmount;
         }
       }
     });
 
     return estimates;
-  }, [gridsByWallet, estOrders, walletDataMap, collateralToken.address, gasFee]);
+  }, [
+    gridsByWallet,
+    estOrders,
+    walletDataMap,
+    collateralToken.address,
+    gasFee,
+  ]);
 
   // 4. Centralized Readiness Check
   // Compares fetched balances (walletDataMap) vs calculated estimates (estimatesByWallet)
@@ -585,8 +715,13 @@ const WalletSelector = ({
     });
 
     setWalletsReady(isReady);
-  }, [selectedWallets, walletDataMap, estimatesByWallet, estOrders.length, setWalletsReady]);
-
+  }, [
+    selectedWallets,
+    walletDataMap,
+    estimatesByWallet,
+    estOrders.length,
+    setWalletsReady,
+  ]);
 
   // Distribution Logic (Assigned Grids)
   const distributeOrders = useCallback(
@@ -608,7 +743,7 @@ const WalletSelector = ({
 
       setGridsByWallet(newGridsByWallet);
     },
-    [estOrders, isSingleWalletStrategy, setGridsByWallet]
+    [estOrders, isSingleWalletStrategy, setGridsByWallet],
   );
 
   // Handlers
@@ -626,12 +761,19 @@ const WalletSelector = ({
       setSelectedWallets(newSelectedWallets);
       distributeOrders(newSelectedWallets);
     },
-    [isSingleWalletStrategy, selectedWallets, estOrders.length, distributeOrders]
+    [
+      isSingleWalletStrategy,
+      selectedWallets,
+      estOrders.length,
+      distributeOrders,
+    ],
   );
 
   const handleRemoveWallet = useCallback(
     (wallet: WalletConfig) => {
-      const newSelectedWallets = selectedWallets.filter((w) => w._id !== wallet._id);
+      const newSelectedWallets = selectedWallets.filter(
+        (w) => w._id !== wallet._id,
+      );
       setSelectedWallets(newSelectedWallets);
 
       const newGridsByWallet = { ...gridsByWallet };
@@ -643,7 +785,7 @@ const WalletSelector = ({
       setGridsByWallet(newGridsByWallet);
       distributeOrders(newSelectedWallets);
     },
-    [selectedWallets, gridsByWallet, distributeOrders, setGridsByWallet]
+    [selectedWallets, gridsByWallet, distributeOrders, setGridsByWallet],
   );
 
   const handleGridForWallet = useCallback(
@@ -656,9 +798,9 @@ const WalletSelector = ({
         [order.sl]: wallet,
       });
     },
-    [gridsByWallet, selectedWallets.length, setGridsByWallet]
+    [gridsByWallet, selectedWallets.length, setGridsByWallet],
   );
-  
+
   // Available Wallets derivation
   const availableWalletsList = useMemo(() => {
     return filteredAvailableWallets
@@ -677,8 +819,8 @@ const WalletSelector = ({
           </h3>
           <p className="text-xs text-gray-600 dark:text-gray-400">
             {selectedWallets.length > 0
-              ? `${selectedWallets.length} wallet${selectedWallets.length > 1 ? 's' : ''} selected`
-              : `Choose wallets${isSingleWalletStrategy ? ' (Single wallet only)' : ''}`}
+              ? `${selectedWallets.length} wallet${selectedWallets.length > 1 ? "s" : ""} selected`
+              : `Choose wallets${isSingleWalletStrategy ? " (Single wallet only)" : ""}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -692,7 +834,9 @@ const WalletSelector = ({
             disabled={isLoading}
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
           >
-            <MdOutlineRefresh className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+            <MdOutlineRefresh
+              className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`}
+            />
             Refresh
           </button>
         </div>
@@ -723,8 +867,11 @@ const WalletSelector = ({
             {selectedWallets.map((wallet) => {
               const address = wallet.address.toLowerCase();
               const data = walletDataMap[address];
-              const estimates = estimatesByWallet[address] || { estCost: BigInt(0), estAmount: BigInt(0) };
-              
+              const estimates = estimatesByWallet[address] || {
+                estCost: BigInt(0),
+                estAmount: BigInt(0),
+              };
+
               // Calculate which grids belong to this wallet
               const walletGrids = Object.entries(gridsByWallet)
                 .filter(([_, w]) => w._id === wallet._id)
@@ -752,10 +899,11 @@ const WalletSelector = ({
       {/* Add Wallets Toggle */}
       <button
         onClick={() => setShowWalletSelector(!showWalletSelector)}
-        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-dashed transition-all text-sm ${showWalletSelector
+        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-dashed transition-all text-sm ${
+          showWalletSelector
             ? "border-red-300 bg-red-50/30 dark:bg-red-900/10 text-red-600 dark:text-red-400"
             : "border-blue-300 hover:border-blue-400 bg-blue-50/30 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-          }`}
+        }`}
       >
         {showWalletSelector ? (
           <>
@@ -779,7 +927,9 @@ const WalletSelector = ({
       {showWalletSelector && availableWalletsList.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300">Available Wallets</h4>
+            <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Available Wallets
+            </h4>
             <span className="text-xs text-gray-500">Click to select</span>
           </div>
 

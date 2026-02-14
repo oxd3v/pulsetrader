@@ -11,6 +11,7 @@ const API_ENDPOINTS = {
   CREATE_NEW_WALLET: '/create-new-wallet',
   GET_HISTORY: '/get-history',
   ADD_TOKEN: '/add-token',
+  GET_USER_HISTORIES: '/get-histories',
 
   // order related endpoints
   GET_ORDER: '/get-order',

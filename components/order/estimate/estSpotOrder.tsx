@@ -111,7 +111,6 @@ const OrderCreationModal = ({
   const confirmDeleteOrder = () => {
     if (selectedOrderId && onDeleteOrder) {
       onDeleteOrder(selectedOrderId);
-      toast.success(`Order deleted`);
     }
     setShowConfirmation(false);
   };

@@ -145,8 +145,8 @@ export default function OrderTable({
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                     {hasTechEntry ? (
                       <div className="flex flex-col gap-1 max-w-[240px]">
-                        <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-500">
-                          <FiActivity /> Technical
+                        <span className="flex items-center gap-1 text-[9px] uppercase font-bold text-blue-500">
+                          <FiActivity /> Technical Entry
                         </span>
                         <div className="overflow-x-auto pb-1 scrollbar-thin">
                           <LogicSummary node={order.entry.technicalLogic!} />
@@ -154,7 +154,7 @@ export default function OrderTable({
                       </div>
                     ) : (
                           renderPriceField(
-                            "Entry Price",
+                            "PRICE ENTRY",
                             order.entry.priceLogic?.threshold || 0,
                             { color: "text-green-600" },
                           )
@@ -165,8 +165,8 @@ export default function OrderTable({
                   <td className="px-4 py-3 whitespace-nowrap">
                     {hasTechExit ? (
                       <div className="flex flex-col gap-1 max-w-[240px]">
-                        <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-500">
-                          <FiActivity /> Technical
+                        <span className="flex items-center gap-1 text-[9px] uppercase font-bold text-blue-500">
+                          <FiActivity /> Technical Exit
                         </span>
                         <div className="overflow-x-auto pb-1 scrollbar-thin">
                           <LogicSummary node={order.exit.technicalLogic!} />

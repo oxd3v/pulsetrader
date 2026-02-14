@@ -34,7 +34,7 @@ export default function ConfirmationModal({
 
   const handleConfirmClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (isInternalLoading || externalLoading) return;
 
     setIsInternalLoading(true);
@@ -52,18 +52,33 @@ export default function ConfirmationModal({
     switch (variant) {
       case "destructive":
         return {
-          icon: <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full"><FiAlertTriangle className="w-6 h-6 text-red-600 dark:text-red-500" /></div>,
-          button: "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500",
+          icon: (
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full shrink-0">
+              <FiAlertTriangle className="w-6 h-6 text-red-600 dark:text-red-500" />
+            </div>
+          ),
+          button:
+            "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500",
         };
       case "warning":
         return {
-          icon: <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full"><FiAlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-500" /></div>,
-          button: "bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500",
+          icon: (
+            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full shrink-0">
+              <FiAlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
+            </div>
+          ),
+          button:
+            "bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500",
         };
       default:
         return {
-          icon: <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full"><FiInfo className="w-6 h-6 text-blue-600 dark:text-blue-500" /></div>,
-          button: "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",
+          icon: (
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full shrink-0">
+              <FiInfo className="w-6 h-6 text-blue-600 dark:text-blue-500" />
+            </div>
+          ),
+          button:
+            "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",
         };
     }
   };
@@ -96,23 +111,23 @@ export default function ConfirmationModal({
             {!isLoading && (
               <button
                 onClick={onClose}
-                className="absolute right-4 top-4 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                className="absolute right-4 top-4 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors z-10"
               >
                 <FiX className="w-5 h-5" />
               </button>
             )}
 
             <div className="p-6">
-              <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 {/* Icon */}
                 {styles.icon}
 
                 {/* Text Content */}
-                <div className="w-full">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-6 mb-2">
+                <div className="flex-1 min-w-0 text-center sm:text-left">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-6 mb-2 break-words">
                     {title}
                   </h3>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-sm text-gray-500 dark:text-gray-400 break-words whitespace-normal">
                     {description}
                   </div>
                 </div>

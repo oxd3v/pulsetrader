@@ -68,7 +68,7 @@ function JoinByCodeInner() {
         invitationCode: invitationCode || undefined,
       });
 
-      if (result.joined) {
+      if (result.joined == true) {
         router.push("/");
       }
     } catch (e) {

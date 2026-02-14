@@ -3,47 +3,55 @@ import { ZeroAddress } from "ethers";
 import { ORDER_TRADE_FEE } from "@/constants/common/order";
 import { BASIS_POINT_DIVISOR_BIGINT } from "@/constants/common/utils";
 
-export const getTradeFee = (user:any)=>{
-   if(user.status != 'admin'){
-     return ORDER_TRADE_FEE;
-   }else{
-     return BigInt(0)
-   }
-}
+export const getTradeFee = (user: any) => {
+  if (user.status != "admin") {
+    return ORDER_TRADE_FEE;
+  } else {
+    return BigInt(0);
+  }
+};
 // Helper to calculate costs for a single order
 export const getOrderCosts = ({
   order,
   collateralTokenAddress,
   gasFee,
-  user
+  user,
 }: {
   order: ORDER_TYPE;
   collateralTokenAddress: string;
   gasFee: bigint;
-  user:any
+  user: any;
 }) => {
-  const isCollateralMatch = collateralTokenAddress.toLowerCase() ===
+  
+  const isCollateralMatch =
+    collateralTokenAddress.toLowerCase() ===
     order.orderAsset.collateralToken.address.toLowerCase();
-  const isOrderTokenMatch = collateralTokenAddress.toLowerCase() ===
+  const isOrderTokenMatch =
+    collateralTokenAddress.toLowerCase() ===
     order.orderAsset.orderToken.address.toLowerCase();
   const tradeFee = getTradeFee(user);
 
   let orderAmount = BigInt(0);
   let orderGasFee = BigInt(0);
-  let onlyCollateral = BigInt(0)
+  let onlyCollateral = BigInt(0);
 
-  if (isCollateralMatch && order.orderType === 'BUY') {
-    orderAmount += BigInt(order.amount.orderSize);
-    onlyCollateral += BigInt(order.amount.orderSize);
-    orderGasFee += (gasFee * BigInt(2));
+  if (order.orderType === "BUY" && order.orderStatus == "PENDING") {
+    orderGasFee += gasFee * BigInt(2);
+    if (isCollateralMatch) {
+      orderAmount += BigInt(order.amount.orderSize);
+      onlyCollateral += BigInt(order.amount.orderSize);
+    }
   }
-  if (isOrderTokenMatch && order.orderType === 'SELL') {
-    orderAmount += BigInt(order.amount.tokenAmount);
+
+  if(order.orderType === "SELL" &&  order.orderStatus == 'PENDING' || order.orderType === "SELL" &&  order.orderStatus == 'OPENED'){
     orderGasFee = gasFee;
+    if(isOrderTokenMatch){
+      orderAmount += BigInt(order.amount.tokenAmount);
+    }
   }
 
-  let tradeAmount = (onlyCollateral*tradeFee)/BASIS_POINT_DIVISOR_BIGINT;
-   orderAmount += tradeAmount;
+  let tradeAmount = (onlyCollateral * tradeFee) / BASIS_POINT_DIVISOR_BIGINT;
+  orderAmount += tradeAmount;
   return { orderAmount, orderGasFee };
 };
 
@@ -53,22 +61,27 @@ export const calculateExistingLockedFunds = (
   walletId: string,
   collateralTokenAddress: string,
   gasFee: bigint,
-  user:any
+  user: any,
 ) => {
   let totalActiveOrders = 0;
   let lockedFundBalance = BigInt(0);
   let totalCollateralPending = BigInt(0);
   
-
   orders.forEach((order) => {
-    if (order.wallet?._id === walletId && order.isActive == true) {
+    console.log(order.wallet === walletId &&
+      order.isActive == true &&
+      order.isBusy == false)
+    if (
+      order.wallet === walletId &&
+      order.isActive == true &&
+      order.isBusy == false
+    ) {
       const costs = getOrderCosts({
         order,
         collateralTokenAddress,
         gasFee,
-        user
+        user,
       });
-      console.log(costs)
 
       if (collateralTokenAddress !== ZeroAddress) {
         lockedFundBalance += costs.orderGasFee;

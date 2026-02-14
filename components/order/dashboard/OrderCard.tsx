@@ -190,7 +190,7 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
                     {order.entry.isTechnicalEntry == true  ? (
                       <div className="flex flex-col gap-1 max-w-[240px]">
                         <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-500">
-                          <FiActivity /> Technical
+                          <FiActivity /> Technical Entry
                         </span>
                         <div className="overflow-x-auto pb-1 scrollbar-thin">
                           <LogicSummary node={order.entry.technicalLogic!} />
@@ -198,7 +198,7 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
                       </div>
                     ) : (
                           renderPriceField(
-                            "Entry Price",
+                            "ENTRY PRICE",
                             order.entry.priceLogic?.threshold || 0,
                             { color: "text-green-600" },
                           )
@@ -216,7 +216,7 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
             {order.exit.isTechnicalExit == true ? (
                       <div className="flex flex-col gap-1 max-w-[240px]">
                         <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-500">
-                          <FiActivity /> Technical
+                          <FiActivity /> Technical Exit
                         </span>
                         <div className="overflow-x-auto pb-1 scrollbar-thin">
                           <LogicSummary node={order.exit.technicalLogic!} />

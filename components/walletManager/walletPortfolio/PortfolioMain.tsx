@@ -27,6 +27,9 @@ import { fetchCodexWalletBalances } from "@/lib/oracle/codex";
 // Components
 import WalletOverview from "./walletOverview";
 import MyTokenPortfolio from "./UserTokensList";
+import ActivityModel from '@/components/activity/activityTable';
+import Analytics from '@/components/walletManager/walletPortfolio/walletAnalytics';
+import WalletSettings from '@/components/walletManager/walletPortfolio/walletSettings';
 import CreationModel from "@/components/walletManager/modal/createWalletModel";
 import { safeParseUnits } from "@/utility/handy";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
@@ -72,9 +75,12 @@ export default function PortfolioMain({
     null,
   );
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Refs for Optimization
   const isInitialMount = useRef(true);
   const prevSelectedWalletRef = useRef<string | null>(null);
   const prevChainIdRef = useRef<number | null>(null);
+  const fetchIdRef = useRef(0); // Tracks the latest fetch request ID
 
   // --- Memoized Values ---
 
@@ -91,14 +97,18 @@ export default function PortfolioMain({
     async (walletAddress: string) => {
       if (!walletAddress) return;
 
+      const currentFetchId = ++fetchIdRef.current; // Increment fetch ID
       setIsLoading(true);
+      
       try {
         // 1. Fetch data in parallel
         const [walletInfo, nativeBalanceRaw] = await Promise.all([
           fetchCodexWalletBalances({ walletAddress, chainId, limit: 100 }),
           getWalletBalance({ walletAddress, chainId }),
         ]);
-        //console.log(walletInfo, nativeBalanceRaw);
+
+        // Optimization: Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) return;
 
         if (walletInfo && Array.isArray(walletInfo)) {
           // 2. High-precision summation using BigInt
@@ -129,13 +139,18 @@ export default function PortfolioMain({
           });
         }
       } catch (error) {
-        console.error("Portfolio sync error:", error);
-        toast.error("Failed to fetch wallet data");
+        // Only log error if this is still the active request
+        if (currentFetchId === fetchIdRef.current) {
+            console.error("Portfolio sync error:", error);
+            toast.error("Failed to fetch wallet data");
+        }
       } finally {
-        setIsLoading(false);
+        if (currentFetchId === fetchIdRef.current) {
+            setIsLoading(false);
+        }
       }
     },
-    [chainId], // Removed selectedWallet?.address dependency
+    [chainId],
   );
 
   const handleWalletChange = useCallback((wallet: WalletConfig) => {
@@ -167,32 +182,23 @@ export default function PortfolioMain({
         filteredWallets.some((w) => w._id === selectedWallet._id);
 
       if (walletStillValid) {
-        // Wallet is still valid, keep it selected
         return;
       } else {
-        // Select the first available wallet
         setSelectedWallet(filteredWallets[0]);
       }
     } else {
       setSelectedWallet(null);
     }
-  }, [filteredWallets]); // Removed chainId dependency
+  }, [filteredWallets]); 
 
   // Fetch wallet data when selected wallet or chainId changes
   useEffect(() => {
-    setBalanceData({
-      nativeBalance: "0",
-      holdingTokens: [],
-      totalSpotUsd: "0",
-      totalPerpUsd: "0",
-    });
-    // Skip initial mount
+    // Skip initial mount check logic is handled, but we ensure clean state
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
 
-    // Check if we actually need to fetch new data
     const walletChanged =
       selectedWallet?.address !== prevSelectedWalletRef.current;
     const chainChanged = chainId !== prevChainIdRef.current;
@@ -206,7 +212,17 @@ export default function PortfolioMain({
     prevChainIdRef.current = chainId;
 
     if (selectedWallet?.address) {
+      // Reset data before fetching to show loading state cleanly or keep old data?
+      // Keeping old data is usually smoother, but user asked for "smooth fetch".
+      // We'll rely on isLoading state.
       handleSelectedWallet(selectedWallet.address);
+    } else {
+        setBalanceData({
+            nativeBalance: "0",
+            holdingTokens: [],
+            totalSpotUsd: "0",
+            totalPerpUsd: "0",
+          });
     }
   }, [selectedWallet?.address, chainId, handleSelectedWallet]);
 
@@ -219,9 +235,11 @@ export default function PortfolioMain({
   ] as const;
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-[#08090a] text-white p-4 lg:p-8 font-sans selection:bg-blue-500/30">
-      {/* Header Section */}
-      <header className="max-w-7xl mx-auto mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+    // OPTIMIZATION: h-screen + flex-col + overflow-hidden to constrain viewport
+    <div className="h-screen bg-gray-100 dark:bg-[#08090a] text-white flex flex-col font-sans selection:bg-blue-500/30 overflow-hidden">
+      
+      {/* Header Section: flex-shrink-0 ensures it stays fixed size */}
+      <div className="w-full lg:w-2/3 mx-auto mb-4 lg:mb-6 2xl:mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-6 flex-shrink-0 pt-4 px-4 lg:px-0">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
@@ -321,12 +339,13 @@ export default function PortfolioMain({
             />
           </motion.button>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Navigation Sidebar */}
-        <nav className="lg:col-span-3 space-y-4">
-          <div className="dark:bg-[#12141a] bg-white border border-white/5 p-2 rounded-[24px] flex lg:flex-col gap-1 shadow-xl sticky top-4">
+      {/* OPTIMIZATION: flex-1 + overflow-hidden allows internal scrolling */}
+      <main className="w-full lg:w-2/3 flex-1 overflow-hidden min-h-0  lg:flex mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 px-4 lg:px-0 pb-4">
+        {/* Navigation Sidebar: overflow-y-auto allows independent scroll if needed */}
+        <nav className="w-full lg:w-1/4 h-full overflow-y-auto no-scrollbar">
+          <div className="dark:bg-[#12141a] bg-white border border-white/5 p-2 rounded-[24px] flex lg:flex-col gap-1 shadow-xl sticky top-0">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -363,8 +382,8 @@ export default function PortfolioMain({
           </div>
         </nav>
 
-        {/* Content Area */}
-        <section className="lg:col-span-9 min-h-[600px]">
+        {/* Content Area: overflow-y-auto enables the scrollable behavior you requested */}
+        <section className="w-full h-full lg:grow  flex-1 overflow-y-auto  custom-scrollbar relative">
           <AnimatePresence mode="wait">
             {selectedWallet ? (
               <motion.div
@@ -373,6 +392,7 @@ export default function PortfolioMain({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
+                className="pb-20" // Add padding bottom so content isn't cut off
               >
                 {activeTab === "overview" && (
                   <WalletOverview
@@ -390,7 +410,9 @@ export default function PortfolioMain({
                     user={user}
                   />
                 )}
-                {/* {activeTab === 'analytics' && <RenderWalletAnalytics wallet={selectedWallet} />} */}
+                {activeTab === 'activity' && <ActivityModel user={user} />}
+                {activeTab === 'analytics' && <Analytics address={selectedWallet.address} chainId={chainId}/>}
+                {activeTab === 'settings' && <WalletSettings wallet={selectedWallet}/>}
               </motion.div>
             ) : (
               <div className="flex flex-col items-center justify-center h-96 text-gray-500 border border-dashed border-gray-800 rounded-3xl bg-white/5">

@@ -139,15 +139,7 @@ export default function FundingModal({
         tokenDecimals: tokenInfo.decimals,
       });
 
-      if (withdrawResult?.success === false) {
-        // Handle explicit failure
-        const type = withdrawResult.type || "DEFAULT_ERROR";
-        const tMessage =
-          NOTIFICATION_CONFIG[type]?.message || "Withdrawal failed";
-        toast.error(tMessage);
-      } else {
-        // Handle success
-        toast.success(`Successfully withdrew ${amount} ${tokenInfo.symbol}`);
+      if (withdrawResult?.success == true) {
         onClose();
         setAmount(""); // Reset form
       }

@@ -104,7 +104,7 @@ export default function DefinedTradeBox({
   userWallets = [],
   userPrevOrders = [],
 }: DefinedTradeBoxProps) {
-  const { configureOrder, addOrder } = useSpotOrder();
+  const { configureOrder, addSpotOrder } = useSpotOrder();
 
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -417,7 +417,7 @@ export default function DefinedTradeBox({
     setCreationPending(true);
 
     try {
-      const submitOrder = await addOrder({
+      const submitOrder = await addSpotOrder({
         estOrders,
         areWalletsReady,
         gridsByWallet,
@@ -430,7 +430,6 @@ export default function DefinedTradeBox({
       });
 
       if (submitOrder.added == true) {
-        toast.success("Successfully created order");
         // Reset form
         setGridNumber(1);
         setEstOrders([]);
@@ -439,11 +438,8 @@ export default function DefinedTradeBox({
         setTechnicalEntry(null);
         setIsConfirmationOpen(false);
         setIsOrderNameValidate(false);
-      } else {
-        toast.error(submitOrder.message);
       }
     } catch (error) {
-      toast.error("Failed to creat order");
       //console.error("Order submission failed:", error);
     } finally {
       setCreationPending(false);
@@ -489,7 +485,7 @@ export default function DefinedTradeBox({
         slippage,
       };
       const _estOrders = configureOrder(orderConfig);
-
+      
       setEstOrders(_estOrders);
     } else {
       setEstOrders([]);
@@ -519,6 +515,7 @@ export default function DefinedTradeBox({
     estimatedUsdValue, // added dependency
   ]);
 
+   console.log(gridsByWallet);
   // const MemoizedWalletSelector = useMemo(
   //     () => (
   //         <WalletSelector
@@ -1079,7 +1076,16 @@ export default function DefinedTradeBox({
 
       {/* Confirmation Modal */}
       {isConfirmationOpen && (
-        <ConfirmationModal isOpen={isConfirmationOpen} onClose={()=>setIsConfirmationOpen(false)} onConfirm={handleOrderSubmit} title="Create order" description='' confirmText="Successfully create order" cancelText=""/>
+        <ConfirmationModal 
+        isOpen={isConfirmationOpen} 
+        onClose={()=>setIsConfirmationOpen(false)} 
+        onConfirm={handleOrderSubmit} 
+        title="Create order" 
+        description='Are you sure to create order?' 
+        confirmText="Confirm" 
+        cancelText="Cancel"
+        variant="default"
+        />
       )}
     </div>
   );

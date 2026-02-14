@@ -5,12 +5,18 @@ import {
   PRECISION_DECIMALS,
 } from "@/constants/common/utils";
 import { safeParseUnits } from "@/utility/handy";
+import { chains } from "@/constants/common/chain";
 import { userDeafultTokens } from "@/constants/common/tokens";
 import { USER_LEVEL } from "@/constants/common/user";
-import TechnicalEntry from "@/components/tradeBox/TradeBoxCommon/TechnicalEntry";
 import OrderService from "@/service/order-service";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
+
+import {
+  handleServerErrorToast,
+  notify,
+  notifyWithResponseError,
+} from "@/lib/utils";
 
 interface AddOrderProps {
   estOrders: ORDER_TYPE[];
@@ -324,7 +330,7 @@ export const useSpotOrder = () => {
     return estOrders;
   };
 
-  const addOrder = async ({
+  const addSpotOrder = async ({
     estOrders,
     areWalletsReady,
     gridsByWallet,
@@ -336,58 +342,71 @@ export const useSpotOrder = () => {
     isLong,
     user,
   }: AddOrderProps) => {
+    let orderAddResult = { added: false, error: null as string | null };
     try {
       // Validate inputs
       if (estOrders.length == 0 || !areWalletsReady) {
-        return {
-          added: false,
-          message: "Please selects wallet and create order properly",
-        };
+        let key = "INVALID_EST_ORDERS";
+        notify("error", key);
+        orderAddResult.error = key;
+        return orderAddResult;
       }
 
-      let userAddedAssetes = user.assetes || [];
-      let userTokens = [...userAddedAssetes, ...userDeafultTokens]
-        .filter((t) => t.split(":")[1] == chainId)
-        .map((t) => t.split(":")[0].toLowerCase());
-
-      if (
-        category != "perpetual" &&
-        !userTokens.includes(indexToken.toLowerCase())
-      ) {
-        return {
-          added: false,
-          message: "Please add this token from explorer",
-        };
+      if(!chainId){
+        let key = "INVALID_NETWORK";
+        notify("error", key);
+        orderAddResult.error = key;
+        return orderAddResult;
+      }else{
+        if(!Object.values(chains).includes(chainId)){
+          let key = "UNSUPPORTED_NETWORK";
+          notify("error", key);
+          orderAddResult.error = key;
+          return orderAddResult;
+        }
       }
 
-      if (category == "perpetual" && typeof isLong != "boolean") {
-        return {
-          added: false,
-          message: "Please select position type",
-        };
+      if(!name){
+        let key = "INVALID_ORDER_NAME";
+          notify("error", key);
+          orderAddResult.error = key;
+          return orderAddResult;
+      }
+
+      if(!strategy){
+        let key = "INVALID ORDER_STRATEGY";
+          notify("error", key);
+          orderAddResult.error = key;
+          return orderAddResult;
+      }
+
+      if (category != "perpetual") {
+        let userAddedAssetes = user.assetes || [];
+        let userTokens = [...userAddedAssetes, ...userDeafultTokens]
+          .filter((t) => t.split(":")[1] == chainId)
+          .map((t) => t.toLowerCase());
+        if (!userTokens.includes((`${indexToken}:${chainId}`).toLowerCase())) {
+          let key = "TOKEN_NOT_ADDED";
+          notify("error", key);
+          orderAddResult.error = key;
+          return orderAddResult;
+        }
       }
 
       if (user.status != "admin") {
         const state = USER_LEVEL[user.status.toUpperCase()];
         if (!state) {
-          return {
-            added: false,
-            message: "User status not found!",
-          };
-        }
-
-        if (!state.benefits.supportTrading.includes(category)) {
-          return {
-            added: false,
-            message: "You are not allowed to create order on this category",
-          };
+          let key = "USER_NOT_ELIGIBLE";
+          notify("error", key);
+          orderAddResult.error = key;
+          return orderAddResult;
         }
 
         if (!state.benefits.supportStrategy.includes(strategy)) {
-          return {
-            added: false,
-            message: "You are not allowed to create order on this strategy",
-          };
+          let key = "UNSUPPORTED_STRATEGY";
+          notify("error", key);
+          orderAddResult.error = key;
+          return orderAddResult;
         }
       }
 
@@ -400,7 +419,7 @@ export const useSpotOrder = () => {
       }
 
       // Submit order
-      const response: any = await OrderService.addOrder({
+      const apiResponse: any = await OrderService.addOrder({
         orders: estOrders,
         chainId,
         strategy,
@@ -409,87 +428,96 @@ export const useSpotOrder = () => {
         category,
         name,
         isLong,
-      }).catch((err) => {
-        //console.log(err)
-        let message = err.response.data.message || "Failed to create Order.";
-        if (message == "EXIST_ORDER_NAME") {
-          throw new Error("Order name already exist");
-        } else if ("ORDERS_WALLET_NOT_MATCHED" == message) {
-          throw new Error("Insufficient wallet selection");
-        } else if ((message = "No valid wallets selected")) {
-          throw new Error("Invalid wallet selection");
-        } else if (message == "ONLY_SINGLE_WALLET") {
-          throw new Error("Only single wallet can select");
-        } else if (message == "ASSET_NOT_ADDED") {
-          throw new Error("Asset not add by user");
-        } else if (message == "EXCEED_ORDER_LIMIT") {
-          throw new Error("Exceed order limit");
-        } else {
-          throw new Error("Failed to create Order.");
-        }
       });
 
-      setUserOrders(response.allOrders);
-      return {
-        added: true,
-        message: "Successfully create the order",
-      };
+      if (!apiResponse.success) {
+        let key = apiResponse.success || "SERVER_ERROR";
+        notify("error", key);
+        orderAddResult.error = key;
+        return orderAddResult;
+      }
+
+      notify("success", "ORDER_CREATION_SUCCESS");
+
+      if (apiResponse.data.orders) {
+        setUserOrders(apiResponse.data.orders);
+      } else {
+        notifyWithResponseError("error", "Network congested. Refresh the page");
+      }
+      orderAddResult.added = true;
+      return orderAddResult;
     } catch (error: any) {
-      return {
-        added: false,
-        message: "Failed to create the order  ",
-        error: error.message,
-      };
+      let key = handleServerErrorToast({ err: error });
+      orderAddResult.error = key;
+      return orderAddResult;
     }
   };
 
   const deleteOrder = async (order: ORDER_TYPE) => {
+    let deleteResult = { deleted: false, error: null as string | null };
+    if (!order._id) {
+      let key = "INVALID_ORDER";
+      notify("error", key);
+      deleteResult.error = key;
+      return deleteResult;
+    }
     try {
-      let deleteResult = await OrderService.deleteOrde({
+      let apiResponse: any = await OrderService.deleteOrde({
         orderId: order._id,
-      }).catch((err: any) => {
-        let errorMessage =
-          err.response.data.message || "Failed to delete Order";
-        if (errorMessage == "ORDER_NOT_EXIST") {
-          throw new Error("Order not exist");
-        } else if (errorMessage == "ORDER_IN_USE") {
-          throw new Error("Order in process. Cant delete now.");
-        } else {
-          throw new Error("Failed to delete order");
-        }
       });
-      return { delete: true };
+      if (!apiResponse.deleted) {
+        let key = apiResponse.message || "SERVER_ERROR";
+        notify("error", key);
+        deleteResult.error = key;
+        return deleteResult;
+      }
+      notify("success", "ORDER_DELETE_SUCCESS");
+
+      if (apiResponse.data.orders) {
+        setUserOrders(apiResponse.data.orders);
+      } else {
+        notifyWithResponseError("error", "Network congested. Refresh the page");
+      }
+      deleteResult.deleted = true;
+      return deleteResult;
     } catch (err: any) {
-      return {
-        delete: false,
-        message: err.message || "failed to delete order",
-      };
+      let key = handleServerErrorToast({ err });
+      deleteResult.error = key;
+      return deleteResult;
     }
   };
 
   const closeOrder = async (order: ORDER_TYPE) => {
+    let closedResult = { deleted: false, error: null as string | null };
+    if (!order._id) {
+      let key = "INVALID_ORDER";
+      notify("error", key);
+      closedResult.error = key;
+      return closedResult;
+    }
     try {
-      let closeResult = await OrderService.closeOrder({
+      let apiResponse: any = await OrderService.closeOrder({
         orderId: order._id,
-      }).catch((err: any) => {
-        let errorMessage =
-          err.response.data.message || "Failed to delete Order";
-        if (errorMessage == "ORDER_NOT_EXIST") {
-          throw new Error("Order not exist");
-        } else if (errorMessage == "ORDER_IN_USE") {
-          throw new Error("Order in process. Cant delete now.");
-        } else if (errorMessage == 'INVALID_ORDER'){
-          throw new Error("Invalid order");
-        } else {
-          throw new Error("Failed to delete order");
-        }
       });
-      return { closed: true };
+      if (!apiResponse.closed) {
+        let key = apiResponse.message || "SERVER_ERROR";
+        notify("error", key);
+        closedResult.error = key;
+        return closedResult;
+      }
+      notify("success", "ORDER_DELETE_SUCCESS");
+
+      if (apiResponse.data.orders) {
+        setUserOrders(apiResponse.data.orders);
+      } else {
+        notifyWithResponseError("error", "Network congested. Refresh the page");
+      }
+      closedResult.deleted = true;
+      return closedResult;
     } catch (err: any) {
-      return {
-        closed: false,
-        message: err.message || "failed to delete order",
-      };
+      let key = handleServerErrorToast({ err });
+      closedResult.error = key;
+      return closedResult;
     }
   };
 
@@ -514,13 +542,24 @@ export const useSpotOrder = () => {
 
   const getOrders = async () => {
     try {
-      let orders = await OrderService.getOrder({});
-    } catch (err) {}
+      let apiResponse: any = await OrderService.getOrder({});
+      if (!apiResponse.success) {
+        let key = apiResponse.message || "SERVER_ERROR";
+        notify("error", key);
+        return false;
+      }
+      notify("success", "ORDER_FETCH_SUCCESS");
+      setUserOrders(apiResponse.data.orders);
+      return true;
+    } catch (err) {
+      let key = handleServerErrorToast({ err });
+      return false;
+    }
   };
 
   return {
     configureOrder,
-    addOrder,
+    addSpotOrder,
     closeOrder,
     deleteOrder,
     getOrders,

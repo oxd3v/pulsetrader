@@ -48,10 +48,10 @@ export type ACTIVITY_TYPE = {
         amountInUsd: string,
         parsedPrice: string
     },
-    nativeFee: {
-        amount: string,
-        amountInUsd: string
-    },
+    txFee: {
+     feeAmount: string,
+     feeInUsd: string
+    }
     info:any,
     txHash: string,
     indexToken: string,

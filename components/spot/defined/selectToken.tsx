@@ -80,7 +80,7 @@ const TokenRow = memo(
       setIsLoading(true);
       try{
         let res:any = await onAdd(tokenInfo.token.address)
-        if(res.success){
+        if(res.added == true){
           isAlreadyAdded = true;
           onSelect(tokenInfo.token.address);
         }
@@ -200,7 +200,6 @@ const TokenSelection = ({
   // Fix: Ensure we fallback to chain defaults correctly if available
   const alreadyAddedTokens = useMemo(() => {
     let userTokensByNetwork = [];
-    console.log(user.assetes)
     if (isConnected && user?.assetes?.length > 0) {
       userTokensByNetwork = user.assetes
         .filter((token: string) => {
