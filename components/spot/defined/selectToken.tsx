@@ -329,7 +329,7 @@ const TokenSelection = ({
   const handleAddToken = useCallback(
     async (tokenAddress: string) => {
       if (chainId) {
-        await addToken({tokenAddress, chainId});
+        return await addToken({tokenAddress, chainId});
       }
     },
     [addToken, chainId],

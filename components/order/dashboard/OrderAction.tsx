@@ -102,11 +102,6 @@ const OrderActions = React.memo(({ order }: OrderActionProps) => {
   const confirmDelete = async () => {
     try {
       let deleteResult = await deleteOrder(order);
-      if (deleteResult.delete == false) {
-        toast.error(deleteResult.message);
-      } else {
-        toast.success("Order deleted");
-      }
       setShowDeleteModal(false);
       setShowActions(false);
     } catch (err) {
@@ -116,12 +111,7 @@ const OrderActions = React.memo(({ order }: OrderActionProps) => {
 
   const confirmClose = async () => {
     try {
-      let closeResult: any = await deleteOrder(order);
-      if (closeResult.closed == false) {
-        toast.error(closeResult.message);
-      } else {
-        toast.success("Order deleted");
-      }
+      let closeResult: any = await closeOrder(order);
       setShowCloseModal(false);
       setShowActions(false);
     } catch (err) {

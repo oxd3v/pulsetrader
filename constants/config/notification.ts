@@ -280,6 +280,14 @@ export const NOTIFICATION_CONFIG: Record<string, { title: string; message: strin
         title: 'Order in processing',
         message: 'Network not supported'
     },
+    ['INVALID_ORDER_NAME']:{
+      title: 'Order in processing',
+      message: 'Enter valid order name'
+    },
+    ['INVALID ORDER_STRATEGY']:{
+      title: 'Order in processing',
+      message: 'Enter valid order strategy'
+    },
     ['ORDER_CLOSE_FAILED']:{
         title: 'Order closed',
         message: 'Failed to close order'

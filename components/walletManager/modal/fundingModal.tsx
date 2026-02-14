@@ -144,8 +144,8 @@ export default function FundingModal({
         setAmount(""); // Reset form
       }
     } catch (err) {
-      console.error("Withdrawal error:", err);
-      toast.error("An unexpected error occurred during withdrawal");
+      //console.error("Withdrawal error:", err);
+      //toast.error("An unexpected error occurred during withdrawal");
     } finally {
       setIsLoading(false); // Stop loading
     }
