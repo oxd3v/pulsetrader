@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { useUserAuth } from "@/hooks/useAuth";
 import { useWallet } from "@/hooks/useWallet";
@@ -155,13 +156,13 @@ export default function ConnectionBox({
             )}
           </>
         ) : (
-          <a
+          <Link
             href="https://metamask.io/download/"
             target="_blank"
             className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
           >
             Install MetaMask
-          </a>
+          </Link>
         )}
 
         {/* Divider */}

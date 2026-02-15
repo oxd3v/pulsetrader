@@ -254,7 +254,7 @@ export default function SettingsPage() {
                     target="_blank"
                     className="text-xs font-mono break-all text-gray-600 dark:text-gray-300 mb-4 line-clamp-2"
                   >
-                    {signature ? deviceLink : "No active session token"}
+                    {signature ? deviceLink : isConnected? "Reconnect you wallet to get signature" : 'Connect your wallet'}
                   </Link>
                   <button
                     disabled={!signature}

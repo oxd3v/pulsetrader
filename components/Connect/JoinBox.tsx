@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useWallet } from "@/hooks/useWallet";
@@ -134,13 +135,13 @@ export default function JoinBox({
         title="MetaMask Required"
         subtitle="Please install MetaMask to continue"
       >
-        <a
+        <Link
           href="https://metamask.io/download/"
           target="_blank"
           className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-orange-500/20"
         >
           Install MetaMask
-        </a>
+        </Link>
         <BackToLogin />
       </CardWrapper>
     );

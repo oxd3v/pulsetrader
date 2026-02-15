@@ -117,12 +117,12 @@ export default function CreateWalletModal({ isOpen, onClose }: ModalProps) {
               count={evmWalletCount}
               setCount={setEvmWalletCount}
             />
-            <CounterRow
+            {/* <CounterRow
               label="SVM Network"
               sub="SOLANA MAINNET"
               count={svmWalletCount}
               setCount={setSvmWalletCount}
-            />
+            /> */}
           </div>
 
           <div className="bg-blue-500/5 border border-blue-500/10 p-3 rounded-xl">

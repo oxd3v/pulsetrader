@@ -1,5 +1,6 @@
 "use client";
 import { useState, Suspense, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/hooks/useWallet";
 import { useUserAuth } from "@/hooks/useAuth";
@@ -67,6 +68,7 @@ function JoinByCodeInner() {
         signUpMethod: "INVITATION_CODE",
         invitationCode: invitationCode || undefined,
       });
+      console.log(result)
 
       if (result.joined == true) {
         router.push("/");
@@ -139,13 +141,13 @@ function JoinByCodeInner() {
       {/* Call to Action */}
       <div className="space-y-4">
         {!hasMetaMask ? (
-          <a
+          <Link
             href="https://metamask.io/download/"
             target="_blank"
             className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all"
           >
             <FiDownload /> Install MetaMask to Join
-          </a>
+          </Link>
         ) : !isMetamaskConnected ? (
           <button
             onClick={connectToMetamask}

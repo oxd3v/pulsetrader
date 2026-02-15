@@ -11,7 +11,7 @@ export const chains = {
 export const chainConfig = {
   [chains.Ethereum]: {
     rpcUrls: ["https://ethereum-rpc.publicnode.com"],
-    explorerUrl: "https://etherscan.io",
+    explorerUrl: "https://etherscan.io/",
     chainId: 1,
     name: "ETHEREUM",
     symbol: "ETH",
@@ -29,7 +29,7 @@ export const chainConfig = {
       "https://api.avax.network/ext/bc/C/rpc",
       "https://avalanche-c-chain-rpc.publicnode.com",
     ],
-    explorerUrl: "https://snowscan.xyz",
+    explorerUrl: "https://snowscan.xyz/",
     chainId: 43114,
     name: "AVALANCHE",
     symbol: "AVAX",
@@ -66,7 +66,7 @@ export const chainConfig = {
       //"https://solana-api.projectserum.com",
       //"https://rpc.ankr.com/solana"
     ],
-    explorerUrl: "https://explorer.solana.com/",
+    explorerUrl: "https://solscan.io/",
     chainId: 1399811149,
     name: "SOLANA",
     symbol: "SOL",
@@ -77,7 +77,7 @@ export const chainConfig = {
     },
     imageUrl: `https://solscan.io/_next/static/media/solana-sol-logo.ecf2bf3a.svg`,
     isPerpetual: false,
-    isActive: true,
+    isActive: false,
   },
 };
 

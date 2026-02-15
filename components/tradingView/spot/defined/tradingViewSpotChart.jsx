@@ -9,6 +9,7 @@ import { useShallow } from "zustand/shallow";
 import {
   getDynamicChartOverrides,
   enabledFeatures,
+  PlatformResolutionToChartResolution
 } from "@/constants/common/chart";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
 
@@ -152,8 +153,9 @@ const TradingViewAdvancedChart = React.memo(
       // Add new indicator if specified
       if (indicatorOnChart?.indicatorName) {
         const currentRes = tvWidgetRef.current.activeChart().resolution();
+        
         if (currentRes != indicatorOnChart.resolution) {
-          chart.setResolution(indicatorOnChart.resolution);
+          chart.setResolution(PlatformResolutionToChartResolution[indicatorOnChart.resolution]);
         }
         // const activeStudies = chart.getAllStudies();
         // const isActive = activeStudies.find((i)=>i.name == indicatorOnChart?.indicatorName);

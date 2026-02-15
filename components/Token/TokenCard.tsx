@@ -98,7 +98,7 @@ const TokenCard = memo(
                 {formateAmountWithFixedDecimals(
                   tokenBalance,
                   tokenInfo?.token.decimals || 18,
-                  4
+                  7
                 )}
               </span>
               <span className="text-[10px] text-gray-500 font-semibold">{tokenInfo?.symbol}</span>

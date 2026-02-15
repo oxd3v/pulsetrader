@@ -102,3 +102,12 @@ export const GtResolutionAggregate : Record<string,string> = {
   ['1D']: '1'
 }
 
+export const PlatformResolutionToChartResolution : Record<string,string> = {
+  ['1']: '1',
+  ['5']: '5',
+  ['15']: '15',
+  ['60']: '60',
+  ['240']: '240',
+  ['1440']: '1D'
+}
+

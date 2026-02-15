@@ -394,19 +394,10 @@ export const useUserAuth = () => {
           invitationCode,
           encryptedToken,
         });
+        console.log(apiResponse, !apiResponse.joined, !apiResponse?.data?.userData?.account);
+        console.log(!apiResponse.joined || !apiResponse?.data?.userData?.account)
 
-        if (
-          apiResponse.joined == true &&
-          !apiResponse?.data?.userData?.account
-        ) {
-          localStorage.setItem(TOKEN_STORAGE_KEY, signature);
-          localStorage.setItem(ACCOUNT_STORAGE_KEY, account);
-          setSignature(signature);
-          updateGlobalUserState(apiResponse.data);
-          notify("success", "JOIN_SUCCESS");
-          joinedResult.joined = true;
-          return joinedResult;
-        } else {
+        if (!apiResponse.joined || !apiResponse?.data?.userData?.account) {
           // Clean up if API fails
           localStorage.removeItem(TOKEN_STORAGE_KEY);
           let key = apiResponse.message || "SERVER_ERROR";
@@ -414,7 +405,16 @@ export const useUserAuth = () => {
           joinedResult.error = key;
           return joinedResult;
         }
+        
+        localStorage.setItem(TOKEN_STORAGE_KEY, signature);
+        localStorage.setItem(ACCOUNT_STORAGE_KEY, account);
+        setSignature(signature);
+        updateGlobalUserState(apiResponse.data);
+        notify("success", "JOIN_SUCCESS");
+        joinedResult.joined = true;
+        return joinedResult;
       } catch (err: any) {
+        console.log(err)
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         const key = handleServerErrorToast({ err });
         joinedResult.error = key;
@@ -524,7 +524,7 @@ export const useUserAuth = () => {
           svmWallets,
         });
 
-        if (!apiResponse.sucess) {
+        if (!apiResponse.success) {
           let key = apiResponse.message || "SERVER_ERROR";
           notify("error", key);
           creationResult.error = key;
@@ -533,7 +533,7 @@ export const useUserAuth = () => {
         notify("success", "WALLET_CREATION_SUCCESS");
         creationResult.created = true;
         if (apiResponse?.data?.wallets) {
-          setUserWallets(apiResponse.wallets);
+          setUserWallets(apiResponse.data.wallets);
         } else {
           notifyWithResponseError("success", "Network congested refresh page");
         }
@@ -625,7 +625,7 @@ export const useUserAuth = () => {
             "Network congested. Refresh the page",
           );
         }
-        
+
         removeResult.removed = true;
         return removeResult;
       } catch (err: any) {
@@ -692,14 +692,20 @@ export const useUserAuth = () => {
     }
   };
 
-  const getUserHistory = async ({page, limit = 50}: {page: number, limit: number}) => {
+  const getUserHistory = async ({
+    page,
+    limit = 50,
+  }: {
+    page: number;
+    limit: number;
+  }) => {
     let historiesResult = {
       success: false,
-      histories: null, 
+      histories: null,
       error: null as string | null,
     };
     try {
-      let apiResponse: any = await Service.getUserHistories({page, limit});
+      let apiResponse: any = await Service.getUserHistories({ page, limit });
       if (!apiResponse.success || !apiResponse?.data?.histories) {
         let key = apiResponse.message || "SERVER_ERROR";
         notify("error", key);
@@ -765,6 +771,6 @@ export const useUserAuth = () => {
     connectByToken,
     addToken,
     getPrivateKey,
-    getUserHistory
+    getUserHistory,
   };
 };

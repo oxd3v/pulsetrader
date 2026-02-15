@@ -13,6 +13,8 @@ import { FaWallet } from "react-icons/fa";
 import { formatUnits } from "ethers";
 import { displayNumber } from "@/utility/displayPrice";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
+import { chainConfig } from '@/constants/common/chain';
+import Link from 'next/link';
 
 /**
  * Enhanced Activity Card
@@ -50,10 +52,11 @@ const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE
     payToken, 
     receiveToken, 
     txHash, 
+    chainId,
     wallet,
     txFee 
   } = activityDetails;
-  console.log(activityDetails);
+  
 
   // Configuration for Activity Types
   const getTypeConfig = (type: string) => {
@@ -83,9 +86,10 @@ const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE
 
   // Dynamic Explorer Link
   const getExplorerLink = () => {
-    if (wallet?.network === 'EVM') return `https://etherscan.io/tx/${txHash}`;
-    if (wallet?.network === 'SVM') return `https://solscan.io/tx/${txHash}`;
-    return "#";
+    return `${chainConfig[chainId].explorerUrl}tx/${txHash}`
+    // if (wallet?.network === 'EVM') return `https://etherscan.io/tx/${txHash}`;
+    // if (wallet?.network === 'SVM') return `https://solscan.io/tx/${txHash}`;
+    // return "#";
   };
 
   return (
@@ -160,14 +164,14 @@ const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE
           </div>
         </div>
 
-        <a 
+        <Link 
           href={getExplorerLink()}
           target="_blank" 
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-zinc-500 hover:text-white hover:bg-zinc-900 dark:hover:bg-zinc-100 dark:hover:text-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 transition-all"
         >
           EXPLORER <FiExternalLink className="text-xs" />
-        </a>
+        </Link>
       </div>
       
       {/* Interactive Fee Tag (Hover) */}
