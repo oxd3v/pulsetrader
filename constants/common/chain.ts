@@ -98,7 +98,6 @@ export const gtValidNetworkIdentifiers = [
 // Connection provider cache
 // ------------------------------------------------------------------
 
-const connectionCache = new Map<string, Connection | ethers.JsonRpcProvider>();
 
 export const getConnectionProvider = (
   chainId: number
@@ -106,18 +105,13 @@ export const getConnectionProvider = (
   if (!isValidChain(chainId)) {
     throw new Error(`Invalid chain ID: ${chainId}`);
   }
-
-  const cacheKey = `chain_${chainId}`;
-  const cached = connectionCache.get(cacheKey);
-  if (cached) return cached;
-
   const rpcUrls = chainConfig[chainId].rpcUrls;
   if (!rpcUrls.length) {
     throw new Error(`No RPC URLs available for chain ID: ${chainId}`);
   }
 
   let connection: Connection | ethers.JsonRpcProvider | undefined;
-  let lastError: unknown;
+  //let lastError: unknown;
   // shuffle for load balancing
   const shuffled = [...rpcUrls].sort(() => Math.random() - 0.5);
 
@@ -130,8 +124,9 @@ export const getConnectionProvider = (
         connection = conn;
         break;
       } catch (err) {
-        lastError = err;
-        console.warn(`Failed to connect to Solana RPC ${url}:`, err);
+        continue
+        //lastError = err;
+       // console.warn(`Failed to connect to Solana RPC ${url}:`, err);
       }
     }
   } else {
@@ -143,18 +138,17 @@ export const getConnectionProvider = (
         connection = prov;
         break;
       } catch (err) {
-        lastError = err;
-        console.warn(`Failed to connect to RPC ${url}:`, err);
+        continue;
+        //lastError = err;
+        //console.warn(`Failed to connect to RPC ${url}:`, err);
       }
     }
   }
 
   if (!connection) {
     throw new Error(
-      `Failed to connect to any RPC for chain ID: ${chainId} (${lastError})`
+      `Failed to connect to any RPC for chain ID: ${chainId}`
     );
   }
-
-  connectionCache.set(cacheKey, connection);
   return connection;
 };

@@ -188,7 +188,7 @@ export const useSpotOrder = () => {
           name: orderName,
           strategy,
           category: "spot",
-          orderType: "SELL",
+          orderType: "BUY",
           orderStatus: "PENDING",
           entry: {
             isTechnicalEntry: false,

@@ -111,3 +111,12 @@ export const PlatformResolutionToChartResolution : Record<string,string> = {
   ['1440']: '1D'
 }
 
+export const fontendDisplayCharts : Record<string,string> = {
+  ['1']: '1m',
+  ['5']: '5m',
+  ['15']: '15m',
+  ['60']: '1h',
+  ['240']: '4h',
+  ['1440']: '1d'
+}
+

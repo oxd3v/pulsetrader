@@ -26,6 +26,7 @@ export const getOrderCosts = ({
   const isCollateralMatch =
     collateralTokenAddress.toLowerCase() ===
     order.orderAsset.collateralToken.address.toLowerCase();
+  
   const isOrderTokenMatch =
     collateralTokenAddress.toLowerCase() ===
     order.orderAsset.orderToken.address.toLowerCase();
@@ -34,7 +35,6 @@ export const getOrderCosts = ({
   let orderAmount = BigInt(0);
   let orderGasFee = BigInt(0);
   let onlyCollateral = BigInt(0);
-
   if (order.orderType === "BUY" && order.orderStatus == "PENDING") {
     orderGasFee += gasFee * BigInt(2);
     if (isCollateralMatch) {

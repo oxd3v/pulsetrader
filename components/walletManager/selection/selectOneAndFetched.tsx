@@ -43,6 +43,7 @@ import {
 } from "@/lib/fund/fundHelper";
 import { ZeroAddress } from "ethers";
 
+import { mockWallets } from "@/constants/common/mock";
 import { chains } from "@/constants/common/chain";
 
 // Define missing types
@@ -52,7 +53,7 @@ type Order = ORDER_TYPE & {
   wallet?: WalletConfig;
 };
 
-// Interface: Separated static fetched data from dynamic estimates
+// Refactored Interface: Separated static fetched data from dynamic estimates
 interface WalletData {
   config: WalletConfig;
   totalActiveOrders: number;
@@ -87,9 +88,9 @@ interface WalletSelectorProps {
 // ============================================
 
 interface WalletCardProps {
-  wallet: WalletConfig;
-  walletData?: WalletData;
-  isLoading?: boolean;
+  wallet: WalletConfig;                       // Always available
+  walletData?: WalletData;                     // May be undefined if not loaded
+  isLoading?: boolean;                          // True when fetching this wallet
   isSelected: boolean;
   onSelect?: (wallet: WalletConfig) => void | Promise<void>;
   onRemove: (wallet: WalletConfig) => void;
@@ -98,7 +99,7 @@ interface WalletCardProps {
   selectedGrids: number[];
   selectGrid?: (wallet: WalletConfig, order: Order) => void;
   chainId: number;
-  estimates?: WalletEstimates;
+  estimates?: WalletEstimates;                  // Passed only for selected wallets
 }
 
 const WalletCard = React.memo(
@@ -120,11 +121,15 @@ const WalletCard = React.memo(
 
     // Derived state for validation (only if data is loaded)
     const {
+      availableBalance,
+      availableTokens,
       hasInsufficientBalance,
       hasInsufficientTokens,
     } = useMemo(() => {
       if (!walletData) {
         return {
+          availableBalance: BigInt(0),
+          availableTokens: BigInt(0),
           hasInsufficientBalance: false,
           hasInsufficientTokens: false,
         };
@@ -140,6 +145,8 @@ const WalletCard = React.memo(
         availableTokens < (estimates.estAmount || BigInt(0));
 
       return {
+        availableBalance,
+        availableTokens,
         hasInsufficientBalance,
         hasInsufficientTokens,
       };
@@ -170,9 +177,9 @@ const WalletCard = React.memo(
     // Memoize native token info
     const nativeToken: any = useMemo(() => {
       return (
-        Object.values(Tokens[chainId] || {}).find(
+        Object.values(Tokens[chainId]).find(
           (token: any) => token.address === ZeroAddress,
-        ) || (Tokens[chainId] ? Tokens[chainId][ZeroAddress] : { symbol: 'ETH', decimals: 18, imageUrl: '' })
+        ) || Tokens[chainId][ZeroAddress]
       );
     }, [chainId]);
 
@@ -350,12 +357,12 @@ const WalletCard = React.memo(
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <img
-                      src={nativeToken?.imageUrl}
+                      src={nativeToken.imageUrl}
                       className="w-5 h-5 rounded-full"
-                      alt={nativeToken?.symbol}
+                      alt={nativeToken.symbol}
                     />
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {nativeToken?.symbol}
+                      {nativeToken.symbol}
                     </span>
                   </div>
                   <FaGasPump className="w-4 h-4 text-gray-400" />
@@ -367,7 +374,7 @@ const WalletCard = React.memo(
                       Total Balance
                     </div>
                     <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatBalance(walletData.balance, nativeToken?.decimals || 18)}
+                      {formatBalance(walletData.balance, nativeToken.decimals)}
                     </div>
                   </div>
 
@@ -379,7 +386,7 @@ const WalletCard = React.memo(
                     <div className="text-sm font-semibold text-red-600 dark:text-red-400">
                       {formatBalance(
                         walletData.lockedFundBalance,
-                        nativeToken?.decimals || 18,
+                        nativeToken.decimals,
                       )}
                     </div>
                   </div>
@@ -401,7 +408,7 @@ const WalletCard = React.memo(
                       />
                     </div>
                     <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatBalance(estimates.estCost, nativeToken?.decimals || 18)}
+                      {formatBalance(estimates.estCost, nativeToken.decimals)}
                     </div>
                     {hasInsufficientBalance && (
                       <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
@@ -580,14 +587,7 @@ const WalletSelector = ({
   const [loadingWallets, setLoadingWallets] = useState<Set<string>>(new Set());
 
   const [gasFee, setGasFee] = useState<bigint>(BigInt(0));
-  const isMounted = useRef(true);
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Single wallet strategies check
   const isSingleWalletStrategy = useMemo(() => {
@@ -628,8 +628,8 @@ const WalletSelector = ({
   const ordersByWallet = useMemo(() => {
     const map = new Map<string, ORDER_TYPE[]>();
     orders.forEach((order) => {
-      if (order.wallet._id) {
-        const walletId = order.wallet._id.toString();
+      if (order.wallet) {
+        const walletId = order.wallet.toString();
         if (!map.has(walletId)) map.set(walletId, []);
         map.get(walletId)!.push(order);
       }
@@ -637,106 +637,80 @@ const WalletSelector = ({
     return map;
   }, [orders]);
 
-  // Per-wallet data fetcher
-  // Removed global abort controller to prevent race conditions during multiple selections
-  const fetchSingleWalletData = useCallback(
-    async (wallet: WalletConfig, force = false): Promise<WalletData | undefined> => {
-      const address = wallet.address.toLowerCase();
-      
-      // If not forced and data already exists, return cached data
-      if (!force && walletDataMap[address]) {
-        return walletDataMap[address];
-      }
+  // Per-wallet data fetcher - now returns the data
+const fetchSingleWalletData = useCallback(
+  async (wallet: WalletConfig): Promise<WalletData | undefined> => {
+    const address = wallet.address.toLowerCase();
+    // Avoid duplicate fetches
+    if (walletDataMap[address] || loadingWallets.has(wallet._id)) {
+      return walletDataMap[address];
+    }
 
-      setLoadingWallets((prev) => new Set(prev).add(wallet._id));
+    setLoadingWallets((prev) => new Set(prev).add(wallet._id));
 
-      // Timeout promise for 15s
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Fetch timeout")), 15000)
+    try {
+      const walletOrders = ordersByWallet.get(wallet._id) || [];
+
+      const lockedFunds = calculateExistingLockedFunds(
+        walletOrders,
+        wallet._id,
+        collateralToken.address,
+        gasFee,
+        user,
       );
 
-      try {
-        const walletOrders = ordersByWallet.get(wallet._id) || [];
+      const [balance, tokenBalance] = await Promise.all([
+        getWalletBalance({ walletAddress: wallet.address, chainId }),
+        collateralToken.address !== ZeroAddress
+          ? getWalletTokenBalance({
+              walletAddress: wallet.address,
+              tokenAddress: collateralToken.address,
+              chainId,
+            })
+          : Promise.resolve(BigInt(0)),
+      ]);
 
-        const lockedFunds = calculateExistingLockedFunds(
-          walletOrders,
-          wallet._id,
-          collateralToken.address,
-          gasFee,
-          user,
-        );
+      const newData: WalletData = {
+        config: wallet,
+        ...lockedFunds,
+        balance:
+          typeof balance === "string"
+            ? safeParseUnits(balance, 18)
+            : BigInt(balance),
+        tokenBalance:
+          typeof tokenBalance === "string"
+            ? safeParseUnits(tokenBalance, collateralToken.decimals)
+            : BigInt(tokenBalance),
+      };
 
-        const fetchPromise = Promise.all([
-            getWalletBalance({ walletAddress: wallet.address, chainId }),
-            collateralToken.address !== ZeroAddress
-              ? getWalletTokenBalance({
-                  walletAddress: wallet.address,
-                  tokenAddress: collateralToken.address,
-                  chainId,
-                })
-              : Promise.resolve(BigInt(0)),
-          ]);
+      // Update state for caching
+      setWalletDataMap((prev) => ({
+        ...prev,
+        [address]: newData,
+      }));
 
-        const [balance, tokenBalance] = await Promise.race([
-          fetchPromise,
-          timeoutPromise,
-        ]) as [any, any];
-
-        if (!isMounted.current) return undefined;
-
-        const newData: WalletData = {
-          config: wallet,
-          ...lockedFunds,
-          balance:
-            typeof balance === "string"
-              ? safeParseUnits(balance, 18)
-              : BigInt(balance),
-          tokenBalance:
-            typeof tokenBalance === "string"
-              ? safeParseUnits(tokenBalance, collateralToken.decimals)
-              : BigInt(tokenBalance),
-        };
-
-        // Update state
-        setWalletDataMap((prev) => ({
-          ...prev,
-          [address]: newData,
-        }));
-
-        return newData;
-      } catch (error) {
-        if (isMounted.current) {
-          console.error("Wallet data fetch error:", error);
-          // Only toast if it was a real user interaction error, not just a background check
-          if (force) toast.error(`Failed to load data for ${wallet.address.slice(0, 6)}...`);
-        }
-        return undefined;
-      } finally {
-        if (isMounted.current) {
-          setLoadingWallets((prev) => {
-            const next = new Set(prev);
-            next.delete(wallet._id);
-            return next;
-          });
-        }
-      }
-    },
-    [ordersByWallet, collateralToken, gasFee, chainId, user, walletDataMap]
-  );
+      return newData;
+    } catch (error) {
+      toast.error(`Failed to load data for ${wallet.address.slice(0, 6)}...`);
+      return undefined;
+    } finally {
+      setLoadingWallets((prev) => {
+        const next = new Set(prev);
+        next.delete(wallet._id);
+        return next;
+      });
+    }
+  },
+  [walletDataMap, ordersByWallet, collateralToken, gasFee, chainId, user],
+);
 
   // Centralized Estimation Logic (Memoized)
   const estimatesByWallet = useMemo(() => {
     const estimates: Record<string, WalletEstimates> = {};
 
-    // Initialize zero estimates for all known wallets (selected or loaded)
+    // Initialize zero estimates for all known wallets
     Object.keys(walletDataMap).forEach((address) => {
       estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
-    });
-
-    // Also ensure selected wallets have an entry even if data not loaded yet
-    selectedWallets.forEach((w) => {
-       const addr = w.address.toLowerCase();
-       if (!estimates[addr]) estimates[addr] = { estAmount: BigInt(0), estCost: BigInt(0) };
     });
 
     // Iterate through assigned grids and sum up costs
@@ -744,8 +718,6 @@ const WalletSelector = ({
       const order = estOrders.find((o) => o.sl === Number(gridSl));
       if (order && walletConfig && walletConfig.address) {
         const address = walletConfig.address.toLowerCase();
-        
-        // Ensure entry exists
         if (!estimates[address])
           estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
 
@@ -755,7 +727,6 @@ const WalletSelector = ({
           gasFee,
           user,
         });
-       
 
         if (collateralToken.address !== ZeroAddress) {
           estimates[address].estAmount += costs.orderAmount;
@@ -767,7 +738,7 @@ const WalletSelector = ({
     });
 
     return estimates;
-  }, [gridsByWallet, estOrders, walletDataMap, selectedWallets, collateralToken.address, gasFee, user]);
+  }, [gridsByWallet, estOrders, walletDataMap, collateralToken.address, gasFee, user]);
 
   // Readiness Check
   useEffect(() => {
@@ -782,7 +753,7 @@ const WalletSelector = ({
       if (!data) return false; // data not yet loaded
 
       const estimate = estimatesByWallet[address];
-      if (!estimate) return false; // Should theoretically exist if selected
+      if (!estimate) return false;
 
       const availableNative = data.balance - data.lockedFundBalance;
       const availableTokens = data.tokenBalance - data.totalCollateralPending;
@@ -817,72 +788,58 @@ const WalletSelector = ({
   );
 
   // Handle wallet selection
-  const handleSelectWallet = useCallback(
-    async (wallet: WalletConfig) => {
-      const address = wallet.address.toLowerCase();
+const handleSelectWallet = useCallback(
+  async (wallet: WalletConfig) => {
+    const address = wallet.address.toLowerCase();
+    let data:any = walletDataMap[address];
 
-      // If already loading, show a toast and return early to prevent double clicks
-      if (loadingWallets.has(wallet._id)) {
-        toast.loading("Wallet data is being fetched...", { id: "wallet-loading" });
-        return;
-      }
+    // If no data, fetch it first and use the returned data
+    if (!data) {
+      data = await fetchSingleWalletData(wallet);
+    }
 
-      let data: WalletData | undefined = walletDataMap[address];
+    if (!data) {
+      toast.error("Failed to load wallet data");
+      return;
+    }
 
-      // If no data, fetch it first. 
-      // IMPORTANT: Use the return value 'newData' for logic, not the state.
-      if (!data) {
-        // Show loading indicator in UI immediately via setLoadingWallets inside fetcher
-        data = await fetchSingleWalletData(wallet);
-      }
+    // Validate single-wallet strategy limit
+    if (isSingleWalletStrategy && selectedWallets.length >= 1) {
+      toast.error("Only one wallet can be selected for this strategy");
+      return;
+    }
 
-      // If data is STILL missing after await, it meant fetch failed (error caught inside fetcher)
-      if (!data) {
-        toast.error("Failed to load wallet data. Please try again.");
-        return;
-      }
+    // Check if we already have enough wallets
+    if (estOrders.length <= selectedWallets.length) {
+      toast.error("Already have enough wallets for the number of orders");
+      return;
+    }
 
-      // Validate single-wallet strategy limit
-      if (isSingleWalletStrategy && selectedWallets.length >= 1) {
-        toast.error("Only one wallet can be selected for this strategy");
-        return;
-      }
+    // Check sufficiency
+    const availableNative = data.balance - data.lockedFundBalance;
+    const availableTokens = data.tokenBalance - data.totalCollateralPending;
+    const estimate = estimatesByWallet[address] || { estCost: BigInt(0), estAmount: BigInt(0) };
 
-      // Check if we already have enough wallets
-      if (estOrders.length <= selectedWallets.length) {
-        toast.error("Already have enough wallets for the number of orders");
-        return;
-      }
+    if (availableNative < estimate.estCost || availableTokens < estimate.estAmount) {
+      toast.error("Insufficient funds in this wallet");
+      return;
+    }
 
-      // Check sufficiency using the FRESH 'data' variable
-      const availableNative = data.balance - data.lockedFundBalance;
-      const availableTokens = data.tokenBalance - data.totalCollateralPending;
-      
-      // We might not have estimates for this specific wallet yet in the memoized map,
-      // but initially, the cost to add a wallet is effectively 0 until grids are assigned.
-      // However, strict checking can be done if we pre-calculate what cost it *would* take.
-      // For now, we check if it has AT LEAST 0 or basic minimums if needed.
-      // Since estimatesByWallet relies on gridsByWallet which hasn't updated yet,
-      // we just check if it's not negative or effectively unusable.
-      
-      // (Optional) Simple sanity check: if user has 0 balance, warn them?
-      // For now, we allow selection and let the card show the red warning if funds are low.
-      
-      // Update state
-      const newSelected = [...selectedWallets, wallet];
-      setSelectedWallets(newSelected);
-      distributeOrders(newSelected);
-    },
-    [
-      walletDataMap,
-      loadingWallets,
-      fetchSingleWalletData,
-      isSingleWalletStrategy,
-      selectedWallets,
-      estOrders.length,
-      distributeOrders,
-    ],
-  );
+    // Add to selected
+    const newSelected = [...selectedWallets, wallet];
+    setSelectedWallets(newSelected);
+    distributeOrders(newSelected);
+  },
+  [
+    walletDataMap,
+    fetchSingleWalletData,
+    isSingleWalletStrategy,
+    selectedWallets.length,
+    estOrders.length,
+    estimatesByWallet,
+    distributeOrders,
+  ],
+);
 
   const handleRemoveWallet = useCallback(
     (wallet: WalletConfig) => {
@@ -917,10 +874,10 @@ const WalletSelector = ({
   );
 
   const refreshSelectedWallets = useCallback(async () => {
-    // Refresh sequentially or parallel based on preference. Parallel is faster.
-    await Promise.all(selectedWallets.map(w => fetchSingleWalletData(w, true)));
-    toast.success("Wallets refreshed");
-  }, [selectedWallets, fetchSingleWalletData]);
+  for (const wallet of selectedWallets) {
+    await fetchSingleWalletData(wallet);
+  }
+}, [selectedWallets, fetchSingleWalletData]);
 
   // Available wallets list (includes wallets without data)
   const availableWalletsList = useMemo(() => {
@@ -954,8 +911,8 @@ const WalletSelector = ({
           )}
           <button
             onClick={refreshSelectedWallets}
-            disabled={loadingWallets.size > 0 || selectedWallets.length === 0}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loadingWallets.size > 0}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
           >
             <MdOutlineRefresh
               className={`w-3 h-3 ${loadingWallets.size > 0 ? "animate-spin" : ""}`}

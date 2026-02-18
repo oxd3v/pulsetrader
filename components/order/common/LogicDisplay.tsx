@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { fontendDisplayCharts } from "@/constants/common/chart";
 // types
 import {  
   TECHNICAL_LOGICS_TYPE,
@@ -18,10 +19,11 @@ const LogicSummary = ({ node }: { node: TECHNICAL_LOGICS_TYPE }) => {
       EQUAL: "=",
       NOT_EQUAL: "≠",
     };
+    
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-[10px] font-mono border border-gray-200 dark:border-gray-600 whitespace-nowrap">
-        <span className="font-semibold text-blue-600 dark:text-blue-400">{node.id}</span>
-        <span className="text-gray-500">{opMap[node.operator] || node.operator}</span>
+        <span className="font-semibold text-blue-600 dark:text-blue-400">{node.id}({fontendDisplayCharts[node.resolution as string]})</span>
+        <span className="text-gray-500">{opMap[node.operator] || node.operator} </span>
         <span className="text-gray-800 dark:text-gray-200">{node.threshold}</span>
       </span>
     );
@@ -36,7 +38,7 @@ const LogicSummary = ({ node }: { node: TECHNICAL_LOGICS_TYPE }) => {
               <span className={`text-[9px] font-bold px-1 rounded uppercase ${
                 node.operator === 'AND' ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'text-orange-500 bg-orange-50 dark:bg-orange-900/20'
               }`}>
-                {node.operator}
+                {node.operator} 
               </span>
             )}
             <LogicSummary node={child} />

@@ -515,7 +515,7 @@ export default function DefinedTradeBox({
     estimatedUsdValue, // added dependency
   ]);
 
-   console.log(gridsByWallet);
+   
   // const MemoizedWalletSelector = useMemo(
   //     () => (
   //         <WalletSelector
