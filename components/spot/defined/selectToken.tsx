@@ -23,6 +23,7 @@ import { MdBookmarkAdded } from "react-icons/md";
 import { FiSearch, FiX, FiPlus, FiInfo } from "react-icons/fi";
 import { BiCoinStack } from "react-icons/bi";
 import { BsArrowUpRight } from "react-icons/bs";
+import { IoBookmark, IoBookmarkOutline } from "react-icons/io5";
 
 // store
 import { useStore } from "@/store/useStore";
@@ -154,7 +155,7 @@ const TokenRow = memo(
         </div>
         <div className="flex-shrink-0 flex gap-2 items-center ml-2">
           {/* Only show watchlist toggle for non‑default tokens */}
-          {!isDefault && (
+          {!isDefault  && (
             <>
               {!isAlreadyAdded ? (
                 <button
@@ -165,7 +166,7 @@ const TokenRow = memo(
                   className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
                   title="Add to Watchlist"
                 >
-                  <FiPlus className="w-5 h-5" />
+                  <IoBookmarkOutline className="w-5 h-5" />
                 </button>
               ) : (
                 <button
@@ -176,7 +177,7 @@ const TokenRow = memo(
                   className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
                   title="Remove from Watchlist"
                 >
-                  <MdBookmarkAdded className="w-5 h-5" />
+                  <IoBookmark className="w-5 h-5" />
                 </button>
               )}
             </>
@@ -232,7 +233,7 @@ const TokenSelection = ({
   }, [chainId]);
 
   // 2. Memoize already added tokens (User Watchlist + Defaults)
-  const alreadyAddedTokens = useMemo(() => {
+  const userAlreadyAddedTokens = useMemo(() => {
     let userTokensByNetwork: string[] = [];
     if (isConnected && user?.assetes?.length > 0) {
       userTokensByNetwork = user.assetes
@@ -243,14 +244,16 @@ const TokenSelection = ({
         .map((token: string) => token);
     }
 
-    const defaultTokens = userDeafultTokens
-      .filter((token: string) => {
-        const parts = token.split(":");
-        return parts.length > 1 && parts[1] === String(chainId);
-      })
-      .map((token: string) => token);
+    // const defaultTokens = userDeafultTokens
+    //   .filter((token: string) => {
+    //     const parts = token.split(":");
+    //     return parts.length > 1 && parts[1] === String(chainId);
+    //   })
+    //   .map((token: string) => token);
+    // const collateralTokens = Object.keys(CollateralTokens[chainId] || {}).map(t=>`${t.toLowerCase()}:${chainId}`)
 
-    return Array.from(new Set([...defaultTokens, ...userTokensByNetwork]));
+    // return Array.from(new Set([...defaultTokens, ...collateralTokens]));
+    return userTokensByNetwork;
   }, [isConnected, user, chainId]);
 
   // 3. Debounce Effect
@@ -283,8 +286,8 @@ const TokenSelection = ({
 
       if (debouncedSearchTerm) {
         variables.phrase = debouncedSearchTerm;
-      } else if (alreadyAddedTokens.length > 0) {
-        variables.tokens = alreadyAddedTokens;
+      } else if (userAlreadyAddedTokens.length > 0) {
+        variables.tokens = userAlreadyAddedTokens;
       }
 
       const tokenInfos = await fetchCodexFilterTokens({ variables });
@@ -297,7 +300,7 @@ const TokenSelection = ({
         err.name !== "AbortError" &&
         !abortControllerRef.current?.signal.aborted
       ) {
-        console.error("Token fetch error:", err);
+        //console.error("Token fetch error:", err);
         setError("Unable to load tokens.");
       }
     } finally {
@@ -305,7 +308,7 @@ const TokenSelection = ({
         setLoading(false);
       }
     }
-  }, [chainId, isOpen, debouncedSearchTerm, alreadyAddedTokens]);
+  }, [chainId, isOpen, debouncedSearchTerm, userAlreadyAddedTokens]);
 
   // 5. Trigger Fetch when modal opens or dependencies change
   useEffect(() => {
@@ -403,9 +406,9 @@ const TokenSelection = ({
           .filter((t) => t.token.networkId === chainId)
           .map((tokenInfo) => {
             const tokenKey = `${tokenInfo.token.address.toLowerCase()}:${chainId}`;
-            const isDefault = defaultTokenSet.has(tokenKey);
-            const isAdded = alreadyAddedTokens
-              .map((t) => t.toLowerCase())
+            const isDefault = isConnected && !defaultTokenSet.has(tokenKey);
+            const isAdded = isConnected && userAlreadyAddedTokens
+              .map((t:string) => t.toLowerCase())
               .includes(tokenKey);
 
             return (

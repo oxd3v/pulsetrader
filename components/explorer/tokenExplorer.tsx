@@ -202,6 +202,7 @@ export default function TokenExplorer({
     );
     return new Set([...defaults, ...collateral]);
   }, [network]);
+  
 
   return (
     <div className="w-full min-h-screen bg-gray-50 dark:bg-[#0d1117] text-gray-900 dark:text-white transition-colors duration-200">
