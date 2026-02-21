@@ -115,7 +115,8 @@ export type ORDER_TYPE = {
   };
   executionFee: {
     payInUsd: string;
-    nativeFeeAmount?: string;
+    feeUsed?: string;
+    estFeeLocked?:string;
     feeInUsd: string;
   };
   additional?: {
@@ -123,6 +124,9 @@ export type ORDER_TYPE = {
     walletAddress?: string;
     entryPrice?: string;
     exitPrice?: string;
+    inProcessing?: any;
+    retry: number;
+    executionSpeed?: string
   };
   createdAt: Date;
   updatedAt: Date;

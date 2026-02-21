@@ -19,6 +19,7 @@ export type User = {
 export type ACTIVITY_TYPE = {
     _id: string,
     status: string,
+    walletAddress: string,
     user: object,
     order?: any | undefined,
     wallet: WalletConfig,

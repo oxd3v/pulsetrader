@@ -414,7 +414,7 @@ export const useUserAuth = () => {
         joinedResult.joined = true;
         return joinedResult;
       } catch (err: any) {
-        console.log(err)
+        //console.log(err)
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         const key = handleServerErrorToast({ err });
         joinedResult.error = key;
@@ -695,9 +695,13 @@ export const useUserAuth = () => {
   const getUserHistory = async ({
     page,
     limit = 50,
+    walletAddress,
+    walletId
   }: {
     page: number;
     limit: number;
+    walletAddress:string,
+    walletId:string
   }) => {
     let historiesResult = {
       success: false,
@@ -705,7 +709,7 @@ export const useUserAuth = () => {
       error: null as string | null,
     };
     try {
-      let apiResponse: any = await Service.getUserHistories({ page, limit });
+      let apiResponse: any = await Service.getUserHistories({ page, limit, walletAddress, walletId });
       if (!apiResponse.success || !apiResponse?.data?.histories) {
         let key = apiResponse.message || "SERVER_ERROR";
         notify("error", key);

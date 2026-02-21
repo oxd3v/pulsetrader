@@ -383,7 +383,7 @@ export default function PortfolioMain({
         </nav>
 
         {/* Content Area: overflow-y-auto enables the scrollable behavior you requested */}
-        <section className="w-full h-full lg:grow  flex-1 overflow-y-auto  custom-scrollbar relative">
+        <section className="w-full h-full  lg:grow  flex-1   custom-scrollbar relative">
           <AnimatePresence mode="wait">
             {selectedWallet ? (
               <motion.div
@@ -392,7 +392,7 @@ export default function PortfolioMain({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="pb-20" // Add padding bottom so content isn't cut off
+                className="pb-20 w-full h-full overflow-y-auto " // Add padding bottom so content isn't cut off
               >
                 {activeTab === "overview" && (
                   <WalletOverview
@@ -410,7 +410,7 @@ export default function PortfolioMain({
                     user={user}
                   />
                 )}
-                {activeTab === 'activity' && <ActivityModel user={user} />}
+                {activeTab === 'activity' && <ActivityModel user={user} walletAddress={selectedWallet.address} walletId={selectedWallet._id}/>}
                 {activeTab === 'analytics' && <Analytics address={selectedWallet.address} chainId={chainId}/>}
                 {activeTab === 'settings' && <WalletSettings wallet={selectedWallet}/>}
               </motion.div>

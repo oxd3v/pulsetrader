@@ -236,7 +236,7 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
                           </div>
                         )}
 
-                        {order.exit.stopLoss.isActive &&
+                        {order.exit.stopLoss.isActive == true &&
                           (order.exit.stopLoss.stopLossPrice != '0' ? (
                             renderPriceField(
                               "SL",

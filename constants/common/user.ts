@@ -12,6 +12,23 @@ export const USER_LEVEL_REQUIREMENTS_ASSET: Record<string, any> = {
 }
 
 export const USER_LEVEL: Record<string, any> = {
+  ['IRON']: {
+    id: "iron",
+    name: "Iron X (Free)",
+    benefits: {
+      maxOrder: 2,
+      maxWallets: 2,
+      maxEVMWallets: 1,
+      maxSVMWallets:1,
+      maxAccessAsset: 2,
+      supportTrading: ["spot"],
+      supportStrategy: ["limit", "scalp"],
+    },
+    color: "bg-neutral-600 text-black",
+    requireMents: {
+      
+    }
+  },
   ['SILVER']: {
     id: "silver",
     name: "Silver Access",
@@ -24,7 +41,7 @@ export const USER_LEVEL: Record<string, any> = {
       supportTrading: ["spot"],
       supportStrategy: ["limit", "scalp"],
     },
-    color: "bg-neutral-600 text-black",
+    color: "bg-silver-600 text-black",
     requireMents: {
       ['GLADIATOR']: {
         quantity: "10000000",

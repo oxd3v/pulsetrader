@@ -129,7 +129,7 @@ export const useSpotOrder = () => {
               takeProfitPrice: "0",
             },
             stopLoss: {
-              isActive: false,
+              isActive: activeStopLoss,
               save: "0",
               stopLossPercentage: slPercentage,
               stopLossPrice: slPrice,
@@ -219,7 +219,7 @@ export const useSpotOrder = () => {
               takeProfitPrice: "0",
             },
             stopLoss: {
-              isActive: true,
+              isActive: activeStopLoss,
               save: "0",
               stopLossPercentage: Number(slBps),
               stopLossPrice: "0",

@@ -455,7 +455,7 @@ export default function DefinedTradeBox({
       const orderConfig: any = {
         gridNumber,
         targetPrice: entryPrice,
-        activeStopLoss: true,
+        activeStopLoss: isActiveStopLoss,
         entryLogic: technicalEntry,
         exitLogic: technicalExit,
         orderSizeMultiplier,

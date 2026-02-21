@@ -16,7 +16,7 @@ import {
 } from "@/utility/handy";
 
 import { getWalletBalance, getWalletTokenBalance } from "@/lib/blockchain/balance";
-import { ZeroAddress } from "ethers";
+import { ZeroAddress, formatUnits } from "ethers";
 
 interface FundingModalProps {
   isOpen: boolean;
@@ -277,12 +277,42 @@ export default function FundingModal({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
+                  {/* Risk Warning */}
+                  <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/25 rounded-2xl px-4 py-3">
+                    <span className="text-base mt-0.5 shrink-0">⚠️</span>
+                    <p className="text-[11px] text-red-300/90 font-semibold leading-relaxed">
+                      Withdrawing assets might cancel active orders.{" "}
+                      <span className="text-red-400 font-black">Withdraw at your own risk.</span>
+                    </p>
+                  </div>
+
                   <div className="space-y-3">
-                    <div className={`bg-[#161b22] rounded-2xl border ${safeFormatNumber(balance, tokenInfo.decimals || 18, 4) < amount ? 'border-red-500' : 'border-white/5 focus-within:border-blue-500/50'}  p-4  transition-all`}>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
-                        Amount
-                      </label>
+                    {/* Amount input */}
+                    <div
+                      className={`bg-red-950/20 rounded-2xl border ${
+                        safeFormatNumber(balance, tokenInfo.decimals || 18, 4) < amount
+                          ? "border-red-500"
+                          : "border-red-500/20 focus-within:border-red-400/50"
+                      } p-4 transition-all`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-red-400/70 uppercase tracking-widest">
+                          Amount
+                        </label>
+                        {!isNative && (
+                          <button
+                            onClick={() =>
+                              setAmount(
+                                formatUnits(BigInt(balance), tokenInfo.decimals || 18)
+                              )
+                            }
+                            className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-500/20 hover:bg-red-500/35 text-red-300 border border-red-500/30 rounded-md transition-all"
+                          >
+                            MAX
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="number"
                         value={amount}
@@ -291,29 +321,30 @@ export default function FundingModal({
                         className="bg-transparent outline-none text-2xl font-black text-white w-full"
                       />
                     </div>
+
+                    {/* Receiver address */}
                     <div
-                      className={`bg-[#161b22] rounded-2xl border ${
-                        shouldShowError ? "border-red-500/50" : "border-white/5"
-                      } p-4 focus-within:border-blue-500/50 transition-all`}
+                      className={`bg-red-950/20 rounded-2xl border ${
+                        shouldShowError ? "border-red-500/50" : "border-red-500/20 focus-within:border-red-400/50"
+                      } p-4 transition-all`}
                     >
-                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
+                      <label className="text-[10px] font-bold text-red-400/70 uppercase tracking-widest block mb-1">
                         Receiver Address
                       </label>
                       <div className="flex items-center gap-2">
                         <FiUser
-                          className={
-                            shouldShowError ? "text-red-500" : "text-gray-500"
-                          }
+                          className={shouldShowError ? "text-red-500" : "text-red-400/50"}
                         />
                         <input
                           type="text"
                           value={receiverAddress}
                           onChange={(e) => setReceiverAddress(e.target.value)}
                           placeholder="Enter destination address"
-                          className="bg-transparent outline-none text-sm font-mono text-white w-full"
+                          className="bg-transparent outline-none text-sm font-mono text-white w-full placeholder-white/20"
                         />
                       </div>
                     </div>
+
                     {shouldShowError && (
                       <p className="text-[10px] text-red-500 font-bold px-2">
                         Invalid {isSolana ? "Solana" : "EVM"} address format
@@ -325,10 +356,10 @@ export default function FundingModal({
                     whileTap={{ scale: 0.98 }}
                     disabled={isLoading}
                     onClick={handleWithdraw}
-                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all bg-gradient-to-r ${themeGradient} ${
+                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all bg-gradient-to-r from-red-600 to-rose-500 ${
                       isLoading
                         ? "opacity-70 cursor-not-allowed"
-                        : "hover:shadow-lg hover:shadow-purple-500/20"
+                        : "hover:shadow-lg hover:shadow-red-500/25"
                     }`}
                   >
                     <div className="flex items-center justify-center gap-2">

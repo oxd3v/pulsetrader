@@ -23,7 +23,7 @@ export const NAVBAR_ITEM_LIST = [
     {
       name: "Settings",
       href: "/settings",
-      type: 'public'
+      type: 'private'
     },
     {
       name: "Pricing",

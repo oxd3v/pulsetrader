@@ -7,7 +7,8 @@ import {
   FiClock, 
   FiCheckCircle, 
   FiXCircle, 
-  FiExternalLink 
+  FiExternalLink, 
+  FiCopy
 } from "react-icons/fi";
 import { FaWallet } from "react-icons/fa";
 import { formatUnits } from "ethers";
@@ -15,6 +16,7 @@ import { displayNumber } from "@/utility/displayPrice";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
 import { chainConfig } from '@/constants/common/chain';
 import Link from 'next/link';
+import { handleCopy } from '@/lib/utils';
 
 /**
  * Enhanced Activity Card
@@ -46,6 +48,7 @@ const formatAmount = (amount: string, decimals: number) => {
 
 const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE })=>{
      const { 
+    _id,
     type, 
     status, 
     createdAt, 
@@ -61,11 +64,13 @@ const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE
   // Configuration for Activity Types
   const getTypeConfig = (type: string) => {
     switch (type.toUpperCase()) {
-      case 'SWAP':
-        return { icon: <FiRepeat className="w-5 h-5" />, color: 'bg-blue-100 text-blue-600', label: 'Swap' };
+      case 'BUY TRADE':
+        return { icon: <FiRepeat className="w-5 h-5" />, color: 'bg-green-100 text-blue-600', label: 'BUY' };
+      case 'SELL TRADE':
+        return { icon: <FiRepeat className="w-5 h-5" />, color: 'bg-red-100 text-blue-600', label: 'SELL' };
       case 'TRANSFER':
-      case 'SEND':
-        return { icon: <FiArrowUpRight className="w-5 h-5" />, color: 'bg-orange-100 text-orange-600', label: 'Sent' };
+      case 'WITHDRAW':
+        return { icon: <FiArrowDownLeft className="w-5 h-5" />, color: 'bg-red-100 text-orange-600', label: 'Sent' };
       case 'RECEIVE':
         return { icon: <FiArrowDownLeft className="w-5 h-5" />, color: 'bg-green-100 text-green-600', label: 'Received' };
       default:
@@ -102,8 +107,8 @@ const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE
             {typeConfig.icon}
           </div>
           <div>
-            <h3 className="font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-              {typeConfig.label}
+            <h3 className="flex gap-1 items-center font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+              {typeConfig.label} {_id.slice(-5)} <FiCopy onClick={()=>handleCopy(_id, 'Activity Id copied')}/>
             </h3>
             <span className="text-[11px] text-zinc-500 font-medium">
               {formatDate(createdAt)}
@@ -115,7 +120,7 @@ const ActivityCard = memo(({ activityDetails }: { activityDetails: ACTIVITY_TYPE
           {status.toLowerCase() === 'success' ? <FiCheckCircle /> : 
            status.toLowerCase() === 'failed' ? <FiXCircle /> : 
            <FiClock />}
-          {status}
+          {/* {status} */}
         </div>
       </div>
 
