@@ -9,8 +9,7 @@ import React, {
 } from "react";
 import Link from "next/link";
 // constants
-import { chainConfig } from "@/constants/common/chain";
-import { userDeafultTokens } from "@/constants/common/tokens";
+import { userDeafultTokens, CollateralTokens } from "@/constants/common/tokens";
 
 // lib
 import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
@@ -20,7 +19,8 @@ import { formateNumberInUnit } from "@/utility/handy";
 import { motion, AnimatePresence } from "framer-motion";
 
 // icons
-import { FiSearch, FiX, FiPlus, FiInfo, FiBookmark } from "react-icons/fi";
+import { MdBookmarkAdded } from "react-icons/md";
+import { FiSearch, FiX, FiPlus, FiInfo } from "react-icons/fi";
 import { BiCoinStack } from "react-icons/bi";
 import { BsArrowUpRight } from "react-icons/bs";
 
@@ -35,7 +35,6 @@ interface TokenSelectionParams {
   onClose: () => void;
   selectedToken: string;
   setSelectedToken: (token: string) => void;
-  addToken: ({ chainId, token }: { chainId: number; token: string }) => void;
 }
 
 interface TokenInfo {
@@ -61,36 +60,50 @@ const TokenRow = memo(
     tokenInfo,
     isSelected,
     isAlreadyAdded,
+    isDefault,
     onSelect,
     onAdd,
   }: {
     tokenInfo: TokenInfo;
     isSelected: boolean;
     isAlreadyAdded: boolean;
+    isDefault: boolean;
     onSelect: (address: string) => void;
-    onAdd:  (address: string) => void;
+    onAdd: (address: string, add: boolean) => Promise<any>;
   }) => {
-    const [isLoading,setIsLoading] = useState(false)
+    const [isLoading, setIsLoading] = useState(false);
     const { priceUSD, liquidity, marketCap } = tokenInfo;
     const imageSrc = tokenInfo.token.info?.imageSmallUrl || "/tokenLogo.png";
     const symbol =
       tokenInfo.token.info?.symbol || tokenInfo.token.symbol || "Unknown";
 
-    const handleAddToken = async ()=>{
+    const handleAddToken = async () => {
       setIsLoading(true);
-      try{
-        let res:any = await onAdd(tokenInfo.token.address)
-        if(res.added == true){
-          isAlreadyAdded = true;
-          onSelect(tokenInfo.token.address);
+      try {
+        const res = await onAdd(tokenInfo.token.address, true);
+        if (res?.success) {
+          // Token added – no need to select it, just UI updates via store
         }
-      }catch(err){
-
-      }finally{
-        setIsLoading(false)
+      } catch (err) {
+        // Error is handled inside onAdd (toast)
+      } finally {
+        setIsLoading(false);
       }
-      
-    }
+    };
+
+    const handleRemoveToken = async () => {
+      setIsLoading(true);
+      try {
+        const res = await onAdd(tokenInfo.token.address, false);
+        if (res?.success) {
+          // Token removed – UI updates via store
+        }
+      } catch (err) {
+        // Error handled inside onAdd
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
     return (
       <motion.div
@@ -98,7 +111,9 @@ const TokenRow = memo(
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className={`w-full flex items-center p-3 xl:p-4 rounded-xl hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg transition-all duration-200 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 ${
-          isLoading ? "opacity-50 pointer-events-none" :isSelected
+          isLoading
+            ? "opacity-50 pointer-events-none"
+            : isSelected
             ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
             : ""
         }`}
@@ -138,24 +153,35 @@ const TokenRow = memo(
           </div>
         </div>
         <div className="flex-shrink-0 flex gap-2 items-center ml-2">
-          {!isAlreadyAdded ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAddToken();
-              }}
-              className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
-              title="Add to Watchlist"
-            >
-              <FiPlus className="w-5 h-5" />
-            </button>
-          ) : (<button
-              
-              className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
-              title="Add to Watchlist"
-            >
-              <FiBookmark className="w-5 h-5" />
-            </button>)}
+          {/* Only show watchlist toggle for non‑default tokens */}
+          {!isDefault && (
+            <>
+              {!isAlreadyAdded ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToken();
+                  }}
+                  className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
+                  title="Add to Watchlist"
+                >
+                  <FiPlus className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveToken();
+                  }}
+                  className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
+                  title="Remove from Watchlist"
+                >
+                  <MdBookmarkAdded className="w-5 h-5" />
+                </button>
+              )}
+            </>
+          )}
+
           <button
             onClick={() => onSelect(tokenInfo.token.address)}
             className="px-3 py-2 text-sm border border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg font-medium transition-colors inline-flex items-center gap-2"
@@ -166,7 +192,7 @@ const TokenRow = memo(
         </div>
       </motion.div>
     );
-  },
+  }
 );
 
 TokenRow.displayName = "TokenRow";
@@ -183,10 +209,10 @@ const TokenSelection = ({
       chainId: state.network,
       user: state.user,
       isConnected: state.isConnected,
-    })),
+    }))
   );
 
-  const { addToken } = useUserAuth()
+  const { addToken } = useUserAuth();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -196,15 +222,22 @@ const TokenSelection = ({
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 1. Memoize already added tokens (User Watchlist)
-  // Fix: Ensure we fallback to chain defaults correctly if available
+  // 1. Compute set of default token keys (address:networkId) for the current chain
+  const defaultTokenSet = useMemo(() => {
+    const defaults = userDeafultTokens.map((t: string) => t.toLowerCase());
+    const collateral = Object.keys(CollateralTokens[chainId] || {}).map(
+      (t) => `${t.toLowerCase()}:${chainId}`
+    );
+    return new Set([...defaults, ...collateral]);
+  }, [chainId]);
+
+  // 2. Memoize already added tokens (User Watchlist + Defaults)
   const alreadyAddedTokens = useMemo(() => {
-    let userTokensByNetwork = [];
+    let userTokensByNetwork: string[] = [];
     if (isConnected && user?.assetes?.length > 0) {
       userTokensByNetwork = user.assetes
         .filter((token: string) => {
           const parts = token.split(":");
-          // Safety check if token string is malformed
           return parts.length > 1 && parts[1] === String(chainId);
         })
         .map((token: string) => token);
@@ -213,7 +246,6 @@ const TokenSelection = ({
     const defaultTokens = userDeafultTokens
       .filter((token: string) => {
         const parts = token.split(":");
-        // Safety check if token string is malformed
         return parts.length > 1 && parts[1] === String(chainId);
       })
       .map((token: string) => token);
@@ -221,20 +253,18 @@ const TokenSelection = ({
     return Array.from(new Set([...defaultTokens, ...userTokensByNetwork]));
   }, [isConnected, user, chainId]);
 
-  // 2. Debounce Effect
+  // 3. Debounce Effect
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm.trim());
-    }, 400); // Increased slightly to reduce API spam
-
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // 3. Fetch Logic
+  // 4. Fetch Logic
   const fetchTokenInfo = useCallback(async () => {
     if (!chainId || !isOpen) return;
 
-    // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -252,26 +282,15 @@ const TokenSelection = ({
       };
 
       if (debouncedSearchTerm) {
-        // Case A: Search Active
         variables.phrase = debouncedSearchTerm;
       } else if (alreadyAddedTokens.length > 0) {
-        // Case B: No Search, Show Watchlist/Defaults
-        // NOTE: If you want to show Top 100 AND Watchlist, you might need two queries or logic change.
-        // Current logic: Show specifically the user's tokens if they exist.
-        // If list is small, maybe we fallback to top tokens?
         variables.tokens = alreadyAddedTokens;
       }
-      // Case C: No Search, No Watchlist -> Variables remains default (Top 100 by Volume)
 
       const tokenInfos = await fetchCodexFilterTokens({ variables });
 
-      // Check if aborted before setting state
       if (!abortControllerRef.current?.signal.aborted) {
-        if (tokenInfos) {
-          setFilteredTokens(tokenInfos);
-        } else {
-          setFilteredTokens([]); // Graceful fallback
-        }
+        setFilteredTokens(tokenInfos || []);
       }
     } catch (err: any) {
       if (
@@ -288,13 +307,12 @@ const TokenSelection = ({
     }
   }, [chainId, isOpen, debouncedSearchTerm, alreadyAddedTokens]);
 
-  // 4. Trigger Fetch
+  // 5. Trigger Fetch when modal opens or dependencies change
   useEffect(() => {
     if (isOpen) {
       fetchTokenInfo();
     }
 
-    // Cleanup on unmount or close
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -302,10 +320,9 @@ const TokenSelection = ({
     };
   }, [fetchTokenInfo, isOpen]);
 
-  // 5. Cleanup State on Close
+  // 6. Cleanup State on Close (with animation delay)
   useEffect(() => {
     if (!isOpen) {
-      // Small delay to allow exit animation to finish before clearing data (optional)
       const t = setTimeout(() => {
         setSearchTerm("");
         setDebouncedSearchTerm("");
@@ -323,16 +340,16 @@ const TokenSelection = ({
       setSelectedToken(tokenAddress);
       onClose();
     },
-    [setSelectedToken, onClose],
+    [setSelectedToken, onClose]
   );
 
   const handleAddToken = useCallback(
-    async (tokenAddress: string) => {
+    async (tokenAddress: string, add: boolean) => {
       if (chainId) {
-        return await addToken({tokenAddress, chainId});
+        return await addToken({ tokenAddress, chainId, add });
       }
     },
-    [addToken, chainId],
+    [addToken, chainId]
   );
 
   // Render Helpers
@@ -383,20 +400,29 @@ const TokenSelection = ({
     return (
       <div className="space-y-2 px-4 pb-4">
         {filteredTokens
-          .filter((t: any) => t.token.networkId == chainId)
-          .map((tokenInfo) => (
-            <TokenRow
-              key={tokenInfo.token.address}
-              tokenInfo={tokenInfo}
-              isSelected={
-                selectedToken.toLowerCase() ===
-                tokenInfo.token.address.toLowerCase()
-              }
-              isAlreadyAdded={alreadyAddedTokens.map(t=>t.toLowerCase()).includes(`${tokenInfo.token.address.toLowerCase()}:${chainId}`)}
-              onSelect={handleTokenSelect}
-              onAdd={handleAddToken}
-            />
-          ))}
+          .filter((t) => t.token.networkId === chainId)
+          .map((tokenInfo) => {
+            const tokenKey = `${tokenInfo.token.address.toLowerCase()}:${chainId}`;
+            const isDefault = defaultTokenSet.has(tokenKey);
+            const isAdded = alreadyAddedTokens
+              .map((t) => t.toLowerCase())
+              .includes(tokenKey);
+
+            return (
+              <TokenRow
+                key={tokenInfo.token.address}
+                tokenInfo={tokenInfo}
+                isSelected={
+                  selectedToken.toLowerCase() ===
+                  tokenInfo.token.address.toLowerCase()
+                }
+                isAlreadyAdded={isAdded}
+                isDefault={isDefault}
+                onSelect={handleTokenSelect}
+                onAdd={handleAddToken}
+              />
+            );
+          })}
       </div>
     );
   };

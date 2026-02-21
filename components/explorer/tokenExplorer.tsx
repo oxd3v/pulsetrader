@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,15 +13,17 @@ import {
   FiDroplet,
   FiClock,
   FiBarChart2,
-  FiMoreHorizontal,
-  FiX,
+  FiArrowUpRight,
+  FiArrowDownLeft,
   FiRefreshCw,
 } from "react-icons/fi";
+import { IoBookmark, IoBookmarkOutline } from "react-icons/io5";
 import { BiRocket, BiCoinStack } from "react-icons/bi";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
-import { chains } from "@/constants/common/chain";
+import { userDeafultTokens, CollateralTokens } from "@/constants/common/tokens";
 import RenderTokenFundingModal from "@/components/walletManager/modal/fundingModal";
+import { useUserAuth } from "@/hooks/useAuth";
 
 // Helper for formatting large numbers
 const formatNumber = (
@@ -48,6 +50,7 @@ export default function TokenExplorer({
 }: {
   handleTradeNow: (tokenAddress: string) => void;
 }) {
+  const { addToken } = useUserAuth();
   const { network, user } = useStore(
     useShallow((state: any) => ({
       network: state.network,
@@ -61,6 +64,7 @@ export default function TokenExplorer({
   const [limit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedToken, setSelectedToken] = useState<any>(null);
 
@@ -73,23 +77,34 @@ export default function TokenExplorer({
     direction: "DESC",
   });
 
-  // Filters State
-  const [filters, setFilters] = useState({
+  // Filters State (initial values)
+  const initialFilters = {
     minLiquidity: 1000,
     minVolume: 0,
-    maxAge: 0, // 0 means any
+    maxAge: 0,
     minChange: 0,
-  });
+  };
+  const [filters, setFilters] = useState(initialFilters);
 
-  // --- Fetch Logic ---
+  // --- Debounce search term ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // --- Fetch Logic (accepts explicit offset) ---
   const fetchTokens = useCallback(
-    async (isAppend = false) => {
+    async (isAppend = false, overrideOffset?: number) => {
       setIsLoading(true);
       try {
-        // Convert UI filters to API query variables
+        // Use overrideOffset if provided, otherwise current offset state
+        const currentOffset = overrideOffset !== undefined ? overrideOffset : offset;
+
+        // Build API filters
         const apiFilters: any = {
           network: [network],
-          //potentialScam: false,
           liquidity: { gte: filters.minLiquidity },
           volume24: { gte: filters.minVolume },
         };
@@ -98,9 +113,8 @@ export default function TokenExplorer({
           apiFilters.change24 = { gte: filters.minChange };
         }
 
-        // Handle Age Filter (Created At)
         if (filters.maxAge > 0) {
-          const cutoff = Math.floor(Date.now() / 1000) - filters.maxAge * 3600; // hours to seconds
+          const cutoff = Math.floor(Date.now() / 1000) - filters.maxAge * 3600;
           apiFilters.createdAt = { gte: cutoff };
         }
 
@@ -109,11 +123,11 @@ export default function TokenExplorer({
           creatorAddress: null,
           statsType: "FILTERED",
           limit,
-          offset: isAppend ? offset : 0,
+          offset: currentOffset,
           rankings: [
             { attribute: sortConfig.key, direction: sortConfig.direction },
           ],
-          ...(searchTerm && { phrase: searchTerm }),
+          ...(debouncedSearchTerm && { phrase: debouncedSearchTerm }),
         };
 
         const data = await fetchCodexFilterTokens({ variables });
@@ -129,21 +143,65 @@ export default function TokenExplorer({
         setIsLoading(false);
       }
     },
-    [network, limit, offset, searchTerm, filters, sortConfig],
+    [network, limit, offset, filters, sortConfig, debouncedSearchTerm]
   );
 
+  // Reset offset and fetch when filters/search/sort change
   useEffect(() => {
-    setOffset(0); // Reset offset on filter change
-    fetchTokens(false);
-  }, [network, searchTerm, filters, sortConfig]); // Refetch when these change
+    setOffset(0);
+    fetchTokens(false, 0); // explicitly fetch from offset 0
+  }, [network, debouncedSearchTerm, filters, sortConfig, fetchTokens]);
 
   // --- Handlers ---
-  const handleSort = (key: string) => {
+  const handleSort = useCallback((key: string) => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === "DESC" ? "ASC" : "DESC",
     }));
-  };
+  }, []);
+
+  const handleAddToken = useCallback(
+    async ({
+      tokenAddress,
+      chainId,
+      add,
+    }: {
+      tokenAddress: string;
+      chainId: number;
+      add: boolean;
+    }) => {
+      setIsLoading(true);
+      try {
+        await addToken({ tokenAddress, chainId, add });
+        // Optionally refresh token list or show success toast
+      } catch (err) {
+        // Error is handled inside addToken
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [addToken]
+  );
+
+  const handleResetFilters = useCallback(() => {
+    setFilters(initialFilters);
+  }, []);
+
+  const handleLoadMore = useCallback(() => {
+    const newOffset = offset + limit;
+    setOffset(newOffset);
+    fetchTokens(true, newOffset);
+  }, [offset, limit, fetchTokens]);
+
+  // --- Memoized list of default and user tokens for condition ---
+  const defaultTokenKeys = useMemo(() => {
+    // Build a set of strings like "address:networkId"
+    const defaults = userDeafultTokens.map((t: string) => t.toLowerCase());
+    const collateral = Object.keys(CollateralTokens[network] || {}).map(
+      (t) => `${t.toLowerCase()}:${network}`
+    );
+    return new Set([...defaults, ...collateral]);
+  }, [network]);
 
   return (
     <div className="w-full min-h-screen bg-gray-50 dark:bg-[#0d1117] text-gray-900 dark:text-white transition-colors duration-200">
@@ -192,7 +250,7 @@ export default function TokenExplorer({
             </button>
 
             <button
-              onClick={() => fetchTokens(false)}
+              onClick={() => fetchTokens(false, 0)}
               className="p-2.5 bg-white dark:bg-[#161b22] border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-gray-500"
             >
               <FiRefreshCw className={isLoading ? "animate-spin" : ""} />
@@ -289,14 +347,7 @@ export default function TokenExplorer({
                 {/* Reset Button */}
                 <div className="flex items-end">
                   <button
-                    onClick={() =>
-                      setFilters({
-                        minLiquidity: 0,
-                        minVolume: 0,
-                        maxAge: 0,
-                        minChange: -100,
-                      })
-                    }
+                    onClick={handleResetFilters}
                     className="w-full py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold transition-colors"
                   >
                     Reset All
@@ -317,7 +368,7 @@ export default function TokenExplorer({
                     label="Token Name"
                     sortKey="name"
                     currentSort={sortConfig}
-                    onSort={() => {}}
+                    onSort={() => {}} // Name is not sortable in this table, keep as is
                     className="pl-6"
                   />
                   <SortableHeader
@@ -375,9 +426,9 @@ export default function TokenExplorer({
               <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                 {isLoading && tokens.length === 0
                   ? [...Array(10)].map((_, i) => <SkeletonRow key={i} />)
-                  : tokens.map((token: any, index: number) => (
+                  : tokens.map((token: any) => (
                       <tr
-                        key={index}
+                        key={token.token.address} // Use unique address as key
                         className="hover:bg-blue-50/50 dark:hover:bg-white/[0.02] transition-colors group"
                       >
                         {/* Token Identity */}
@@ -389,6 +440,7 @@ export default function TokenExplorer({
                                   token.token.imageSmallUrl || "/tokenLogo.png"
                                 }
                                 className="w-10 h-10 rounded-full border border-gray-100 dark:border-white/10"
+                                alt={token.token.symbol}
                               />
                               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gray-100 dark:bg-[#161b22] rounded-full flex items-center justify-center">
                                 <div
@@ -425,7 +477,6 @@ export default function TokenExplorer({
 
                         {/* Age */}
                         <td className="py-4 px-6 text-right text-xs text-gray-500 font-medium">
-                          {/* Requires real logic, using placeholder logic for display */}
                           {formatTimestamp(token.createdAt)}
                         </td>
 
@@ -470,15 +521,61 @@ export default function TokenExplorer({
                         {/* Actions */}
                         <td className="py-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Show bookmark only if token is not default/collateral AND user is logged in */}
+                            {!defaultTokenKeys.has(
+                              `${token.token.address.toLowerCase()}:${token.token.networkId}`
+                            ) && user?.account && (
+                              <>
+                                {user?.assetes
+                                  ?.map((t: string) => t.toLowerCase())
+                                  .includes(
+                                    `${token.token.address.toLowerCase()}:${token.token.networkId}`
+                                  ) ? (
+                                  <button
+                                    onClick={() =>
+                                      handleAddToken({
+                                        tokenAddress: token.token.address,
+                                        chainId: network,
+                                        add: false,
+                                      })
+                                    }
+                                    className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                                    title="Remove from watchlist"
+                                  >
+                                    <IoBookmark size={18} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      handleAddToken({
+                                        tokenAddress: token.token.address,
+                                        chainId: network,
+                                        add: true,
+                                      })
+                                    }
+                                    className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                                    title="Add to watchlist"
+                                  >
+                                    <IoBookmarkOutline size={18} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+
                             <button
                               onClick={() => setSelectedToken(token.token)}
                               className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                              title="Fund token"
                             >
-                              <BiCoinStack size={18} />
+                              <div className="flex -space-x-1">
+                                <FiArrowUpRight className="w-4 h-4" />
+                                <FiArrowDownLeft className="w-4 h-4" />
+                              </div>
                             </button>
                             <Link
                               href={`/strategy/spot/${token.token.address}`}
                               className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all"
+                              title="Trade now"
                             >
                               <BiRocket size={18} />
                             </Link>
@@ -493,9 +590,9 @@ export default function TokenExplorer({
 
         {/* --- Mobile Card View (Hidden on Desktop) --- */}
         <div className="md:hidden space-y-3">
-          {tokens.map((token: any, index: number) => (
+          {tokens.map((token: any) => (
             <div
-              key={index}
+              key={token.token.address} // Use unique address as key
               className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-white/5 rounded-2xl p-4 shadow-sm active:scale-[0.99] transition-transform"
             >
               <div className="flex justify-between items-start mb-3">
@@ -503,6 +600,7 @@ export default function TokenExplorer({
                   <img
                     src={token.token.imageSmallUrl || "/tokenLogo.png"}
                     className="w-10 h-10 rounded-full bg-gray-100 dark:bg-black"
+                    alt={token.token.symbol}
                   />
                   <div>
                     <h3 className="font-bold text-gray-900 dark:text-white">
@@ -579,11 +677,7 @@ export default function TokenExplorer({
         {/* Load More */}
         <div className="mt-6 flex justify-center pb-8">
           <button
-            onClick={() => {
-              const newOffset = offset + limit;
-              setOffset(newOffset);
-              fetchTokens(true);
-            }}
+            onClick={handleLoadMore}
             disabled={isLoading}
             className="px-8 py-3 bg-white dark:bg-[#161b22] border border-gray-200 dark:border-white/10 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all shadow-sm"
           >
@@ -596,7 +690,7 @@ export default function TokenExplorer({
           <RenderTokenFundingModal
             isOpen={!!selectedToken}
             onClose={() => setSelectedToken(null)}
-            wallet={user.account}
+            wallet={user?.account}
             tokenInfo={selectedToken}
             chainId={network === 139 ? 139 : 1}
             isNative={false}

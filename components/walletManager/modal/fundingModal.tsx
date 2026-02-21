@@ -194,7 +194,8 @@ export default function FundingModal({
             <div className="p-6 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-white">
-                  {isSolana ? <SiSolana size={20} /> : <SiEthereum size={20} />}
+                <img src={tokenInfo.imageUrl} className="w-5 h-5 rounded-full"/>
+                  {/* {isSolana ? <SiSolana size={20} /> : <SiEthereum size={20} />} */}
                 </div>
                 <div>
                   <h2 className="text-lg font-black text-white tracking-tight">

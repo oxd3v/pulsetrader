@@ -592,6 +592,7 @@ export const useUserAuth = () => {
         return creationResult;
       } catch (err: any) {
         let key = handleServerErrorToast({ err });
+        console.log(key)
         creationResult.error = key;
         return creationResult;
       }
@@ -640,26 +641,28 @@ export const useUserAuth = () => {
   const addToken = async ({
     tokenAddress,
     chainId,
+    add
   }: {
     tokenAddress: string;
     chainId: number;
+    add:boolean
   }) => {
-    let additionResult = { added: false, error: null as string | null };
+    let additionResult = { success: false, error: null as string | null };
     try {
-      let apiResponse: any = await Service.addToken({ tokenAddress, chainId });
+      let apiResponse: any = await Service.addToken({ tokenAddress, chainId, add });
       if (!apiResponse.success) {
         let key = apiResponse.message || "SERVER_ERROR";
         notify("error", key);
         additionResult.error = key;
         return additionResult;
       }
-      notify("success", "TOKEN_ADDED_SUCCESS");
+      notify("success", add ? "TOKEN_ADDED_SUCCESS" : "TOKEN_REMOVED_SUCCESS");
       if (apiResponse.data.userData) {
         setUserState(apiResponse.data.userData);
       } else {
         notifyWithResponseError("error", "Network congested. Refresh the page");
       }
-      additionResult.added = true;
+      additionResult.success = true;
       return additionResult;
     } catch (err) {
       let key = handleServerErrorToast({ err });

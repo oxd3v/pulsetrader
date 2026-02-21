@@ -237,10 +237,10 @@ export default function WalletOverview({
           // Pass dummy token info, real app should derive from chainId
           tokenInfo={{
             address: ZeroAddress,
-            name: selectedWallet.network === "SVM" ? "Solana" : "Ethereum",
-            symbol: selectedWallet.network === "SVM" ? "SOL" : "ETH",
+            name: selectedWallet.network === "SVM" ? "Solana" : chainConfig[chainId].name,
+            symbol: selectedWallet.network === "SVM" ? "SOL" : chainConfig[chainId].symbol,
             decimals: selectedWallet.network === "SVM" ? 9 : 18,
-            imageUrl: "",
+            imageUrl: chainConfig[chainId].imageUrl,
           }}
         />
       )}
