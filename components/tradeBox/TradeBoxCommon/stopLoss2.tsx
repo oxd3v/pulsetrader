@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import InfoTooltip from "./BoxTooltip";
+
 interface StopLossInputProps {
   isTrailingMode: boolean;
   isActive: boolean;
@@ -16,25 +18,31 @@ const ReEntranceInput = ({
   setStopLossPercentage,
   notValid,
 }: StopLossInputProps) => {
-  const handleStopLossChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 1. Remove non-numeric characters and handle empty string
-    const rawValue = e.target.value.replace(/^0+/, ''); 
-    
-    // 2. Convert to number
-    const value = parseInt(rawValue);
+  // Local string state for the percentage input
+  const [inputValue, setInputValue] = useState(String(stopLossPercentage));
 
-    // 3. Validation: check if it's a valid number between 1 and 100
-    if (!isNaN(value)) {
-        if (value >= 1 && value <= 100) {
-            setStopLossPercentage(value);
-        } else if (value > 100) {
-            setStopLossPercentage(100); // Optional: cap at 100
-        }
-    } else {
-        // Allow the field to be empty so the user can delete the number
-        setStopLossPercentage(0); 
-    }
-};
+  // Sync local state when the prop changes (e.g., slider or external update)
+  useEffect(() => {
+    setInputValue(String(stopLossPercentage));
+  }, [stopLossPercentage]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value); // allow free editing
+  };
+
+  const handleInputBlur = () => {
+    let num = parseFloat(inputValue);
+    if (isNaN(num) || num < 1) num = 0; // 0 means disabled (but active is true, so validation will show error)
+    if (num > 100) num = 100;
+    setStopLossPercentage(num);
+  };
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(e.target.value);
+    setStopLossPercentage(val);
+    // No need to update inputValue here because useEffect will sync it
+  };
+
   return (
     <div className="space-y-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
       <div className="flex items-center justify-between">
@@ -68,8 +76,10 @@ const ReEntranceInput = ({
             max="50"
             step="1"
             value={stopLossPercentage}
-            onChange={(e) => setStopLossPercentage(parseInt(e.target.value))}
-            className={`flex-1 h-2 ${notValid ? "bg-red-200" : "bg-gray-200 dark:bg-gray-700"} rounded-lg appearance-none cursor-pointer`}
+            onChange={handleSliderChange}
+            className={`flex-1 h-2 ${
+              notValid ? "bg-red-200" : "bg-gray-200 dark:bg-gray-700"
+            } rounded-lg appearance-none cursor-pointer`}
           />
           <div className="w-24">
             <input
@@ -77,9 +87,14 @@ const ReEntranceInput = ({
               min="0"
               max="100"
               step="1"
-              value={stopLossPercentage}
-              onChange={(e) => handleStopLossChange(e)}
-              className={`w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border ${notValid ? "border-red-500" : "border-gray-200 dark:border-gray-700"} rounded-lg text-gray-900 dark:text-white`}
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleInputBlur}
+              className={`w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border ${
+                notValid
+                  ? "border-red-500"
+                  : "border-gray-200 dark:border-gray-700"
+              } rounded-lg text-gray-900 dark:text-white`}
             />
           </div>
           <span className="text-sm text-gray-600 dark:text-gray-400">%</span>

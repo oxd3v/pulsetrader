@@ -1,6 +1,6 @@
+import { useState, useEffect } from "react";
 import InfoTooltip from "./BoxTooltip";
 
-// NumberInput Component
 interface NumberInputProps {
   inputLabel: string;
   toolTipMessage: string;
@@ -8,6 +8,8 @@ interface NumberInputProps {
   onChange: (value: number) => void;
   notValid: boolean;
   selectTagOptions?: Array<{ label: string; value: number }>;
+  min?: number;      // new optional prop, default 1
+  max?: number;      // new optional prop
 }
 
 const NumberInput = ({
@@ -17,7 +19,22 @@ const NumberInput = ({
   onChange,
   notValid,
   selectTagOptions,
+  min = 1,           // default to 1
+  max,
 }: NumberInputProps) => {
+  const [inputValue, setInputValue] = useState(String(value));
+
+  useEffect(() => {
+    setInputValue(String(value));
+  }, [value]);
+
+  const handleBlur = () => {
+    let num = parseFloat(inputValue);
+    if (isNaN(num) || num < min) num = min;
+    if (max !== undefined && num > max) num = max;
+    onChange(num);
+  };
+
   return (
     <div className="space-y-1 md:space-y-2">
       <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -27,36 +44,20 @@ const NumberInput = ({
       <div className="flex gap-2">
         <input
           type="number"
-          min="0"
+          min={min}
+          max={max}
           step="0.1"
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={handleBlur}
           className={`flex-1 px-3 py-2 bg-white dark:bg-gray-800 border ${
             notValid ? "border-red-500" : "border-gray-200 dark:border-gray-700"
           } rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
         />
-        {/* {selectTagOptions && (
-          <div className="flex gap-1">
-            {selectTagOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onChange(option.value)}
-                className={`px-2 py-1 text-xs rounded-lg border ${
-                  value === option.value
-                    ? "bg-blue-500 text-white border-blue-500"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )} */}
+        {/* selectTagOptions can remain commented or be enabled later */}
       </div>
     </div>
   );
 };
 
 export default NumberInput;
-

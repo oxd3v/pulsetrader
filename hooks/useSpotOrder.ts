@@ -38,6 +38,298 @@ export const useSpotOrder = () => {
       setUserOrders: state.setUserOrders,
     })),
   );
+  // const configureOrder = (config: any): ORDER_TYPE[] => {
+  //   const {
+  //     gridNumber,
+  //     targetPrice,
+  //     activeStopLoss,
+  //     entryLogic,
+  //     exitLogic,
+  //     orderSizeMultiplier,
+  //     initialOrderSize,
+  //     gridMultiplier,
+  //     gridDistance,
+  //     collateralToken,
+  //     outputToken,
+  //     orderToken,
+  //     priority,
+  //     executionSpeed,
+  //     orderName,
+  //     strategy,
+  //     chainId,
+  //     isTrailingMode,
+  //     tpPrice,
+  //     slPrice,
+  //     isTechnicalExit,
+  //     tpPercentage,
+  //     slPercentage,
+  //     isReEntrance,
+  //     reEntrancePercentage,
+  //     slippage,
+  //   } = config;
+
+  //   const estOrders: ORDER_TYPE[] = [];
+
+  //   if (
+  //     gridNumber > 1 &&
+  //     strategy == "sellToken" &&
+  //     tpPrice &&
+  //     Number(tpPrice) > 0
+  //   ) {
+  //     const parsedEntryPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
+  //     let lastPriceDistanceRate = 0;
+  //     const CollateralParseOrderSize = safeParseUnits(
+  //       initialOrderSize,
+  //       orderToken.decimals,
+  //     );
+  //     for (let i = 0; i < gridNumber; i++) {
+  //       const sizeMultiplier = Math.pow(orderSizeMultiplier, i);
+  //       const rawSize = CollateralParseOrderSize * BigInt(sizeMultiplier);
+  //       let targetedPrice = BigInt(0);
+  //       if (i === 0) {
+  //         targetedPrice = parsedEntryPrice;
+  //       } else {
+  //         const distMultiplier = Math.pow(gridMultiplier, i - 1);
+  //         const currentStepDistance = gridDistance * distMultiplier;
+  //         lastPriceDistanceRate += currentStepDistance;
+  //         const bpsChange = BigInt(Math.floor(lastPriceDistanceRate * 100));
+  //         targetedPrice =
+  //           parsedEntryPrice +
+  //           (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
+  //       }
+  //       estOrders.push({
+  //         user: {},
+  //         wallet: {},
+  //         chainId,
+  //         name: orderName,
+  //         strategy,
+  //         category: "spot",
+  //         orderType: "SELL",
+  //         orderStatus: "PENDING",
+  //         entry: {
+  //           isTechnicalEntry: false,
+  //         },
+  //         orderAsset: {
+  //           orderToken: orderToken,
+  //           collateralToken: collateralToken,
+  //           outputToken: outputToken,
+  //           pairAddress: orderToken.pairAddress,
+  //         },
+  //         amount: {
+  //           orderSize: "0",
+  //           tokenAmount: rawSize.toString(),
+  //         },
+  //         slippage,
+  //         sl: slPercentage,
+  //         isTrailingMode,
+  //         exit: {
+  //           takeProfit: {
+  //             profit: "0",
+  //             takeProfitPercentage: tpPercentage,
+  //             takeProfitPrice: "0",
+  //           },
+  //           stopLoss: {
+  //             isActive: activeStopLoss,
+  //             save: "0",
+  //             stopLossPercentage: slPercentage,
+  //             stopLossPrice: slPrice,
+  //           },
+  //           isTechnicalExit: false,
+  //         },
+  //         isActive: true,
+  //         isBusy: false,
+  //         priority: Number(priority),
+  //         executionSpeed,
+  //         reEntrance: {
+  //           isReEntrance,
+  //           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
+  //         },
+  //         executionFee: {
+  //           payInUsd: "0",
+  //           feeInUsd: "0",
+  //         },
+  //         createdAt: new Date(),
+  //         updatedAt: new Date(),
+  //       });
+  //     }
+  //   } else if (
+  //     gridNumber > 1 &&
+  //     ["grid", "multiScalp", "dca"].includes(strategy) &&
+  //     targetPrice &&
+  //     Number(targetPrice) > 0
+  //   ) {
+  //     const parsedEntryPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
+  //     let lastPriceDistanceRate = 0;
+  //     const CollateralParseOrderSize = safeParseUnits(
+  //       initialOrderSize,
+  //       collateralToken.decimals,
+  //     );
+  //     const slBps = BigInt(Math.floor(slPercentage * 100));
+  //     const tpBps = BigInt(Math.floor(tpPercentage * 100));
+  //     for (let i = 0; i < gridNumber; i++) {
+  //       const sizeMultiplier = Math.pow(orderSizeMultiplier, i);
+  //       const rawSize = CollateralParseOrderSize * BigInt(sizeMultiplier);
+  //       let targetedPrice = BigInt(0);
+  //       if (i === 0) {
+  //         targetedPrice = parsedEntryPrice;
+  //       } else {
+  //         const distMultiplier = Math.pow(gridMultiplier, i - 1);
+  //         const currentStepDistance = gridDistance * distMultiplier;
+  //         lastPriceDistanceRate += currentStepDistance;
+  //         const bpsChange = BigInt(Math.floor(lastPriceDistanceRate * 100));
+  //         targetedPrice =
+  //           parsedEntryPrice -
+  //           (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
+  //       }
+  //       estOrders.push({
+  //         user: {},
+  //         wallet: {},
+  //         chainId,
+  //         name: orderName,
+  //         strategy,
+  //         category: "spot",
+  //         orderType: "BUY",
+  //         orderStatus: "PENDING",
+  //         entry: {
+  //           isTechnicalEntry: false,
+  //           priceLogic: {
+  //             type: "Price",
+  //             id: "price",
+  //             operator: "LESS_THAN",
+  //             threshold: targetedPrice.toString(),
+  //           },
+  //         },
+  //         orderAsset: {
+  //           orderToken: orderToken,
+  //           collateralToken: collateralToken,
+  //           outputToken: outputToken,
+  //           pairAddress: orderToken.pairAddress,
+  //         },
+  //         amount: {
+  //           orderSize: rawSize.toString(),
+  //           tokenAmount: "0",
+  //         },
+  //         slippage,
+  //         sl: i + 1,
+  //         isTrailingMode,
+  //         exit: {
+  //           takeProfit: {
+  //             profit: "0",
+  //             takeProfitPercentage: Number(tpBps),
+  //             takeProfitPrice: "0",
+  //           },
+  //           stopLoss: {
+  //             isActive: activeStopLoss,
+  //             save: "0",
+  //             stopLossPercentage: Number(slBps),
+  //             stopLossPrice: "0",
+  //           },
+  //           isTechnicalExit: false,
+  //         },
+  //         isActive: true,
+  //         isBusy: false,
+  //         priority: Number(priority),
+  //         executionSpeed,
+  //         reEntrance: {
+  //           isReEntrance,
+  //           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
+  //         },
+  //         executionFee: {
+  //           payInUsd: "0",
+  //           feeInUsd: "0",
+  //         },
+  //         createdAt: new Date(),
+  //         updatedAt: new Date(),
+  //       });
+  //     }
+  //   } else {
+  //     let isSellStrategy = strategy == "sellToken";
+
+  //     const slBps = BigInt(Math.floor(slPercentage * 100));
+  //     const tpBps = BigInt(Math.floor(tpPercentage * 100));
+  //     estOrders.push({
+  //       user: {},
+  //       wallet: {},
+  //       chainId,
+  //       name: orderName,
+  //       strategy,
+  //       category: "spot",
+  //       orderType: isSellStrategy ? "SELL" : "BUY",
+  //       orderStatus: "PENDING",
+  //       entry: {
+  //         isTechnicalEntry:
+  //           !isSellStrategy && strategy == "algo" ? true : false,
+  //         ...(strategy == "algo" && { technicalLogic: entryLogic }),
+  //         ...(!isSellStrategy &&
+  //           strategy != "algo" && {
+  //             priceLogic: {
+  //               type: "Price",
+  //               id: "price",
+  //               operator: "LESS_THAN",
+  //               threshold: safeParseUnits(
+  //                 targetPrice,
+  //                 PRECISION_DECIMALS,
+  //               ).toString(),
+  //             },
+  //           }),
+  //       },
+  //       orderAsset: {
+  //         orderToken: orderToken,
+  //         collateralToken: collateralToken,
+  //         outputToken: outputToken,
+  //         pairAddress: orderToken.pairAddress,
+  //       },
+  //       amount: {
+  //         orderSize: isSellStrategy
+  //           ? "0"
+  //           : safeParseUnits(
+  //               initialOrderSize,
+  //               collateralToken.decimals,
+  //             ).toString(),
+  //         tokenAmount: isSellStrategy
+  //           ? safeParseUnits(initialOrderSize, orderToken.decimals).toString()
+  //           : "0",
+  //       },
+  //       slippage,
+  //       sl: 1,
+  //       isTrailingMode,
+  //       exit: {
+  //         takeProfit: {
+  //           profit: "0",
+  //           takeProfitPercentage: isTechnicalExit ? 0 : Number(tpBps),
+  //           takeProfitPrice:
+  //             isSellStrategy && !isTechnicalExit && tpPrice
+  //               ? safeParseUnits(tpPrice, PRECISION_DECIMALS).toString()
+  //               : "0",
+  //         },
+  //         stopLoss: {
+  //           isActive: !isSellStrategy && activeStopLoss && !isTechnicalExit,
+  //           save: "0",
+  //           stopLossPercentage: isTechnicalExit ? 0 : Number(slBps),
+  //           stopLossPrice: "0",
+  //         },
+  //         isTechnicalExit: isTechnicalExit,
+  //         ...(isTechnicalExit && { technicalLogic: exitLogic }),
+  //       },
+  //       isActive: true,
+  //       isBusy: false,
+  //       priority: Number(priority),
+  //       executionSpeed,
+  //       reEntrance: {
+  //         isReEntrance,
+  //         reEntranceLimit: Math.floor(reEntrancePercentage * 100),
+  //       },
+  //       executionFee: {
+  //         payInUsd: "0",
+  //         feeInUsd: "0",
+  //       },
+  //       createdAt: new Date(),
+  //       updatedAt: new Date(),
+  //     });
+  //   }
+  //   return estOrders;
+  // };
+
   const configureOrder = (config: any): ORDER_TYPE[] => {
     const {
       gridNumber,
@@ -70,6 +362,15 @@ export const useSpotOrder = () => {
 
     const estOrders: ORDER_TYPE[] = [];
 
+    // Helper to multiply a bigint amount by a decimal multiplier
+    // using fixed‑point arithmetic with 1e6 precision (adjustable).
+    const applyMultiplier = (base: bigint, multiplier: number): bigint => {
+      const PRECISION = 1_000_000; // 1e6 – enough for typical multipliers
+      const scaledMultiplier = BigInt(Math.round(multiplier * PRECISION));
+      return (base * scaledMultiplier) / BigInt(PRECISION);
+    };
+
+    // ────────────────── SELL (grid) branch ──────────────────
     if (
       gridNumber > 1 &&
       strategy == "sellToken" &&
@@ -78,14 +379,13 @@ export const useSpotOrder = () => {
     ) {
       const parsedEntryPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
       let lastPriceDistanceRate = 0;
-      const CollateralParseOrderSize = safeParseUnits(
-        initialOrderSize,
-        orderToken.decimals,
-      );
+      const baseAmount = safeParseUnits(initialOrderSize, orderToken.decimals);
+      let currentMultiplier = 1; // multiplier for the first grid
+
       for (let i = 0; i < gridNumber; i++) {
-        const sizeMultiplier = Math.pow(orderSizeMultiplier, i);
-        const rawSize = CollateralParseOrderSize * BigInt(sizeMultiplier);
+        const rawSize = applyMultiplier(baseAmount, currentMultiplier);
         let targetedPrice = BigInt(0);
+
         if (i === 0) {
           targetedPrice = parsedEntryPrice;
         } else {
@@ -97,7 +397,9 @@ export const useSpotOrder = () => {
             parsedEntryPrice +
             (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
         }
+
         estOrders.push({
+          // ... (order object unchanged) ...
           user: {},
           wallet: {},
           chainId,
@@ -106,13 +408,11 @@ export const useSpotOrder = () => {
           category: "spot",
           orderType: "SELL",
           orderStatus: "PENDING",
-          entry: {
-            isTechnicalEntry: false,
-          },
+          entry: { isTechnicalEntry: false },
           orderAsset: {
-            orderToken: orderToken,
-            collateralToken: collateralToken,
-            outputToken: outputToken,
+            orderToken,
+            collateralToken,
+            outputToken,
             pairAddress: orderToken.pairAddress,
           },
           amount: {
@@ -144,15 +444,16 @@ export const useSpotOrder = () => {
             isReEntrance,
             reEntranceLimit: Math.floor(reEntrancePercentage * 100),
           },
-          executionFee: {
-            payInUsd: "0",
-            feeInUsd: "0",
-          },
+          executionFee: { payInUsd: "0", feeInUsd: "0" },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
+        currentMultiplier *= orderSizeMultiplier; // prepare for next grid
       }
-    } else if (
+    }
+    // ────────────────── BUY (grid/multiScalp/dca) branch ──────────────────
+    else if (
       gridNumber > 1 &&
       ["grid", "multiScalp", "dca"].includes(strategy) &&
       targetPrice &&
@@ -160,16 +461,18 @@ export const useSpotOrder = () => {
     ) {
       const parsedEntryPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
       let lastPriceDistanceRate = 0;
-      const CollateralParseOrderSize = safeParseUnits(
+      const baseAmount = safeParseUnits(
         initialOrderSize,
         collateralToken.decimals,
       );
       const slBps = BigInt(Math.floor(slPercentage * 100));
       const tpBps = BigInt(Math.floor(tpPercentage * 100));
+      let currentMultiplier = 1;
+
       for (let i = 0; i < gridNumber; i++) {
-        const sizeMultiplier = Math.pow(orderSizeMultiplier, i);
-        const rawSize = CollateralParseOrderSize * BigInt(sizeMultiplier);
+        const rawSize = applyMultiplier(baseAmount, currentMultiplier);
         let targetedPrice = BigInt(0);
+
         if (i === 0) {
           targetedPrice = parsedEntryPrice;
         } else {
@@ -181,7 +484,9 @@ export const useSpotOrder = () => {
             parsedEntryPrice -
             (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
         }
+
         estOrders.push({
+          // ... (order object unchanged) ...
           user: {},
           wallet: {},
           chainId,
@@ -200,9 +505,9 @@ export const useSpotOrder = () => {
             },
           },
           orderAsset: {
-            orderToken: orderToken,
-            collateralToken: collateralToken,
-            outputToken: outputToken,
+            orderToken,
+            collateralToken,
+            outputToken,
             pairAddress: orderToken.pairAddress,
           },
           amount: {
@@ -234,20 +539,22 @@ export const useSpotOrder = () => {
             isReEntrance,
             reEntranceLimit: Math.floor(reEntrancePercentage * 100),
           },
-          executionFee: {
-            payInUsd: "0",
-            feeInUsd: "0",
-          },
+          executionFee: { payInUsd: "0", feeInUsd: "0" },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
-      }
-    } else {
-      let isSellStrategy = strategy == "sellToken";
 
+        currentMultiplier *= orderSizeMultiplier;
+      }
+    }
+    // ────────────────── Single order branch ──────────────────
+    else {
+      const isSellStrategy = strategy == "sellToken";
       const slBps = BigInt(Math.floor(slPercentage * 100));
       const tpBps = BigInt(Math.floor(tpPercentage * 100));
+
       estOrders.push({
+        // ... (single order object unchanged) ...
         user: {},
         wallet: {},
         chainId,
@@ -274,9 +581,9 @@ export const useSpotOrder = () => {
             }),
         },
         orderAsset: {
-          orderToken: orderToken,
-          collateralToken: collateralToken,
-          outputToken: outputToken,
+          orderToken,
+          collateralToken,
+          outputToken,
           pairAddress: orderToken.pairAddress,
         },
         amount: {
@@ -319,17 +626,14 @@ export const useSpotOrder = () => {
           isReEntrance,
           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
         },
-        executionFee: {
-          payInUsd: "0",
-          feeInUsd: "0",
-        },
+        executionFee: { payInUsd: "0", feeInUsd: "0" },
         createdAt: new Date(),
         updatedAt: new Date(),
       });
     }
+
     return estOrders;
   };
-
   const addSpotOrder = async ({
     estOrders,
     areWalletsReady,
@@ -352,13 +656,13 @@ export const useSpotOrder = () => {
         return orderAddResult;
       }
 
-      if(!chainId){
+      if (!chainId) {
         let key = "INVALID_NETWORK";
         notify("error", key);
         orderAddResult.error = key;
         return orderAddResult;
-      }else{
-        if(!Object.values(chains).includes(chainId)){
+      } else {
+        if (!Object.values(chains).includes(chainId)) {
           let key = "UNSUPPORTED_NETWORK";
           notify("error", key);
           orderAddResult.error = key;
@@ -366,18 +670,18 @@ export const useSpotOrder = () => {
         }
       }
 
-      if(!name){
+      if (!name) {
         let key = "INVALID_ORDER_NAME";
-          notify("error", key);
-          orderAddResult.error = key;
-          return orderAddResult;
+        notify("error", key);
+        orderAddResult.error = key;
+        return orderAddResult;
       }
 
-      if(!strategy){
+      if (!strategy) {
         let key = "INVALID ORDER_STRATEGY";
-          notify("error", key);
-          orderAddResult.error = key;
-          return orderAddResult;
+        notify("error", key);
+        orderAddResult.error = key;
+        return orderAddResult;
       }
 
       if (category != "perpetual") {
@@ -385,7 +689,7 @@ export const useSpotOrder = () => {
         let userTokens = [...userAddedAssetes, ...userDeafultTokens]
           .filter((t) => t.split(":")[1] == chainId)
           .map((t) => t.toLowerCase());
-        if (!userTokens.includes((`${indexToken}:${chainId}`).toLowerCase())) {
+        if (!userTokens.includes(`${indexToken}:${chainId}`.toLowerCase())) {
           let key = "TOKEN_NOT_ADDED";
           notify("error", key);
           orderAddResult.error = key;
