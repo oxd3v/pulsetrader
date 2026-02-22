@@ -61,14 +61,14 @@ const TokenRow = memo(
     tokenInfo,
     isSelected,
     isAlreadyAdded,
-    isDefault,
+    isConnectedAndNotDefault,
     onSelect,
     onAdd,
   }: {
     tokenInfo: TokenInfo;
     isSelected: boolean;
     isAlreadyAdded: boolean;
-    isDefault: boolean;
+    isConnectedAndNotDefault: boolean;
     onSelect: (address: string) => void;
     onAdd: (address: string, add: boolean) => Promise<any>;
   }) => {
@@ -155,7 +155,7 @@ const TokenRow = memo(
         </div>
         <div className="flex-shrink-0 flex gap-2 items-center ml-2">
           {/* Only show watchlist toggle for non‑default tokens */}
-          {!isDefault  && (
+          {!isConnectedAndNotDefault  && (
             <>
               {!isAlreadyAdded ? (
                 <button
@@ -406,7 +406,7 @@ const TokenSelection = ({
           .filter((t) => t.token.networkId === chainId)
           .map((tokenInfo) => {
             const tokenKey = `${tokenInfo.token.address.toLowerCase()}:${chainId}`;
-            const isDefault = isConnected && !defaultTokenSet.has(tokenKey);
+            const isConnectedAndNotDefault = isConnected && !defaultTokenSet.has(tokenKey);
             const isAdded = isConnected && userAlreadyAddedTokens
               .map((t:string) => t.toLowerCase())
               .includes(tokenKey);
@@ -420,7 +420,7 @@ const TokenSelection = ({
                   tokenInfo.token.address.toLowerCase()
                 }
                 isAlreadyAdded={isAdded}
-                isDefault={isDefault}
+                isConnectedAndNotDefault={isConnectedAndNotDefault}
                 onSelect={handleTokenSelect}
                 onAdd={handleAddToken}
               />
