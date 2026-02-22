@@ -6,28 +6,22 @@ import React, {
   useRef,
   useMemo,
   memo,
+  useDeferredValue,
 } from "react";
 import Link from "next/link";
-// constants
-import { userDeafultTokens, CollateralTokens } from "@/constants/common/tokens";
-
-// lib
-import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
-import { displayNumber } from "@/utility/displayPrice";
-import { formateNumberInUnit } from "@/utility/handy";
-// animations
 import { motion, AnimatePresence } from "framer-motion";
-
-// icons
-import { MdBookmarkAdded } from "react-icons/md";
+import { useShallow } from "zustand/shallow";
 import { FiSearch, FiX, FiPlus, FiInfo } from "react-icons/fi";
 import { BiCoinStack } from "react-icons/bi";
 import { BsArrowUpRight } from "react-icons/bs";
 import { IoBookmark, IoBookmarkOutline } from "react-icons/io5";
+import { MdBookmarkAdded } from "react-icons/md";
 
-// store
+import { userDeafultTokens, CollateralTokens } from "@/constants/common/tokens";
+import { fetchCodexFilterTokens } from "@/lib/oracle/codex";
+import { displayNumber } from "@/utility/displayPrice";
+import { formateNumberInUnit } from "@/utility/handy";
 import { useStore } from "@/store/useStore";
-import { useShallow } from "zustand/shallow";
 import { useUserAuth } from "@/hooks/useAuth";
 
 // --- Types ---
@@ -55,56 +49,48 @@ interface TokenInfo {
   marketCap: string;
 }
 
-// --- Sub-Component: TokenRow (Optimized for Rendering) ---
+// --- Memoized Token Row ---
 const TokenRow = memo(
   ({
     tokenInfo,
     isSelected,
     isAlreadyAdded,
-    isConnectedAndNotDefault,
+    showBookmark,
     onSelect,
     onAdd,
   }: {
     tokenInfo: TokenInfo;
     isSelected: boolean;
     isAlreadyAdded: boolean;
-    isConnectedAndNotDefault: boolean;
+    showBookmark: boolean;
     onSelect: (address: string) => void;
     onAdd: (address: string, add: boolean) => Promise<any>;
   }) => {
     const [isLoading, setIsLoading] = useState(false);
-    const { priceUSD, liquidity, marketCap } = tokenInfo;
     const imageSrc = tokenInfo.token.info?.imageSmallUrl || "/tokenLogo.png";
-    const symbol =
-      tokenInfo.token.info?.symbol || tokenInfo.token.symbol || "Unknown";
+    const symbol = tokenInfo.token.info?.symbol || tokenInfo.token.symbol || "Unknown";
 
-    const handleAddToken = async () => {
+    const handleAddToken = useCallback(async () => {
       setIsLoading(true);
       try {
-        const res = await onAdd(tokenInfo.token.address, true);
-        if (res?.success) {
-          // Token added – no need to select it, just UI updates via store
-        }
-      } catch (err) {
-        // Error is handled inside onAdd (toast)
+        await onAdd(tokenInfo.token.address, true);
+      } catch {
+        // error handled in parent
       } finally {
         setIsLoading(false);
       }
-    };
+    }, [tokenInfo.token.address, onAdd]);
 
-    const handleRemoveToken = async () => {
+    const handleRemoveToken = useCallback(async () => {
       setIsLoading(true);
       try {
-        const res = await onAdd(tokenInfo.token.address, false);
-        if (res?.success) {
-          // Token removed – UI updates via store
-        }
-      } catch (err) {
-        // Error handled inside onAdd
+        await onAdd(tokenInfo.token.address, false);
+      } catch {
+        // error handled in parent
       } finally {
         setIsLoading(false);
       }
-    };
+    }, [tokenInfo.token.address, onAdd]);
 
     return (
       <motion.div
@@ -143,26 +129,22 @@ const TokenRow = memo(
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs font-mono">
             <span className="flex items-center text-gray-600 dark:text-gray-400 font-medium">
-              ${displayNumber(Number(priceUSD) || 0)}
+              ${displayNumber(Number(tokenInfo.priceUSD) || 0)}
             </span>
             <span className="text-gray-500 dark:text-gray-500">
-              L: {formateNumberInUnit(Number(liquidity) || 0, 2)}
+              L: {formateNumberInUnit(Number(tokenInfo.liquidity) || 0, 2)}
             </span>
             <span className="text-gray-500 dark:text-gray-500">
-              MC: {formateNumberInUnit(Number(marketCap) || 0, 2)}
+              MC: {formateNumberInUnit(Number(tokenInfo.marketCap) || 0, 2)}
             </span>
           </div>
         </div>
         <div className="flex-shrink-0 flex gap-2 items-center ml-2">
-          {/* Only show watchlist toggle for non‑default tokens */}
-          {!isConnectedAndNotDefault  && (
+          {showBookmark && (
             <>
               {!isAlreadyAdded ? (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddToken();
-                  }}
+                  onClick={handleAddToken}
                   className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
                   title="Add to Watchlist"
                 >
@@ -170,10 +152,7 @@ const TokenRow = memo(
                 </button>
               ) : (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveToken();
-                  }}
+                  onClick={handleRemoveToken}
                   className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 rounded-lg transition-colors"
                   title="Remove from Watchlist"
                 >
@@ -182,7 +161,6 @@ const TokenRow = memo(
               )}
             </>
           )}
-
           <button
             onClick={() => onSelect(tokenInfo.token.address)}
             className="px-3 py-2 text-sm border border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg font-medium transition-colors inline-flex items-center gap-2"
@@ -197,6 +175,62 @@ const TokenRow = memo(
 );
 
 TokenRow.displayName = "TokenRow";
+
+// --- Memoized Token List (to prevent re-renders of the whole list when header/footer change) ---
+const TokenList = memo(
+  ({
+    tokens,
+    selectedToken,
+    chainId,
+    isConnected,
+    defaultTokenSet,
+    userAddedTokens,
+    onSelect,
+    onAdd,
+  }: {
+    tokens: TokenInfo[];
+    selectedToken: string;
+    chainId: number;
+    isConnected: boolean;
+    defaultTokenSet: Set<string>;
+    userAddedTokens: string[];
+    onSelect: (address: string) => void;
+    onAdd: (address: string, add: boolean) => Promise<any>;
+  }) => {
+    const userAddedSet = useMemo(
+      () => new Set(userAddedTokens.map((t) => t.toLowerCase())),
+      [userAddedTokens]
+    );
+
+    return (
+      <div className="space-y-2 px-4 pb-4">
+        {tokens
+          .filter((t) => t.token.networkId === chainId)
+          .map((tokenInfo) => {
+            const tokenKey = `${tokenInfo.token.address.toLowerCase()}:${chainId}`;
+            const showBookmark = isConnected && !defaultTokenSet.has(tokenKey);
+            const isAdded = userAddedSet.has(tokenKey);
+            const isSelected =
+              selectedToken.toLowerCase() === tokenInfo.token.address.toLowerCase();
+
+            return (
+              <TokenRow
+                key={tokenInfo.token.address}
+                tokenInfo={tokenInfo}
+                isSelected={isSelected}
+                isAlreadyAdded={isAdded}
+                showBookmark={showBookmark}
+                onSelect={onSelect}
+                onAdd={onAdd}
+              />
+            );
+          })}
+      </div>
+    );
+  }
+);
+
+TokenList.displayName = "TokenList";
 
 // --- Main Component ---
 const TokenSelection = ({
@@ -216,14 +250,14 @@ const TokenSelection = ({
   const { addToken } = useUserAuth();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const deferredSearch = useDeferredValue(searchTerm); // smoother UI while typing
   const [filteredTokens, setFilteredTokens] = useState<TokenInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 1. Compute set of default token keys (address:networkId) for the current chain
+  // Memoized sets
   const defaultTokenSet = useMemo(() => {
     const defaults = userDeafultTokens.map((t: string) => t.toLowerCase());
     const collateral = Object.keys(CollateralTokens[chainId] || {}).map(
@@ -232,45 +266,21 @@ const TokenSelection = ({
     return new Set([...defaults, ...collateral]);
   }, [chainId]);
 
-  // 2. Memoize already added tokens (User Watchlist + Defaults)
-  const userAlreadyAddedTokens = useMemo(() => {
-    let userTokensByNetwork: string[] = [];
-    if (isConnected && user?.assetes?.length > 0) {
-      userTokensByNetwork = user.assetes
-        .filter((token: string) => {
-          const parts = token.split(":");
-          return parts.length > 1 && parts[1] === String(chainId);
-        })
-        .map((token: string) => token);
-    }
-
-    // const defaultTokens = userDeafultTokens
-    //   .filter((token: string) => {
-    //     const parts = token.split(":");
-    //     return parts.length > 1 && parts[1] === String(chainId);
-    //   })
-    //   .map((token: string) => token);
-    // const collateralTokens = Object.keys(CollateralTokens[chainId] || {}).map(t=>`${t.toLowerCase()}:${chainId}`)
-
-    // return Array.from(new Set([...defaultTokens, ...collateralTokens]));
-    return userTokensByNetwork;
+  const userAddedTokens = useMemo(() => {
+    if (!isConnected || !user?.assetes) return [];
+    return user.assetes
+      .filter((token: string) => {
+        const parts = token.split(":");
+        return parts.length > 1 && parts[1] === String(chainId);
+      })
+      .map((token: string) => token);
   }, [isConnected, user, chainId]);
 
-  // 3. Debounce Effect
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm.trim());
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // 4. Fetch Logic
+  // Fetch token info
   const fetchTokenInfo = useCallback(async () => {
     if (!chainId || !isOpen) return;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
     setLoading(true);
@@ -284,10 +294,10 @@ const TokenSelection = ({
         rankings: [{ attribute: "volume24", direction: "DESC" }],
       };
 
-      if (debouncedSearchTerm) {
-        variables.phrase = debouncedSearchTerm;
-      } else if (userAlreadyAddedTokens.length > 0) {
-        variables.tokens = userAlreadyAddedTokens;
+      if (deferredSearch) {
+        variables.phrase = deferredSearch;
+      } else if (userAddedTokens.length > 0) {
+        variables.tokens = userAddedTokens;
       }
 
       const tokenInfos = await fetchCodexFilterTokens({ variables });
@@ -300,7 +310,6 @@ const TokenSelection = ({
         err.name !== "AbortError" &&
         !abortControllerRef.current?.signal.aborted
       ) {
-        //console.error("Token fetch error:", err);
         setError("Unable to load tokens.");
       }
     } finally {
@@ -308,36 +317,30 @@ const TokenSelection = ({
         setLoading(false);
       }
     }
-  }, [chainId, isOpen, debouncedSearchTerm, userAlreadyAddedTokens]);
+  }, [chainId, isOpen, deferredSearch, userAddedTokens]);
 
-  // 5. Trigger Fetch when modal opens or dependencies change
   useEffect(() => {
     if (isOpen) {
       fetchTokenInfo();
     }
-
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      abortControllerRef.current?.abort();
     };
   }, [fetchTokenInfo, isOpen]);
 
-  // 6. Cleanup State on Close (with animation delay)
+  // Clean up on close
   useEffect(() => {
     if (!isOpen) {
-      const t = setTimeout(() => {
+      const timer = setTimeout(() => {
         setSearchTerm("");
-        setDebouncedSearchTerm("");
         setFilteredTokens([]);
         setLoading(false);
         setError(null);
       }, 300);
-      return () => clearTimeout(t);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
-  // Handlers
   const handleTokenSelect = useCallback(
     (tokenAddress: string) => {
       setSelectedToken(tokenAddress);
@@ -348,14 +351,12 @@ const TokenSelection = ({
 
   const handleAddToken = useCallback(
     async (tokenAddress: string, add: boolean) => {
-      if (chainId) {
-        return await addToken({ tokenAddress, chainId, add });
-      }
+      if (!chainId) return;
+      return await addToken({ tokenAddress, chainId, add });
     },
     [addToken, chainId]
   );
 
-  // Render Helpers
   const renderContent = () => {
     if (loading) {
       return (
@@ -392,8 +393,8 @@ const TokenSelection = ({
             <FiSearch className="w-6 h-6 text-gray-400" />
           </div>
           <p className="text-gray-600 dark:text-gray-400">
-            {debouncedSearchTerm
-              ? `No tokens found for "${debouncedSearchTerm}"`
+            {deferredSearch
+              ? `No tokens found for "${deferredSearch}"`
               : "No tokens available."}
           </p>
         </div>
@@ -401,32 +402,16 @@ const TokenSelection = ({
     }
 
     return (
-      <div className="space-y-2 px-4 pb-4">
-        {filteredTokens
-          .filter((t) => t.token.networkId === chainId)
-          .map((tokenInfo) => {
-            const tokenKey = `${tokenInfo.token.address.toLowerCase()}:${chainId}`;
-            const isConnectedAndNotDefault = isConnected && !defaultTokenSet.has(tokenKey);
-            const isAdded = isConnected && userAlreadyAddedTokens
-              .map((t:string) => t.toLowerCase())
-              .includes(tokenKey);
-
-            return (
-              <TokenRow
-                key={tokenInfo.token.address}
-                tokenInfo={tokenInfo}
-                isSelected={
-                  selectedToken.toLowerCase() ===
-                  tokenInfo.token.address.toLowerCase()
-                }
-                isAlreadyAdded={isAdded}
-                isConnectedAndNotDefault={isConnectedAndNotDefault}
-                onSelect={handleTokenSelect}
-                onAdd={handleAddToken}
-              />
-            );
-          })}
-      </div>
+      <TokenList
+        tokens={filteredTokens}
+        selectedToken={selectedToken}
+        chainId={chainId}
+        isConnected={isConnected}
+        defaultTokenSet={defaultTokenSet}
+        userAddedTokens={userAddedTokens}
+        onSelect={handleTokenSelect}
+        onAdd={handleAddToken}
+      />
     );
   };
 
@@ -475,7 +460,6 @@ const TokenSelection = ({
                 autoFocus
               />
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm("")}
