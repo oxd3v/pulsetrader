@@ -478,7 +478,6 @@ export default function DefinedSpotMain({
         <SelectTokenModal
           selectedToken={selectedAddress}
           setSelectedToken={handleTokenSelected}
-          addToken={() => console.log("Add token unimplemented")}
           isOpen={showTokenSelectionModal}
           onClose={() => setShowTokenSelectionModal(false)}
         />
