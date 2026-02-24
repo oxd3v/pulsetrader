@@ -105,8 +105,8 @@ export default class DataFeed {
       description: `${symbolName}/USD`,
       type: "crypto",
       session: "24x7",
-      minmov: 0.00000001,
-      pricescale: 1000000,
+      minmov: 1,
+      pricescale: 10000000,
       timezone: "Etc/UTC",
       ticker: symbolName,
       has_intraday: true,
@@ -145,6 +145,7 @@ export default class DataFeed {
     });
 
     let bars = res.candles || [];
+    
 
     // Validating bars are within the requested range
     let filteredBars = bars.filter((bar: Bar) => !isNaN(bar.time)).filter((bar: Bar) => {
@@ -167,7 +168,7 @@ export default class DataFeed {
       noData: filteredBars.length === 0,
     });
   } catch (error) {
-    console.log("[getBars]: Get error", error);
+    //console.log("[getBars]: Get error", error);
     onErrorCallback(error as Error);
   }
 }

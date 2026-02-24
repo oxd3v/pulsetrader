@@ -25,9 +25,7 @@ export const USER_LEVEL: Record<string, any> = {
       supportStrategy: ["limit", "scalp"],
     },
     color: "bg-neutral-600 text-black",
-    requireMents: {
-      
-    }
+    requireMents: null
   },
   ['SILVER']: {
     id: "silver",
@@ -50,7 +48,7 @@ export const USER_LEVEL: Record<string, any> = {
   },
   ['GOLD']: {
     id: "gold",
-    name: "Gold Circle",
+    name: "Gold Elite",
     benefits: {
       maxOrder: 50,
       maxWallets: 7,
@@ -69,7 +67,7 @@ export const USER_LEVEL: Record<string, any> = {
   },
   ['PLATINUM']: {
     id: "platinum",
-    name: "Platinum Elite",
+    name: "Platinum Prestige",
     benefits: {
       maxOrder: 100,
       maxWallets: 10,
@@ -77,7 +75,7 @@ export const USER_LEVEL: Record<string, any> = {
       maxSVMWallets:4,
       maxAccessAsset: 50,
       supportTrading: ["spot", "perpetual"],
-      supportStrategy: ["limit", "scalp", "grid", "dca", "sellToken"],
+      supportStrategy: ["limit", "scalp", "grid", "dca", "sellToken", 'algo'],
     },
     color: "bg-sky-400 text-black",
     requireMents: {
@@ -88,13 +86,13 @@ export const USER_LEVEL: Record<string, any> = {
   },
   ['DIAMOND']: {
     id: "diamond",
-    name: "Diamond Prestige",
+    name: "Diamond Enterprise",
     benefits: {
       maxOrder: "Unlimited",
-      maxWallets: 20,
-      maxEVMWallets: 12,
-      maxSVMWallets:8,
-      maxAccessAsset: 100,
+      maxWallets: "Unlimited",
+      maxEVMWallets: "Unlimited",
+      maxSVMWallets: 100,
+      maxAccessAsset: "Unlimited",
       supportTrading: ["spot", "perpetual"],
       supportStrategy: ["limit", "scalp", "grid", "dca", "sellToken", "algo"],
     },

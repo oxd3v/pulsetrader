@@ -496,7 +496,7 @@ export const safeFormatNumber = (
     // Round to nearest integer
     const powerToScale = totalPrecision;
     const roundDivisor = BigInt(10) ** BigInt(powerToScale);
-    const roundedBigInt = (BigInt(value) + roundDivisor / 2n) / roundDivisor;
+    const roundedBigInt = (BigInt(value) + roundDivisor / BigInt(2)) / roundDivisor;
     const result = sign + roundedBigInt.toString();
     return result === '-0' ? '0' : result;
   }
@@ -519,7 +519,7 @@ export const safeFormatNumber = (
       // Round up using BigInt arithmetic
       const powerToScale = totalPrecision - displayDecimals;
       const roundDivisor = BigInt(10) ** BigInt(powerToScale);
-      const roundedBigInt = (BigInt(value) + roundDivisor / 2n) / roundDivisor;
+      const roundedBigInt = (BigInt(value) + roundDivisor / BigInt(2)) / roundDivisor;
       const roundedString = roundedBigInt.toString();
 
       // Format with displayDecimals digits

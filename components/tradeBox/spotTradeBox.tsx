@@ -986,9 +986,9 @@ export default function DefinedTradeBox({
 
           <OrderPriority
             priority={priority}
-            executionSpeed={executionSpeed}
+            //executionSpeed={executionSpeed}
             setPriority={setPriority}
-            setExecutionSpeed={setExecutionSpeed}
+            //setExecutionSpeed={setExecutionSpeed}
             user={user}
           />
         </div>
