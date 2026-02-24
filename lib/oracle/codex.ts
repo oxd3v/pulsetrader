@@ -300,7 +300,7 @@ const CODEX_WALLET_BALANCE = `
 `;
 
 let getUrlConfigurration = () => {
- let randomIndex = Math.floor(Math.random() * handleCodexUrlParams.length);
+  let randomIndex = Math.floor(Math.random() * handleCodexUrlParams.length);
   return handleCodexUrlParams[randomIndex];
 };
 
@@ -319,51 +319,61 @@ export const fetchCodexCandleBar = async ({
   chainId: number;
   resolution: string;
   from?: number;
-  to?:number;
-  createdAt:number
+  to?: number;
+  createdAt: number;
   limit: number;
 }) => {
-  let urlConfigurration = getUrlConfigurration();
-  // Use passed 'to' or fallback to current time
-  const requestTo = to || Math.floor(Date.now() / 1000);
-  
-  // Use passed 'from' or fallback to a default (limit * resolution in seconds)
-  // Ensure we never request data older than the token's 'createdAt'
-  const requestFrom = from 
-    ? Math.max(from, createdAt) 
-    : Math.max((requestTo - 28512000), createdAt);
-  //const to = Math.floor(Date.now() / 1000);
-  //let from = Math.max((to - 28512000), createdAt); // 330 days earlier
-  let response = await axiosRequest({
-    ...urlConfigurration,
-    method: "POST",
-    data: {
-      query: CODEX_CANDLE_BAR_QUERY,
-      variables: {
-        symbol: `${pairAddress}:${chainId}`,
-        countback: limit,
-        from: requestFrom,
-        to:requestTo,
-        resolution,
-        currencyCode: "USD",
-        quoteToken,
-        statsType: "FILTERED",
-      },
-    },
-  });
-  //console.log(response);
-  let bars = response.data.getBars;
-  const sanitizeBars = bars.t.map((time: number, i: number) => ({
-    time: time * 1000,
-    high: parseFloat(bars.h[i]),
-    low: parseFloat(bars.l[i]),
-    close: parseFloat(bars.c[i]),
-    open: parseFloat(bars.o[i]),
-    volume: parseFloat(bars.volume[i] || 0),
-  }));
-  return {
-    candles: sanitizeBars,
-  };
+  //let urlConfigurration = getUrlConfigurration();
+  for (let i = 0; i < handleCodexUrlParams.length; i++) {
+    let urlConfigurration = handleCodexUrlParams[i];
+    try {
+      // Use passed 'to' or fallback to current time
+      const requestTo = to || Math.floor(Date.now() / 1000);
+
+      // Use passed 'from' or fallback to a default (limit * resolution in seconds)
+      // Ensure we never request data older than the token's 'createdAt'
+      const requestFrom = from
+        ? Math.max(from, createdAt)
+        : Math.max(requestTo - 28512000, createdAt);
+      //const to = Math.floor(Date.now() / 1000);
+      //let from = Math.max((to - 28512000), createdAt); // 330 days earlier
+      let response = await axiosRequest({
+        ...urlConfigurration,
+        method: "POST",
+        data: {
+          query: CODEX_CANDLE_BAR_QUERY,
+          variables: {
+            symbol: `${pairAddress}:${chainId}`,
+            countback: limit,
+            from: requestFrom,
+            to: requestTo,
+            resolution,
+            currencyCode: "USD",
+            quoteToken,
+            statsType: "FILTERED",
+          },
+        },
+      }).catch((err) => null);
+      if (!response) {
+        continue;
+      }
+      //console.log(response);
+      let bars = response.data.getBars;
+      const sanitizeBars = bars.t.map((time: number, i: number) => ({
+        time: time * 1000,
+        high: parseFloat(bars.h[i]),
+        low: parseFloat(bars.l[i]),
+        close: parseFloat(bars.c[i]),
+        open: parseFloat(bars.o[i]),
+        volume: parseFloat(bars.volume[i] || 0),
+      }));
+      return {
+        candles: sanitizeBars,
+      };
+    } catch (err) {
+      continue;
+    }
+  }
 };
 
 export const fetchCodexFilterTokens = async ({
@@ -371,18 +381,28 @@ export const fetchCodexFilterTokens = async ({
 }: {
   variables: any;
 }) => {
-  let urlConfigurration = getUrlConfigurration();
-  let response = await axiosRequest({
-    ...urlConfigurration,
-    method: "POST",
-    data: {
-      query: CODEX_FILTER_TOKENS,
-      variables,
-    },
-  });
-  //console.log(response)
-  let tokens = response.data.filterTokens.results;
-  return tokens;
+  for (let i = 0; i < handleCodexUrlParams.length; i++) {
+    try {
+      let urlConfigurration = handleCodexUrlParams[i];
+      let response = await axiosRequest({
+        ...urlConfigurration,
+        method: "POST",
+        data: {
+          query: CODEX_FILTER_TOKENS,
+          variables,
+        },
+      }).catch((err) => null);
+      if (!response) continue;
+      //console.log(response)
+      let tokens = response.data.filterTokens.results;
+      return tokens;
+    } catch (err) {
+      if (i == handleCodexUrlParams.length - 1) {
+        throw err;
+      }
+      continue;
+    }
+  }
 };
 
 export const fetchCodexTokenPrice = async ({
@@ -392,49 +412,68 @@ export const fetchCodexTokenPrice = async ({
   tokenAddress: string;
   chainId: number;
 }) => {
-  let urlConfigurration = getUrlConfigurration();
-  //console.log(urlConfigurration);
-  let response = await axiosRequest({
-    ...urlConfigurration,
-    method: "POST",
-    data: {
-      query: CODEX_TOKEN_PRICE_QUERY,
-      variables: {
-        inputs: [{ address: tokenAddress, networkId: chainId }],
-      },
-    },
-  });
-  //console.log(response);
-  let tokenPrices = response.data.getTokenPrices[0];
-  return tokenPrices.priceUsd;
+  for (let i = 0; i < handleCodexUrlParams.length; i++) {
+    try {
+      let urlConfigurration = handleCodexUrlParams[i];
+      let response = await axiosRequest({
+        ...urlConfigurration,
+        method: "POST",
+        data: {
+          query: CODEX_TOKEN_PRICE_QUERY,
+          variables: {
+            inputs: [{ address: tokenAddress, networkId: chainId }],
+          },
+        },
+      }).catch((err) => null);
+      if (!response) continue;
+      //console.log(response)
+      let tokenPrices = response.data.getTokenPrices[0];
+      return tokenPrices.priceUsd;
+    } catch (err) {
+      if (i == handleCodexUrlParams.length - 1) {
+        throw err;
+      }
+      continue;
+    }
+  }
 };
 
 export const fetchCodexWalletBalances = async ({
   walletAddress,
   chainId,
-  limit
+  limit,
 }: {
   walletAddress: string;
   chainId: number;
-  limit:number;
+  limit: number;
 }) => {
-  let urlConfigurration = getUrlConfigurration();
-  let response = await axiosRequest({
-    ...urlConfigurration,
-    method: "POST",
-    data: {
-      query: CODEX_WALLET_BALANCE,
-      variables: {
-      input: {
-        includeNative: true,
-        limit,
-        removeScams: true,
-        walletId: `${walletAddress}:${chainId}`
+  for (let i = 0; i < handleCodexUrlParams.length; i++) {
+    try {
+      let urlConfigurration = handleCodexUrlParams[i];
+      let response = await axiosRequest({
+        ...urlConfigurration,
+        method: "POST",
+        data: {
+          query: CODEX_WALLET_BALANCE,
+          variables: {
+            input: {
+              includeNative: true,
+              limit,
+              removeScams: true,
+              walletId: `${walletAddress}:${chainId}`,
+            },
+          },
+        },
+      }).catch((err) => null);
+      if (!response) continue;
+      //console.log(response)
+      let tokenBalances = response.data.balances.items;
+      return tokenBalances;
+    } catch (err) {
+      if (i == handleCodexUrlParams.length - 1) {
+        throw err;
       }
+      continue;
     }
-    },
-  });
-  //console.log(response);
-  let tokenBalances = response.data.balances.items;
-  return tokenBalances;
+  }
 };

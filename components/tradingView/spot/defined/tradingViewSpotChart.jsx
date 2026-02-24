@@ -81,7 +81,7 @@ const TradingViewAdvancedChart = React.memo(
             );
             const tpLine = chart
               .createPositionLine({ ...commonStyle })
-              .setText(`${order.name}_TP`)
+              .setText(`${order.name}/${order.sl}_TP`)
               .setPrice(tpPrice)
               .setLineColor("#05aa58")
               .setBodyBackgroundColor("#21ee21")
@@ -94,18 +94,18 @@ const TradingViewAdvancedChart = React.memo(
             order.exit.stopLoss?.stopLossPrice &&
             order.exit.stopLoss?.stopLossPrice != 0
           ) {
-            const tpPrice = formatUnits(
+            const slPrice = formatUnits(
               BigInt(order.exit.stopLoss?.stopLossPrice || 0),
               PRECISION_DECIMALS,
             );
-            const tpLine = chart
+            const slLine = chart
               .createPositionLine({ ...commonStyle })
-              .setText(`${order.name}_TP`)
-              .setPrice(tpPrice)
+              .setText(`${order.name}/${order.sl}_SL`)
+              .setPrice(slPrice)
               .setLineColor("#aa0573")
               .setBodyBackgroundColor("#ee214d")
               .setBodyBorderColor("#91042e");
-            linesRef.current.push(tpLine);
+            linesRef.current.push(slLine);
           }
         }
 
@@ -123,7 +123,7 @@ const TradingViewAdvancedChart = React.memo(
           );
           const entryLine = chart
             .createPositionLine({ ...commonStyle })
-            .setText(`${order.name}_Entry`)
+            .setText(`${order.name}/${order.sl}_Entry`)
             .setPrice(entryPrice)
             .setBodyTextColor("#000")
             .setLineColor("#e0d5d5")

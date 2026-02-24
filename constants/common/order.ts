@@ -11,9 +11,10 @@ export const GAS_LIMIT = {
     },
   },  
   ["SPOT"]: {
-    [chains.Avalanche]: BigInt(5000000),
-    [chains.Ethereum]: BigInt(1000000),
-    [chains.Arbitrum]: BigInt(2000000),
+    [chains.Avalanche]: BigInt(6000000), // with transfer and approve gas limit
+    [chains.Solana]: BigInt(1700000), // with transfer gas limit
+    [chains.Ethereum]: BigInt(1800000), // with transfer gas limit
+    [chains.Arbitrum]: BigInt(2700000), // with transfer gas limit
   },
 };
 

@@ -150,6 +150,7 @@ export default function DefinedTradeBox({
   // Advanced Settings State
   const [priority, setPriority] = useState<number>(2);
   const [executionSpeed, setExecutionSpeed] = useState<string>("standard");
+  const [orderNetworkFee, setOrderNetworkFee] = useState("0");
 
   // Wallet & Order State
   const [gridsByWallet, setGridsByWallet] = useState<GridsByWallet>({});
@@ -176,7 +177,7 @@ export default function DefinedTradeBox({
       // 2. If collateral matches the current page token (assuming tokenInfo has current price)
       if (
         collateralToken.address.toLowerCase() ===
-          tokenInfo?.address?.toLowerCase() 
+        tokenInfo?.address?.toLowerCase()
       ) {
         if (tokenInfo?.priceUsd) {
           setCollateralPrice(Number(tokenInfo.priceUsd));
@@ -483,9 +484,10 @@ export default function DefinedTradeBox({
         isReEntrance,
         reEntrancePercentage,
         slippage,
+        orderNetworkFee,
       };
       const _estOrders = configureOrder(orderConfig);
-      
+
       setEstOrders(_estOrders);
     } else {
       setEstOrders([]);
@@ -512,38 +514,42 @@ export default function DefinedTradeBox({
     isTechnicalExit,
     executionSpeed,
     isOrderNameValidate,
+    orderNetworkFee,
     estimatedUsdValue, // added dependency
   ]);
 
-   
-  // const MemoizedWalletSelector = useMemo(
-  //     () => (
-  //         <WalletSelector
-  //             availableWallets={wallets}
-  //             orders={userPrevOrders}
-  //             gridsByWallet={gridsByWallet}
-  //             setGridsByWallet={setGridsByWallet}
-  //             areWalletsReady={areWalletsReady}
-  //             setWalletsReady={setWalletsReady}
-  //             chainId={chainId}
-  //             collateralToken={collateralToken}
-  //             selectedStrategy={selectedStrategy}
-  //             estOrders={estOrders}
-  //             category="spot"
-  //         />
-  //     ),
-  //     [
-  //         estOrders,
-  //         gridNumber,
-  //         selectedStrategy,
-  //         initialOrderSize,
-  //         orderSizeMultiplier,
-  //         chainId,
-  //         collateralToken,
-  //         gridsByWallet,
-  //         areWalletsReady
-  //     ]
-  // );
+  const MemoizedWalletSelector = useMemo(
+    () => (
+      <SelectWallet
+        category="spot"
+        orders={userPrevOrders}
+        availableWallets={userWallets}
+        gridsByWallet={gridsByWallet}
+        setGridsByWallet={setGridsByWallet}
+        areWalletsReady={areWalletsReady}
+        setWalletsReady={setWalletsReady}
+        chainId={chainId}
+        collateralToken={collateralToken}
+        selectedStrategy={selectedStrategy}
+        estOrders={estOrders}
+        setOrderNetworkFee={setOrderNetworkFee}
+        user={user}
+      />
+    ),
+    [
+      estOrders,
+      userPrevOrders,
+      userWallets,
+      gridNumber,
+      selectedStrategy,
+      initialOrderSize,
+      orderSizeMultiplier,
+      chainId,
+      collateralToken,
+      gridsByWallet,
+      areWalletsReady,
+    ],
+  );
 
   // ========================================================================
   // Render
@@ -833,31 +839,32 @@ export default function DefinedTradeBox({
                   selectTagOptions={GRID_MULTIPLIER_OPTIONS}
                 />
               </div>
-
-              <div className="grid xl:grid-cols-2 gap-4">
-                <NumberInput
-                  inputLabel="Grid Multiplier"
-                  toolTipMessage="Multiplier for increasing grid size at each level"
-                  value={gridMultiplier}
-                  onChange={setGridMultiplier}
-                  notValid={
-                    Number(gridNumber) > 1 &&
-                    (gridMultiplier === 0 || !gridMultiplier)
-                  }
-                  selectTagOptions={GRID_MULTIPLIER_OPTIONS}
-                />
-                <NumberInput
-                  inputLabel="Collateral Multiplier"
-                  toolTipMessage="Multiplier for increasing collateral at each grid level"
-                  value={orderSizeMultiplier}
-                  onChange={setOrderSizeMultiplier}
-                  notValid={
-                    Number(gridNumber) > 1 &&
-                    (orderSizeMultiplier === 0 || !orderSizeMultiplier)
-                  }
-                  selectTagOptions={GRID_MULTIPLIER_OPTIONS}
-                />
-              </div>
+              {selectedStrategy.id != "dca" && (
+                <div className="grid xl:grid-cols-2 gap-4">
+                  <NumberInput
+                    inputLabel="Grid Multiplier"
+                    toolTipMessage="Multiplier for increasing grid size at each level"
+                    value={gridMultiplier}
+                    onChange={setGridMultiplier}
+                    notValid={
+                      Number(gridNumber) > 1 &&
+                      (gridMultiplier === 0 || !gridMultiplier)
+                    }
+                    selectTagOptions={GRID_MULTIPLIER_OPTIONS}
+                  />
+                  <NumberInput
+                    inputLabel="Collateral Multiplier"
+                    toolTipMessage="Multiplier for increasing collateral at each grid level"
+                    value={orderSizeMultiplier}
+                    onChange={setOrderSizeMultiplier}
+                    notValid={
+                      Number(gridNumber) > 1 &&
+                      (orderSizeMultiplier === 0 || !orderSizeMultiplier)
+                    }
+                    selectTagOptions={GRID_MULTIPLIER_OPTIONS}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -987,22 +994,7 @@ export default function DefinedTradeBox({
         </div>
       </div>
 
-      {estOrders.length > 0 && user.account && (
-        <SelectWallet
-          category="spot"
-          orders={userPrevOrders}
-          availableWallets={userWallets}
-          gridsByWallet={gridsByWallet}
-          setGridsByWallet={setGridsByWallet}
-          areWalletsReady={areWalletsReady}
-          setWalletsReady={setWalletsReady}
-          chainId={chainId}
-          collateralToken={collateralToken}
-          selectedStrategy={selectedStrategy}
-          estOrders={estOrders}
-          user={user}
-        />
-      )}
+      {estOrders.length > 0 && user.account && MemoizedWalletSelector}
 
       {/* ============================================================ */}
       {/* Action Buttons */}
@@ -1076,15 +1068,15 @@ export default function DefinedTradeBox({
 
       {/* Confirmation Modal */}
       {isConfirmationOpen && (
-        <ConfirmationModal 
-        isOpen={isConfirmationOpen} 
-        onClose={()=>setIsConfirmationOpen(false)} 
-        onConfirm={handleOrderSubmit} 
-        title="Create order" 
-        description='Are you sure to create order?' 
-        confirmText="Confirm" 
-        cancelText="Cancel"
-        variant="default"
+        <ConfirmationModal
+          isOpen={isConfirmationOpen}
+          onClose={() => setIsConfirmationOpen(false)}
+          onConfirm={handleOrderSubmit}
+          title="Create order"
+          description="Are you sure to create order?"
+          confirmText="Confirm"
+          cancelText="Cancel"
+          variant="default"
         />
       )}
     </div>

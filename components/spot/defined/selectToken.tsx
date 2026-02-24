@@ -268,12 +268,18 @@ const TokenSelection = ({
 
   const userAddedTokens = useMemo(() => {
     if (!isConnected || !user?.assetes) return [];
-    return user.assetes
+    const defaults = userDeafultTokens.filter((token: string) => {
+        const parts = token.split(":");
+        return parts.length > 1 && parts[1] === String(chainId);
+      })
+      .map((token: string) => token);;
+    const onlyUserAdded =  user.assetes
       .filter((token: string) => {
         const parts = token.split(":");
         return parts.length > 1 && parts[1] === String(chainId);
       })
       .map((token: string) => token);
+    return [...defaults, ...onlyUserAdded]
   }, [isConnected, user, chainId]);
 
   // Fetch token info

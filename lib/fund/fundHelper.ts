@@ -63,16 +63,14 @@ export const calculateExistingLockedFunds = (
   gasFee: bigint,
   user: any,
 ) => {
+  
   let totalActiveOrders = 0;
   let lockedFundBalance = BigInt(0);
   let totalCollateralPending = BigInt(0);
   
   orders.forEach((order) => {
-    console.log(order.wallet === walletId &&
-      order.isActive == true &&
-      order.isBusy == false)
     if (
-      order.wallet === walletId &&
+      order.wallet._id === walletId &&
       order.isActive == true &&
       order.isBusy == false
     ) {

@@ -5,6 +5,7 @@ import {
   FiBarChart,
   FiPieChart,
   FiShield,
+  FiList,
   FiActivity,
   FiCreditCard,
   FiPlus,
@@ -27,6 +28,7 @@ import { fetchCodexWalletBalances } from "@/lib/oracle/codex";
 // Components
 import WalletOverview from "./walletOverview";
 import MyTokenPortfolio from "./UserTokensList";
+import OrderList from "@/components/order/dashboard/OrderList";
 import ActivityModel from '@/components/activity/activityTable';
 import Analytics from '@/components/walletManager/walletPortfolio/walletAnalytics';
 import WalletSettings from '@/components/walletManager/walletPortfolio/walletSettings';
@@ -54,7 +56,7 @@ export default function PortfolioMain({
 }: PortfolioMainProps) {
   // --- State ---
   const [activeTab, setActiveTab] = useState<
-    "overview" | "holdings" | "activity" | "analytics" | "settings"
+    "overview" | "holdings" |"orders" | "activity" | "analytics" | "settings"
   >("overview");
   const [isWalletDropdownOpen, setIsWalletDropdownOpen] = useState(false);
   const [isCreationModelOpen, setIsCreationModelOpen] = useState(false);
@@ -231,6 +233,7 @@ export default function PortfolioMain({
     { id: "holdings", label: "Holdings", icon: FiCreditCard },
     { id: "activity", label: "Activity", icon: FiActivity },
     { id: "analytics", label: "Analytics", icon: FiBarChart },
+    { id: "orders", label: "Orders", icon: FiList },
     { id: "settings", label: "Setting", icon: FiShield },
   ] as const;
 
@@ -411,6 +414,7 @@ export default function PortfolioMain({
                   />
                 )}
                 {activeTab === 'activity' && <ActivityModel user={user} walletAddress={selectedWallet.address} walletId={selectedWallet._id}/>}
+                {activeTab == 'orders' && <OrderList network={chainId} userOrders={userOrders} isConnected={true}/>}
                 {activeTab === 'analytics' && <Analytics address={selectedWallet.address} chainId={chainId}/>}
                 {activeTab === 'settings' && <WalletSettings wallet={selectedWallet}/>}
               </motion.div>

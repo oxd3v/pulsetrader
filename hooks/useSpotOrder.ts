@@ -358,6 +358,7 @@ export const useSpotOrder = () => {
       isReEntrance,
       reEntrancePercentage,
       slippage,
+      orderNetworkFee
     } = config;
 
     const estOrders: ORDER_TYPE[] = [];
@@ -420,7 +421,7 @@ export const useSpotOrder = () => {
             tokenAmount: rawSize.toString(),
           },
           slippage,
-          sl: slPercentage,
+          sl: i+1,
           isTrailingMode,
           exit: {
             takeProfit: {
@@ -444,7 +445,7 @@ export const useSpotOrder = () => {
             isReEntrance,
             reEntranceLimit: Math.floor(reEntrancePercentage * 100),
           },
-          executionFee: { payInUsd: "0", feeInUsd: "0" },
+          executionFee: { payInUsd: "0", feeInUsd: "0", feeUsed: '0', ...(orderNetworkFee != '0' && {networkTradeFeeLocked:orderNetworkFee}) },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -539,7 +540,7 @@ export const useSpotOrder = () => {
             isReEntrance,
             reEntranceLimit: Math.floor(reEntrancePercentage * 100),
           },
-          executionFee: { payInUsd: "0", feeInUsd: "0" },
+          executionFee: { payInUsd: "0", feeInUsd: "0", feeUsed: '0', ...(orderNetworkFee != '0' && {networkTradeFeeLocked:(BigInt(orderNetworkFee)*BigInt(2)).toString()}) },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -626,7 +627,7 @@ export const useSpotOrder = () => {
           isReEntrance,
           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
         },
-        executionFee: { payInUsd: "0", feeInUsd: "0" },
+        executionFee: { payInUsd: "0", feeInUsd: "0",feeUsed: '0',  ...(orderNetworkFee != '0' && {networkTradeFeeLocked: (BigInt(orderNetworkFee)*BigInt(isSellStrategy ? 1 : 2)).toString()})},
         createdAt: new Date(),
         updatedAt: new Date(),
       });

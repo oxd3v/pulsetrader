@@ -1,17 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
-import {
-  FiSearch,
-  FiX,
-  FiAlertCircle,
-  FiFilter,
-} from "react-icons/fi";
+import { FiSearch, FiX, FiAlertCircle, FiFilter } from "react-icons/fi";
 import { BiWallet } from "react-icons/bi";
 import { CiGrid2H, CiGrid41 } from "react-icons/ci";
 import { RiRefreshLine } from "react-icons/ri";
 
 // Types
-import { ORDER_TYPE, OrderStatusType } from "@/type/order";
+import { ORDER_TYPE } from "@/type/order";
 
 // Hooks & Store
 import { useSpotOrder } from "@/hooks/useSpotOrder";
@@ -21,10 +16,10 @@ import StrategyGrouped from "./StrategyGrouped";
 import OrderTable from "./OrderTable";
 
 interface OrderListParams {
-  network: number;
+  network?: number;
   userOrders: ORDER_TYPE[];
-  orderCategory: string; // 'all' | 'spot' | 'perpetual'
-  walletAddress: string | undefined;
+  orderCategory?: string; // 'all' | 'spot' | 'perpetual'
+  walletAddress?: string | undefined;
   isConnected: boolean;
   tokenInfo?: any;
 }
@@ -60,21 +55,17 @@ export default function OrderList({
   // View Mode — table on desktop, grid on mobile
   const [isTableOrder, setIsTableOrder] = useState<boolean>(getInitialTableView);
 
-  // Data
+  // Data (GMX – currently unused, kept for child components)
   const [gmxOpenedPositionOrders, setGmxOpenedPositionOrders] = useState<Record<string, any>>({});
   const [isGmxPosition, setIsGmxPosition] = useState<boolean>(false);
   const gmxPositionUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ------------------------------------------------------------------
   // Sync categoryFilter when the orderCategory prop changes
-  // ------------------------------------------------------------------
   useEffect(() => {
     setCategoryFilter(orderCategory);
   }, [orderCategory]);
 
-  // ------------------------------------------------------------------
   // Responsive: switch view automatically on resize
-  // ------------------------------------------------------------------
   useEffect(() => {
     function handleResize() {
       setIsTableOrder(window.innerWidth >= 768);
@@ -84,93 +75,115 @@ export default function OrderList({
   }, []);
 
   // ------------------------------------------------------------------
-  // Filtering Logic
+  // Memoized Filtering Logic (flattened and safe)
   // ------------------------------------------------------------------
-  
-  const filteredOrders = userOrders.filter((o) => {
-    // Network filter
-    if (network !== undefined && network !== o.chainId) return false;
+  const filteredOrders = useMemo(() => {
+    return userOrders.filter((o) => {
+      // Network filter – allow chainId 0
+      if (network !== undefined && o.chainId !== network) return false;
 
-    // Token filter
-    if (tokenInfo?.address) {
-      const orderTokenAddress = o.orderAsset?.orderToken?.address;
-      if (
-        !orderTokenAddress ||
-        tokenInfo.address.toLowerCase() !== orderTokenAddress.toLowerCase()
-      ) {
-        return false;
+      // Wallet filter – case‑insensitive, skip if order has no wallet
+      if (walletAddress) {
+        const orderWalletAddr = o.wallet?.address;
+        if (!orderWalletAddr || orderWalletAddr.toLowerCase() !== walletAddress.toLowerCase()) {
+          return false;
+        }
       }
-    }
 
-    // Category filter
-    if (categoryFilter !== "all" && o.category !== categoryFilter) return false;
+      // Token filter – case‑insensitive, skip if order has no token address
+      if (tokenInfo?.address) {
+        const orderTokenAddr = o.orderAsset?.orderToken?.address;
+        if (!orderTokenAddr || orderTokenAddr.toLowerCase() !== tokenInfo.address.toLowerCase()) {
+          return false;
+        }
+      }
 
-    // Status filter
-    if (statusFilter !== "all" && o.orderStatus !== statusFilter) return false;
+      // Category filter
+      if (categoryFilter !== "all" && o.category !== categoryFilter) return false;
 
-    // Search filter — applied additively, not as a short-circuit override
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchesName = o.name?.toLowerCase().includes(term) ?? false;
-      const matchesId = o._id?.toLowerCase().includes(term) ?? false;
-      if (!matchesName && !matchesId) return false;
-    }
+      // Status filter
+      if (statusFilter !== "all" && o.orderStatus !== statusFilter) return false;
 
-    return true;
-  });
+      // Search filter (name or ID)
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchesName = o.name?.toLowerCase().includes(term) ?? false;
+        const matchesId = o._id?.toLowerCase().includes(term) ?? false;
+        if (!matchesName && !matchesId) return false;
+      }
 
-  // ------------------------------------------------------------------
-  // Sorting — safe date comparison with fallback to 0
-  // ------------------------------------------------------------------
-  const sortedOrders = [...filteredOrders].sort((a: any, b: any) => {
-    const timeA = a[sortBy] ? new Date(a[sortBy]).getTime() : 0;
-    const timeB = b[sortBy] ? new Date(b[sortBy]).getTime() : 0;
-    // Treat NaN as 0
-    const safeA = isNaN(timeA) ? 0 : timeA;
-    const safeB = isNaN(timeB) ? 0 : timeB;
-    return sortOrder === "asc" ? safeA - safeB : safeB - safeA;
-  });
+      return true;
+    });
+  }, [userOrders, network, walletAddress, tokenInfo, categoryFilter, statusFilter, searchTerm]);
 
   // ------------------------------------------------------------------
-  // Grouping Logic
+  // Memoized Sorting
   // ------------------------------------------------------------------
-  const groupedOrders = sortedOrders.reduce((groups, order) => {
-    const key = order.name || "Untitled";
-    if (!groups[key]) {
-      groups[key] = {
-        orders: [],
-        strategy: order.strategy,
-        category: order.category,
-        stats: { total: 0, pending: 0, opened: 0, reverted: 0, closed: 0 },
-      };
-    }
-
-    groups[key].orders.push(order);
-    groups[key].stats.total++;
-
-    switch (order.orderStatus) {
-      case "PENDING":
-        groups[key].stats.pending++;
-        break;
-      case "OPENED":
-        groups[key].stats.opened++;
-        break;
-      case "REVERTED":
-      case "CANCELLED":
-        groups[key].stats.reverted++;
-        break;
-      case "COMPLETED":
-        groups[key].stats.closed++;
-        break;
-    }
-
-    return groups;
-  }, {} as Record<string, any>);
+  const sortedOrders = useMemo(() => {
+    return [...filteredOrders].sort((a: any, b: any) => {
+      const timeA = a[sortBy] ? new Date(a[sortBy]).getTime() : 0;
+      const timeB = b[sortBy] ? new Date(b[sortBy]).getTime() : 0;
+      const safeA = isNaN(timeA) ? 0 : timeA;
+      const safeB = isNaN(timeB) ? 0 : timeB;
+      return sortOrder === "asc" ? safeA - safeB : safeB - safeA;
+    });
+  }, [filteredOrders, sortBy, sortOrder]);
 
   // ------------------------------------------------------------------
-  // Handlers
+  // Memoized Grouping (only used in group view)
   // ------------------------------------------------------------------
-  const handleRefresh = async () => {
+  const groupedOrders = useMemo(() => {
+    return sortedOrders.reduce((groups, order) => {
+      const key = order.name || "Untitled";
+      if (!groups[key]) {
+        groups[key] = {
+          orders: [],
+          strategy: order.strategy,
+          category: order.category,
+          stats: { total: 0, pending: 0, opened: 0, reverted: 0, closed: 0 },
+        };
+      }
+
+      groups[key].orders.push(order);
+      groups[key].stats.total++;
+
+      switch (order.orderStatus) {
+        case "PENDING":
+          groups[key].stats.pending++;
+          break;
+        case "OPENED":
+          groups[key].stats.opened++;
+          break;
+        case "REVERTED":
+        case "CANCELLED":
+          groups[key].stats.reverted++;
+          break;
+        case "COMPLETED":
+          groups[key].stats.closed++;
+          break;
+      }
+
+      return groups;
+    }, {} as Record<string, any>);
+  }, [sortedOrders]);
+
+  // ------------------------------------------------------------------
+  // Memoized active filters flag
+  // ------------------------------------------------------------------
+  const hasActiveFilters = useMemo(
+    () =>
+      categoryFilter !== orderCategory ||
+      statusFilter !== "all" ||
+      searchTerm !== "" ||
+      sortBy !== "createdAt" ||
+      sortOrder !== "desc",
+    [categoryFilter, orderCategory, statusFilter, searchTerm, sortBy, sortOrder]
+  );
+
+  // ------------------------------------------------------------------
+  // Memoized Handlers
+  // ------------------------------------------------------------------
+  const handleRefresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -180,22 +193,15 @@ export default function OrderList({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getOrders]);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setCategoryFilter(orderCategory);
     setStatusFilter("all");
     setSearchTerm("");
     setSortBy("createdAt");
     setSortOrder("desc");
-  };
-
-  const hasActiveFilters =
-    categoryFilter !== orderCategory ||
-    statusFilter !== "all" ||
-    searchTerm !== "" ||
-    sortBy !== "createdAt" ||
-    sortOrder !== "desc";
+  }, [orderCategory]);
 
   // ------------------------------------------------------------------
   // Render
@@ -220,13 +226,14 @@ export default function OrderList({
 
   return (
     <div className="w-full flex flex-col rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden h-[800px]">
-
       {/* Header Toolbar */}
       <div className="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Orders</h2>
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                Orders
+              </h2>
               <p className="text-xs text-gray-500 mt-0.5">
                 {userOrders.length} Total • {sortedOrders.length} Filtered
               </p>
@@ -284,7 +291,9 @@ export default function OrderList({
               className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh Orders"
             >
-              <RiRefreshLine className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`} />
+              <RiRefreshLine
+                className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`}
+              />
             </button>
           </div>
         </div>

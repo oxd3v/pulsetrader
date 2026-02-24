@@ -69,7 +69,7 @@ export const spotNetworkFee = async (chainId:number)=>{
   let networkFee = BigInt(0);
   if(chainId == chains.Solana){
     let priorityFee = await getSolanaPriorityFeeEstimate([]) || DEFAULT_SOLANA_PRIORITY_FEE;
-    const expFee = SOLANA_BASE_FEE + ((DEFAULT_SOLANA_COMPUTE_UNITS * priorityFee) / BigInt(1_000_000));
+    const expFee = SOLANA_BASE_FEE + ((GAS_LIMIT['SPOT'][chains.Solana] * priorityFee) / BigInt(1_000_000));
     networkFee = expFee;
   }else{
     let gasFee = await getEVMSpotGasFee(chainId);

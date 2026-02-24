@@ -104,6 +104,7 @@ export type ORDER_TYPE = {
   isTechnicalExit: boolean;
   technicalLogic?: TECHNICAL_LOGICS_TYPE
   }
+  message?: string | null;
   isActive: boolean;
   isBusy: boolean;
   priority: number;

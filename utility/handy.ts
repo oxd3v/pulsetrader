@@ -459,99 +459,96 @@ export const safeParseUnits = (valueInput:string, decimals:number) => {
 
 
 export const safeFormatNumber = (
-    rawValue:string,
-    totalPrecision:number,
-    displayDecimals: number
+  rawValue: string,
+  totalPrecision: number,
+  displayDecimals: number
 ): string => {
-    // 1. Basic input validation and normalization
-    let value = String(rawValue).trim();
-    if (value === '') return '0';
-    if (!/^-?\d+$/.test(value)) {
-        throw new Error(`Invalid scaled integer format: ${rawValue}`);
-    }
+  // 1. Basic input validation and normalization
+  let value = String(rawValue).trim();
+  if (value === '') return '0';
+  if (!/^-?\d+$/.test(value)) {
+    throw new Error(`Invalid scaled integer format: ${rawValue}`);
+  }
 
-    // --- 2. String Manipulation to insert the decimal point (Shift right by totalPrecision) ---
-    
-    // Handle sign
-    let sign = '';
-    if (value.startsWith('-')) {
-        sign = '-';
-        value = value.slice(1);
-    }
+  // Handle sign
+  let sign = '';
+  if (value.startsWith('-')) {
+    sign = '-';
+    value = value.slice(1);
+  }
 
-    // Determine position of decimal point
-    const len = value.length;
-    let decimalIndex = len - totalPrecision;
-    let decimalString;
+  // 2. Insert decimal point according to totalPrecision
+  const len = value.length;
+  const decimalIndex = len - totalPrecision;
+  let decimalString: string;
 
-    if (decimalIndex > 0) {
-        // Case A: Integer part exists (e.g., rawValue="12345", precision=2 -> "123.45")
-        const intPart = value.slice(0, decimalIndex);
-        const fracPart = value.slice(decimalIndex);
-        decimalString = `${intPart}.${fracPart}`;
+  if (decimalIndex > 0) {
+    const intPart = value.slice(0, decimalIndex);
+    const fracPart = value.slice(decimalIndex);
+    decimalString = `${intPart}.${fracPart}`;
+  } else {
+    const leadingZeros = '0'.repeat(totalPrecision - len);
+    decimalString = `0.${leadingZeros}${value}`;
+  }
+
+  // 3. Handle displayDecimals = 0 (integer only)
+  if (displayDecimals === 0) {
+    // Round to nearest integer
+    const powerToScale = totalPrecision;
+    const roundDivisor = BigInt(10) ** BigInt(powerToScale);
+    const roundedBigInt = (BigInt(value) + roundDivisor / 2n) / roundDivisor;
+    const result = sign + roundedBigInt.toString();
+    return result === '-0' ? '0' : result;
+  }
+
+  // 4. Split into integer and fractional parts
+  const [intPart, fracPart = ''] = decimalString.split('.');
+
+  // If fractional part is already within displayDecimals, keep it (but trim trailing zeros later)
+  if (fracPart.length <= displayDecimals) {
+    // No rounding needed, just ensure correct number of digits (pad with zeros if required)
+    const paddedFrac = fracPart.padEnd(displayDecimals, '0');
+    decimalString = `${intPart}.${paddedFrac}`;
+  } else {
+    // Need to round/truncate
+    const truncFrac = fracPart.slice(0, displayDecimals + 1);
+    const roundDigit = parseInt(truncFrac.slice(-1), 10);
+    const finalFrac = truncFrac.slice(0, displayDecimals);
+
+    if (roundDigit >= 5) {
+      // Round up using BigInt arithmetic
+      const powerToScale = totalPrecision - displayDecimals;
+      const roundDivisor = BigInt(10) ** BigInt(powerToScale);
+      const roundedBigInt = (BigInt(value) + roundDivisor / 2n) / roundDivisor;
+      const roundedString = roundedBigInt.toString();
+
+      // Format with displayDecimals digits
+      if (roundedString.length <= displayDecimals) {
+        const zerosNeeded = displayDecimals - roundedString.length;
+        decimalString = `0.${'0'.repeat(zerosNeeded)}${roundedString}`;
+      } else {
+        const newDecimalIndex = roundedString.length - displayDecimals;
+        decimalString = `${roundedString.slice(0, newDecimalIndex)}.${roundedString.slice(newDecimalIndex)}`;
+      }
     } else {
-        // Case B: Only fractional part (e.g., rawValue="123", precision=5 -> "0.00123")
-        // Number of leading zeros needed: totalPrecision - len
-        const leadingZeros = '0'.repeat(totalPrecision - len);
-        decimalString = `0.${leadingZeros}${value}`;
+      // Truncate (round down)
+      decimalString = `${intPart}.${finalFrac}`;
+      // Pad with zeros if finalFrac is shorter than displayDecimals (can happen after truncation)
+      const currentFrac = decimalString.split('.')[1] || '';
+      if (currentFrac.length < displayDecimals) {
+        decimalString = decimalString.padEnd(decimalString.length + (displayDecimals - currentFrac.length), '0');
+      }
     }
+  }
 
-    // --- 3. Rounding/Truncation to displayDecimals ---
-    
-    // Find the current fractional part after the shift
-    let [, currentFracPart] = decimalString.split('.');
-    
-    if (currentFracPart && currentFracPart.length > displayDecimals) {
-        // We only care about up to (displayDecimals + 1) for rounding.
-        const truncFrac = currentFracPart.slice(0, displayDecimals + 1);
+  // 5. Remove trailing zeros after decimal point (safe method)
+  const [finalInt, finalFrac] = decimalString.split('.');
+  let trimmedFrac = finalFrac.replace(/0+$/, '');
+  let result = trimmedFrac ? `${finalInt}.${trimmedFrac}` : finalInt;
 
-        // Check the rounding digit (the digit at position displayDecimals)
-        const roundDigit = parseInt(truncFrac.slice(-1), 10);
-        
-        // Final fractional part is the truncated part (up to displayDecimals)
-        let finalFrac = truncFrac.slice(0, displayDecimals);
-        let finalInt = decimalString.split('.')[0] || '0';
+  // 6. Reapply sign and fix negative zero
+  result = sign + result;
+  if (result === '-0') result = '0';
 
-        if (roundDigit >= 5) {
-            // Round up: since we are working with BigInt scale, use BigInt arithmetic 
-            // for the rounding carry.
-            
-            // Re-scale the number to the desired display precision (e.g., to 10^6)
-            // This is the safest way to perform high-precision rounding with BigInt
-            
-            // Calculate the power to re-scale for rounding: totalPrecision - displayDecimals
-            const powerToScale = totalPrecision - displayDecimals;
-            const roundDivisor = BigInt(10) ** BigInt(powerToScale);
-            
-            // Scale raw value down to the new precision
-            // Add half the divisor for rounding effect (i.e., +0.5 before truncating)
-            const roundedBigInt = (BigInt(rawValue) + roundDivisor / BigInt(2)) / roundDivisor;
-
-            // Re-convert to decimal string at the new, lower precision
-            const roundedString = String(roundedBigInt);
-            
-            // Re-apply the decimal point at displayDecimals position
-            if (roundedString.length <= displayDecimals) {
-                const zeroPad = '0'.repeat(displayDecimals - roundedString.length + 1);
-                decimalString = `0.${zeroPad}${roundedString}`;
-            } else {
-                const newDecimalIndex = roundedString.length - displayDecimals;
-                const newIntPart = roundedString.slice(0, newDecimalIndex);
-                const newFracPart = roundedString.slice(newDecimalIndex);
-                decimalString = `${newIntPart}.${newFracPart}`;
-            }
-        } else {
-            // Truncation (round down)
-            const [intPart, fracPart] = decimalString.split('.');
-            decimalString = `${intPart}.${finalFrac}`;
-        }
-    }
-    
-    // Final cleanup: remove trailing zeros from fractional part
-    if (decimalString.includes('.')) {
-        decimalString = decimalString.replace(/\.?0+$/, '');
-    }
-    
-    // Re-apply sign and return
-    return sign + decimalString;
+  return result;
 };

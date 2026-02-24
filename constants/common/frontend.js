@@ -11,6 +11,11 @@ export const NAVBAR_ITEM_LIST = [
       type: 'private'
     },
     {
+      name: "Orders",
+      href: "/orders",
+      type: 'private'
+    },
+    {
       name: "Portfolio",
       href: "/portfolio",
       type: 'private'
