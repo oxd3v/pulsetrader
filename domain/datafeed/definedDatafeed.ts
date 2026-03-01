@@ -42,6 +42,7 @@ interface Bar {
   close: string | number;
   low: number;
   high: number;
+  volume: number;
 }
 
 interface PeriodParams {

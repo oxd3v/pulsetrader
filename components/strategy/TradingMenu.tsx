@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FiInfo } from "react-icons/fi";
 
+const FUTURES_PROTOCOL = [
+  {id: "asterdex", name: 'AsterDex'},
+  {id: "hyperliquid", name: 'HyperLiquid'},
+  {id: "gmx", name: 'GMX'},
+]
+
 export default function TradingStrategyMenu() {
   const [selectedType, setSelectedType] = useState<any>(null);
   const router = useRouter();
@@ -43,14 +49,14 @@ export default function TradingStrategyMenu() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300  ${
               selectedType === "perpetual"
                 ? "ring-2 ring-blue-500"
                 : "hover:shadow-xl"
             }`}
             onClick={() => {
               setSelectedType("perpetual");
-              router.push("/strategy/perpetual");
+              //router.push("/strategy/perpetual");
             }}
           >
             <div className="flex items-center justify-between mb-4">
@@ -66,35 +72,35 @@ export default function TradingStrategyMenu() {
               Trade perpetual futures contracts with leverage
             </p>
 
-            {/* <motion.div 
+            <motion.div 
                             initial={false}
                             animate={{ height: selectedType === 'perpetual' ? 'auto' : 0 }}
                             className="overflow-hidden"
                         >
                             <div className="space-y-3">
-                                {strategies.map((strategy) => (
+                                {FUTURES_PROTOCOL.map((protcol) => (
                                     <motion.div 
-                                        key={strategy.id}
+                                        key={protcol.id}
                                         className="relative group"
-                                        onMouseEnter={() => setHoveredStrategy(strategy.id)}
-                                        onMouseLeave={() => setHoveredStrategy(null)}
+                                        //onMouseEnter={() => setHoveredStrategy(protcol.id)}
+                                        //onMouseLeave={() => setHoveredStrategy(null)}
                                         whileHover={{ x: 8 }}
                                     >
                                         <div className="bg-blue-50 p-4 rounded-lg hover:bg-blue-100 cursor-pointer transition-all">
                                             <div className="flex items-center space-x-3">
-                                                <strategy.icon className="h-6 w-6 text-blue-600" />
-                                                <p className="text-blue-800 font-medium">{strategy.name}</p>
+                                                {/* <strategy.icon className="h-6 w-6 text-blue-600" /> */}
+                                                <p className="text-blue-800 font-medium">{protcol.name}</p>
                                             </div>
                                         </div>
-                                        {hoveredStrategy === strategy.id && (
+                                        {/* {hoveredStrategy === strategy.id && (
                                             <div className="absolute top-0 left-full ml-4 w-64 p-4 bg-white rounded-lg shadow-lg z-10">
                                                 <p className="text-sm text-gray-600">{strategy.description}</p>
                                             </div>
-                                        )}
+                                        )} */}
                                     </motion.div>
                                 ))}
                             </div>
-                        </motion.div> */}
+                        </motion.div>
           </motion.div>
 
           {/* Spot Trading Card */}
