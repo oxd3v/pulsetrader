@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { OrderBookLevel, TradeItem, useRealTimeOrderBook } from '@/hooks/useAsterhooks/useRealTimeOrderBook';
+import { OrderBookLevel, TradeItem, useRealTimeOrderBook } from '@/hooks/useHyperLiquidHooks/useRealTimeOrderBook';
 
 type ActiveTab = 'orderbook' | 'trades';
 

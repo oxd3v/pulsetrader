@@ -7,10 +7,27 @@ import Link from "next/link";
 import { FiInfo } from "react-icons/fi";
 
 const FUTURES_PROTOCOL = [
-  {id: "asterdex", name: 'AsterDex'},
-  {id: "hyperliquid", name: 'HyperLiquid'},
-  {id: "gmx", name: 'GMX'},
-]
+  {
+    id: "asterdex",
+    name: "AsterDex",
+    assetIdentifier: 'BTCUSDT',
+    imageUrl:
+      "https://static.asterindex.com/cloud-futures/static/images/aster/logo.svg",
+  },
+  {
+    id: "hyperliquid",
+    name: "HyperLiquid",
+    assetIdentifier: 'BTC',
+    imageUrl: "./hyperliquidWhite.svg",
+  },
+  {
+    id: "gmx",
+    name: "GMX",
+    assetIdentifier: 'BTCUSDT',
+    imageUrl:
+      "https://raw.githubusercontent.com/gmx-io/gmx-assets/6ca89def873126e2d46bab65651cf940b2597923/GMX-Assets/SVG/GMX.svg",
+  },
+];
 
 export default function TradingStrategyMenu() {
   const [selectedType, setSelectedType] = useState<any>(null);
@@ -72,35 +89,41 @@ export default function TradingStrategyMenu() {
               Trade perpetual futures contracts with leverage
             </p>
 
-            <motion.div 
-                            initial={false}
-                            animate={{ height: selectedType === 'perpetual' ? 'auto' : 0 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="space-y-3">
-                                {FUTURES_PROTOCOL.map((protcol) => (
-                                    <motion.div 
-                                        key={protcol.id}
-                                        className="relative group"
-                                        //onMouseEnter={() => setHoveredStrategy(protcol.id)}
-                                        //onMouseLeave={() => setHoveredStrategy(null)}
-                                        whileHover={{ x: 8 }}
-                                    >
-                                        <div className="bg-blue-50 p-4 rounded-lg hover:bg-blue-100 cursor-pointer transition-all">
-                                            <div className="flex items-center space-x-3">
-                                                {/* <strategy.icon className="h-6 w-6 text-blue-600" /> */}
-                                                <p className="text-blue-800 font-medium">{protcol.name}</p>
-                                            </div>
-                                        </div>
-                                        {/* {hoveredStrategy === strategy.id && (
+            <motion.div
+              initial={false}
+              animate={{
+                height: "auto" /*selectedType === 'perpetual' ? 'auto' : 0*/,
+              }}
+              className="overflow-hidden"
+            >
+              <div className="space-y-3 flex gap-1">
+                {FUTURES_PROTOCOL.map((protcol) => (
+                  <motion.div
+                    key={protcol.id}
+                    className="relative group"
+                    //onMouseEnter={() => setHoveredStrategy(protcol.id)}
+                    //onMouseLeave={() => setHoveredStrategy(null)}
+                    whileHover={{ x: 8 }}
+                  >
+                    <div
+                      className="bg-black p-4 rounded-lg hover:bg-gray-800 cursor-pointer transition-all"
+                      onClick={() => {
+                        router.push(`/strategy/perp/${protcol.id}/${protcol.assetIdentifier}`);
+                      }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <img src={protcol.imageUrl} className="h-4" />
+                      </div>
+                    </div>
+                    {/* {hoveredStrategy === strategy.id && (
                                             <div className="absolute top-0 left-full ml-4 w-64 p-4 bg-white rounded-lg shadow-lg z-10">
                                                 <p className="text-sm text-gray-600">{strategy.description}</p>
                                             </div>
                                         )} */}
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
           </motion.div>
 
           {/* Spot Trading Card */}
@@ -114,7 +137,9 @@ export default function TradingStrategyMenu() {
             }`}
             onClick={() => {
               setSelectedType("spot");
-              router.push("/strategy/spot/0x152b9d0FdC40C096757F570A51E494bd4b943E50");
+              router.push(
+                "/strategy/spot/0x152b9d0FdC40C096757F570A51E494bd4b943E50",
+              );
             }}
           >
             <div className="flex items-center justify-between mb-4">
@@ -130,35 +155,29 @@ export default function TradingStrategyMenu() {
               Trade actual cryptocurrencies without leverage
             </p>
 
-            {/* <motion.div 
-                            initial={false}
-                            animate={{ height: selectedType === 'spot' ? 'auto' : 0 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="space-y-3">
-                                {strategies.map((strategy) => (
-                                    <motion.div 
-                                        key={strategy.id}
-                                        className="relative group"
-                                        onMouseEnter={() => setHoveredStrategy(strategy.id)}
-                                        onMouseLeave={() => setHoveredStrategy(null)}
-                                        whileHover={{ x: 8 }}
-                                    >
-                                        <div className="bg-green-50 p-4 rounded-lg hover:bg-green-100 cursor-pointer transition-all">
-                                            <div className="flex items-center space-x-3">
-                                                <strategy.icon className="h-6 w-6 text-green-600" />
-                                                <p className="text-green-800 font-medium">{strategy.name}</p>
-                                            </div>
-                                        </div>
-                                        {hoveredStrategy === strategy.id && (
-                                            <div className="absolute top-0 left-full ml-4 w-64 p-4 bg-white rounded-lg shadow-lg z-10">
-                                                <p className="text-sm text-gray-600">{strategy.description}</p>
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div> */}
+            <motion.div
+              initial={false}
+              animate={{
+                height: "auto" /*selectedType === 'spot' ? 'auto' : 0*/,
+              }}
+              className="overflow-hidden"
+            >
+              <div className=" flex gap-1">
+                <div className="bg-black p-2 rounded-md flex items-center space-x-3">
+                  <img
+                    src={"https://kyberswap.com/logo-dark.svg"}
+                    className="h-8"
+                  />
+                </div>
+
+                <div className="bg-black rounded-md p-2 flex items-center space-x-3">
+                  <img
+                    src={"https://debridge.com/assets/img/logo/full-logo.svg"}
+                    className="h-4 "
+                  />
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
           {/*  Trenches */}
         </div>

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSearch, AiOutlineStar, AiFillStar, AiOutlineClose } from 'react-icons/ai';
-import { SymbolData, useAsterSymbols } from '@/hooks/useAsterhooks/useAsterSymbol';
+import { SymbolData, useHyperliquidSymbols } from '@/hooks/useHyperLiquidHooks/useHyperliquidSymbol';
 
 interface AssetSelectProps {
   isOpen: boolean;
@@ -11,15 +11,6 @@ interface AssetSelectProps {
   onSelectSymbol: (symbol: string) => void;
   currentSymbol?: string;
 }
-
-type OpenInterestPayload = {
-  openInterest?: string | number;
-};
-
-const API_BASE_URL = 'https://fapi.asterdex.com/fapi/v3';
-const OPEN_INTEREST_REFRESH_MS = 30000;
-const OPEN_INTEREST_SYMBOL_LIMIT = 24;
-const OPEN_INTEREST_BATCH_SIZE = 6;
 
 const CATEGORIES = [
   'All markets',
@@ -102,14 +93,6 @@ const getCryptoIcon = (symbol: string): string => {
   return asset.slice(0, 1).toUpperCase() || '?';
 };
 
-const chunkSymbols = (symbols: string[], chunkSize: number): string[][] => {
-  const chunks: string[][] = [];
-  for (let index = 0; index < symbols.length; index += chunkSize) {
-    chunks.push(symbols.slice(index, index + chunkSize));
-  }
-  return chunks;
-};
-
 const AssetSelect: React.FC<AssetSelectProps> = ({
   isOpen,
   onClose,
@@ -126,26 +109,29 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
     setCategory,
     tab,
     setTab,
-  } = useAsterSymbols({ enabled: isOpen });
+  } = useHyperliquidSymbols({ enabled: isOpen });
 
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [openInterestMap, setOpenInterestMap] = useState<Record<string, number>>({});
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') {
+      return new Set();
+    }
+
+    const saved = window.localStorage.getItem('hyperliquid_favorites');
+    if (!saved) {
+      return new Set();
+    }
+
+    try {
+      const parsedFavorites = JSON.parse(saved) as string[];
+      return new Set(parsedFavorites);
+    } catch {
+      return new Set();
+    }
+  });
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('asterdex_favorites');
-    if (saved) {
-      try {
-        const parsedFavorites = JSON.parse(saved) as string[];
-        setFavorites(new Set(parsedFavorites));
-      } catch {
-        setFavorites(new Set());
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('asterdex_favorites', JSON.stringify(Array.from(favorites)));
+    localStorage.setItem('hyperliquid_favorites', JSON.stringify(Array.from(favorites)));
   }, [favorites]);
 
   const toggleFavorite = useCallback((symbol: string) => {
@@ -180,70 +166,6 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
     }
     return filteredSymbols;
   }, [category, favorites, filteredSymbols]);
-
-  const openInterestSymbols = useMemo(() => {
-    return displaySymbols.slice(0, OPEN_INTEREST_SYMBOL_LIMIT).map((symbolItem) => symbolItem.symbol);
-  }, [displaySymbols]);
-
-  const openInterestKey = useMemo(() => openInterestSymbols.join(','), [openInterestSymbols]);
-
-  useEffect(() => {
-    if (!isOpen || openInterestSymbols.length === 0) {
-      return undefined;
-    }
-
-    let disposed = false;
-
-    const loadOpenInterest = async () => {
-      const nextEntries: Record<string, number> = {};
-      const symbolChunks = chunkSymbols(openInterestSymbols, OPEN_INTEREST_BATCH_SIZE);
-
-      for (const symbolChunk of symbolChunks) {
-        const chunkResults = await Promise.all(
-          symbolChunk.map(async (symbolCode) => {
-            try {
-              const response = await fetch(`${API_BASE_URL}/openInterest?symbol=${symbolCode}`);
-              if (!response.ok) {
-                return null;
-              }
-
-              const payload = (await response.json()) as OpenInterestPayload;
-              const openInterest = toFiniteNumber(payload.openInterest);
-              if (openInterest <= 0) {
-                return null;
-              }
-
-              return { symbol: symbolCode, openInterest };
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        if (disposed) return;
-
-        chunkResults.forEach((item) => {
-          if (!item) return;
-          nextEntries[item.symbol] = item.openInterest;
-        });
-      }
-
-      if (!disposed && Object.keys(nextEntries).length > 0) {
-        setOpenInterestMap((previous) => ({
-          ...previous,
-          ...nextEntries,
-        }));
-      }
-    };
-
-    loadOpenInterest();
-    const intervalId = setInterval(loadOpenInterest, OPEN_INTEREST_REFRESH_MS);
-
-    return () => {
-      disposed = true;
-      clearInterval(intervalId);
-    };
-  }, [isOpen, openInterestKey]);
 
   const normalizedCurrentSymbol = currentSymbol.toUpperCase();
 
@@ -361,10 +283,7 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
                       const isFavorite = favorites.has(symbolItem.symbol);
                       const isSelected = normalizedCurrentSymbol === symbolItem.symbol.toUpperCase();
                       const fundingRate = toFiniteNumber(symbolItem.fundingRate) * 100;
-                      const markPrice = toFiniteNumber(symbolItem.markPrice ?? symbolItem.lastPrice);
-                      const openInterestUnits = openInterestMap[symbolItem.symbol] ?? toFiniteNumber(symbolItem.openInterest);
-                      const openInterestUsdt =
-                        openInterestUnits > 0 && markPrice > 0 ? openInterestUnits * markPrice : 0;
+                      const openInterestUsdt = toFiniteNumber(symbolItem.openInterest);
 
                       return (
                         <motion.tr

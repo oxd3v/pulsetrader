@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { formatUnits } from "ethers";
 
 // Domain & Store Imports
-import DataFeed from "@/domain/datafeed/asterdexDatafeed";
+import DataFeed from "@/domain/datafeed/hyperliquidDatafeed";
 import { useChartDataStore } from "@/store/useChartData";
 import { useShallow } from "zustand/shallow";
 import {
@@ -21,7 +21,7 @@ const getTheme = () => {
   return "dark";
 };
 
-const TradingViewAdvancedChart = React.memo(
+const TradingViewHyperliquidChart = React.memo(
   ({symbol }) => {
     // --- State & Refs ---
     const [chartReady, setChartReady] = useState(false);
@@ -144,7 +144,7 @@ const TradingViewAdvancedChart = React.memo(
       if (studyRef.current) {
         try {
           chart.removeEntity(studyRef.current);
-        } catch (e) {
+        } catch {
           // Ignore errors
         }
         studyRef.current = null;
@@ -316,4 +316,6 @@ const TradingViewAdvancedChart = React.memo(
   },
 );
 
-export default TradingViewAdvancedChart;
+TradingViewHyperliquidChart.displayName = "TradingViewHyperliquidChart";
+
+export default TradingViewHyperliquidChart;

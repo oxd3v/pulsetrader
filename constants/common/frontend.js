@@ -48,7 +48,7 @@ import {
 
 
 
-export const GmxStrategies  = [
+export const PerpetualStrategies  = [
   {
     id: "limit",
     name: "Limit Order",
@@ -88,6 +88,15 @@ export const GmxStrategies  = [
     recommendedFor: "Experienced scalpers and day traders",
     type: "Premium"
   },
+  {
+    id: "algo",
+    name: "Advanced Algo Trading",
+    description: "Technical Entry",
+    icon: <FiSettings className="w-5 h-5" />,
+    features: ["Advanced Indicator access", "Indicator based Strategy",],
+    recommendedFor: "Traders who want to trade based on algorithmic indicators",
+    type: "Advanced"
+  }
 ];
 
 export const SpotStrategies = [

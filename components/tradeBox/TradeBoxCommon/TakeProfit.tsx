@@ -51,7 +51,7 @@ const TakeProfitInput = ({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-          Take Profit
+         {isTrailingMode && 'Trailing'} Take Profit
           <InfoTooltip
             id="tp-tooltip"
             content="Percentage profit target to close position"

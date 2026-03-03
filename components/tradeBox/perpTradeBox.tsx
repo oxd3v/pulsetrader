@@ -3,7 +3,7 @@ import { ORDER_TYPE } from "@/type/order";
 
 import { MIN_ORDER_SIZE, MAX_GRID_NUMBER } from "@/constants/common/order";
 import { CollateralTokens } from "@/constants/common/tokens";
-import { SpotStrategies } from "@/constants/common/frontend";
+import { PerpetualStrategies } from "@/constants/common/frontend";
 import { FiChevronDown, FiInfo } from "react-icons/fi";
 import { ZeroAddress } from "ethers";
 
@@ -22,6 +22,7 @@ import OrderNameValidationInput from "./TradeBoxCommon/orderNameValidation";
 import GridInput from "./TradeBoxCommon/GridInput";
 import NumberInput from "./TradeBoxCommon/NumberInput";
 import EstSpotOrders from "@/components/order/estimate/estSpotOrder";
+import LeverageInput from "./TradeBoxCommon/LeverageInput";
 import SelectWallet from "@/components/walletManager/selection/selectWalletToCreateOrder";
 import ConfirmationModal from "../common/Confirmation/ConfirmationBox";
 
@@ -114,7 +115,9 @@ export default function DefinedTradeBox({
 
   // Strategy & Token State
   const [isTechnicalExit, setIsTechnicalExit] = useState(false);
-  const [selectedStrategy, setSelectedStrategy] = useState(SpotStrategies[0]);
+  const [selectedStrategy, setSelectedStrategy] = useState(
+    PerpetualStrategies[0],
+  );
   const [collateralToken, setCollateralToken] = useState<any>(
     CollateralTokens[chainId][ZeroAddress],
   );
@@ -137,6 +140,9 @@ export default function DefinedTradeBox({
   const [gridDistance, setGridDistance] = useState<number>(1);
   const [gridMultiplier, setGridMultiplier] = useState<number>(1);
   const [orderSizeMultiplier, setOrderSizeMultiplier] = useState<number>(1);
+
+  const [leverage, setLeverage] = useState(1);
+  const [leverageMultiplier, setLevrageMultiplier] = useState(1);
 
   // Risk Management State
   const [tpPercentage, setTpPercentage] = useState<number>(10);
@@ -242,7 +248,7 @@ export default function DefinedTradeBox({
     setInitialOrderSize(value);
   };
 
-  const handleStrategyChange = (strategy: (typeof SpotStrategies)[0]) => {
+  const handleStrategyChange = (strategy: (typeof PerpetualStrategies)[0]) => {
     setSelectedStrategy(strategy);
     setGridNumber(1);
     setShowStrategyDropdown(false);
@@ -602,7 +608,7 @@ export default function DefinedTradeBox({
         {/* Strategy Dropdown Menu */}
         {showStrategyDropdown && (
           <div className="absolute top-full h-[400px] left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg z-50 overflow-y-auto">
-            {SpotStrategies.map((strategy) => (
+            {PerpetualStrategies.map((strategy) => (
               <div
                 key={strategy.id}
                 onClick={() => handleStrategyChange(strategy)}
@@ -870,6 +876,59 @@ export default function DefinedTradeBox({
               )}
             </div>
           )}
+        <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
+          <div className="space-y-1 md:space-y-2">
+            <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-lg">
+              Leverage Settings
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Configure future order settings
+            </p>
+          </div>
+
+          <div className="grid xl:grid-cols-2 gap-4">
+            <NumberInput
+              inputLabel="Levrager"
+              toolTipMessage="leverage"
+              value={leverage}
+              onChange={setLeverage}
+              notValid={Number(leverage) > 1 && (leverage === 0 || !leverage)}
+            />
+            <NumberInput
+              inputLabel="Levrager Multiplier"
+              toolTipMessage="leverage Multiplier"
+              value={leverageMultiplier}
+              onChange={setLevrageMultiplier}
+              notValid={
+                Number(leverageMultiplier) > 1 &&
+                (leverageMultiplier === 0 || !leverageMultiplier)
+              }
+            />
+          </div>
+          <div className="grid xl:grid-cols-2 gap-4">
+            <div className="space-y-1 md:space-y-2">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                Margin Type
+                <InfoTooltip
+                  id={`MarginType-tooltip`}
+                  content={"Order Margin type"}
+                />
+              </label>
+              <div className="flex gap-2 font-bold text-md">ISOLATED</div>
+            </div>
+            <div className="space-y-1 md:space-y-2">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                Position Mode
+                <InfoTooltip
+                  id={`PositionMode-tooltip`}
+                  content={"Order Margin type"}
+                />
+              </label>
+              <div className="flex gap-2 font-bold text-md">HEDGE</div>
+            </div>
+          </div>
+        </div>
+        {/* <LeverageInput leverage={leverage} setLevrage={setLeverage} leverageMultiplier={leverageMultiplier} setLevrageMultiplier={setLevrageMultiplier}/> */}
 
         {/* ======================================================== */}
         {/* Risk Management Section */}
@@ -1003,7 +1062,7 @@ export default function DefinedTradeBox({
       {/* Action Buttons */}
       {/* ============================================================ */}
 
-      {isConnected == false ? (
+      {/* {isConnected == false ? (
         <div className="flex gap-0.5 items-center">
           {estOrders.length > 0 && (
             <button
@@ -1053,7 +1112,14 @@ export default function DefinedTradeBox({
             {creationPending ? "Creating..." : "Create Order"}
           </button>
         </div>
-      )}
+      )} */}
+      <button
+            className={`grow py-3 md:py-4 ${
+              estOrders.length > 0 ? "rounded-e-xl" : "rounded-xl"
+            } bg-gray-50 dark:bg-gray-900 font-bold text-black dark:text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
+          >
+            Coming soon
+          </button>
 
       {openEstOrderModal && estOrders.length > 0 && (
         <EstSpotOrders

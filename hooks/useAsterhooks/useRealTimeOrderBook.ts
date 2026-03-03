@@ -68,6 +68,8 @@ interface UseRealTimeOrderBookReturn {
   error: string | null;
   connected: boolean;
   marketSymbol: string;
+  snapshot: OrderBookSnapshot;
+  trades: TradeItem[];
 }
 
 const WS_BASE_URL = 'wss://fstream.asterdex.com/stream?streams=';
@@ -91,7 +93,7 @@ const toFiniteNumber = (value: unknown): number => {
 };
 
 const normalizeSymbol = (symbol: string): string => {
-  const normalized = symbol.trim().toUpperCase();
+  const normalized = (symbol ?? '').trim().toUpperCase();
   if (!normalized) return '';
   if (normalized.endsWith('USDT') || normalized.endsWith('USDC') || normalized.endsWith('BUSD')) {
     return normalized;
@@ -295,16 +297,14 @@ export const useRealTimeOrderBook = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [snapshot, setSnapshot] = useState<OrderBookSnapshot>(EMPTY_SNAPSHOT);
+  const [trades, setTrades] = useState<TradeItem[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flushRafRef = useRef<number | null>(null);
 
   const snapshotRef = useRef<OrderBookSnapshot>(EMPTY_SNAPSHOT);
   const tradesRef = useRef<TradeItem[]>([]);
-
-  const pendingSnapshotRef = useRef<OrderBookSnapshot | null>(null);
-  const pendingTradesRef = useRef<TradeItem[] | null>(null);
 
   const orderBookCallbackRef = useRef(onOrderBookUpdate);
   const tradesCallbackRef = useRef(onTradesUpdate);
@@ -317,57 +317,22 @@ export const useRealTimeOrderBook = ({
     tradesCallbackRef.current = onTradesUpdate;
   }, [onTradesUpdate]);
 
-  const flushCallbacks = useCallback(() => {
-    flushRafRef.current = null;
-
-    if (pendingSnapshotRef.current && orderBookCallbackRef.current) {
-      orderBookCallbackRef.current(pendingSnapshotRef.current);
-      pendingSnapshotRef.current = null;
-    }
-
-    if (pendingTradesRef.current && tradesCallbackRef.current) {
-      tradesCallbackRef.current(pendingTradesRef.current);
-      pendingTradesRef.current = null;
+  const publishSnapshot = useCallback((nextSnapshot: OrderBookSnapshot) => {
+    if (areSnapshotsEqual(snapshotRef.current, nextSnapshot)) return;
+    snapshotRef.current = nextSnapshot;
+    setSnapshot(nextSnapshot);
+    if (orderBookCallbackRef.current) {
+      orderBookCallbackRef.current(nextSnapshot);
     }
   }, []);
 
-  const scheduleFlush = useCallback(() => {
-    if (flushRafRef.current !== null) return;
-
-    if (typeof window === 'undefined') {
-      flushCallbacks();
-      return;
+  const publishTrades = useCallback((nextTrades: TradeItem[]) => {
+    if (areTradesEqual(tradesRef.current, nextTrades)) return;
+    tradesRef.current = nextTrades;
+    setTrades(nextTrades);
+    if (tradesCallbackRef.current) {
+      tradesCallbackRef.current(nextTrades);
     }
-
-    flushRafRef.current = window.requestAnimationFrame(flushCallbacks);
-  }, [flushCallbacks]);
-
-  const publishSnapshot = useCallback(
-    (nextSnapshot: OrderBookSnapshot) => {
-      if (areSnapshotsEqual(snapshotRef.current, nextSnapshot)) return;
-      snapshotRef.current = nextSnapshot;
-      pendingSnapshotRef.current = nextSnapshot;
-      scheduleFlush();
-    },
-    [scheduleFlush]
-  );
-
-  const publishTrades = useCallback(
-    (nextTrades: TradeItem[]) => {
-      if (areTradesEqual(tradesRef.current, nextTrades)) return;
-      tradesRef.current = nextTrades;
-      pendingTradesRef.current = nextTrades;
-      scheduleFlush();
-    },
-    [scheduleFlush]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (flushRafRef.current !== null && typeof window !== 'undefined') {
-        window.cancelAnimationFrame(flushRafRef.current);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -377,9 +342,14 @@ export const useRealTimeOrderBook = ({
       setError(null);
       snapshotRef.current = EMPTY_SNAPSHOT;
       tradesRef.current = [];
-      pendingSnapshotRef.current = EMPTY_SNAPSHOT;
-      pendingTradesRef.current = [];
-      scheduleFlush();
+      setSnapshot(EMPTY_SNAPSHOT);
+      setTrades([]);
+      if (orderBookCallbackRef.current) {
+        orderBookCallbackRef.current(EMPTY_SNAPSHOT);
+      }
+      if (tradesCallbackRef.current) {
+        tradesCallbackRef.current([]);
+      }
       return undefined;
     }
 
@@ -389,12 +359,16 @@ export const useRealTimeOrderBook = ({
     setLoading(true);
     setError(null);
     setConnected(false);
-
     snapshotRef.current = EMPTY_SNAPSHOT;
     tradesRef.current = [];
-    pendingSnapshotRef.current = EMPTY_SNAPSHOT;
-    pendingTradesRef.current = [];
-    scheduleFlush();
+    setSnapshot(EMPTY_SNAPSHOT);
+    setTrades([]);
+    if (orderBookCallbackRef.current) {
+      orderBookCallbackRef.current(EMPTY_SNAPSHOT);
+    }
+    if (tradesCallbackRef.current) {
+      tradesCallbackRef.current([]);
+    }
 
     const clearReconnectTimer = () => {
       if (reconnectTimeoutRef.current) {
@@ -426,7 +400,7 @@ export const useRealTimeOrderBook = ({
         }
 
         const depthPayload = (await depthResponse.json()) as RawDepthPayload;
-        const snapshot = buildSnapshot(
+        const initialSnapshot = buildSnapshot(
           depthPayload.bids ?? depthPayload.b,
           depthPayload.asks ?? depthPayload.a,
           normalizedDepth,
@@ -434,7 +408,7 @@ export const useRealTimeOrderBook = ({
         );
 
         if (!disposed) {
-          publishSnapshot(snapshot);
+          publishSnapshot(initialSnapshot);
         }
 
         if (tradesResponse.ok) {
@@ -483,14 +457,13 @@ export const useRealTimeOrderBook = ({
           const data = (rawMessage.data ?? rawMessage) as RawDepthPayload & RawWsTradePayload;
 
           if (streamNameFromPayload.includes('@depth') || data.e === 'depthUpdate') {
-            const snapshot = buildSnapshot(
+            const nextSnapshot = buildSnapshot(
               data.bids ?? data.b,
               data.asks ?? data.a,
               normalizedDepth,
               toFiniteNumber(data.E) || toFiniteNumber(data.T) || Date.now()
             );
-
-            publishSnapshot(snapshot);
+            publishSnapshot(nextSnapshot);
             setLoading(false);
             return;
           }
@@ -499,8 +472,8 @@ export const useRealTimeOrderBook = ({
             const parsedTrade = parseWsTrade(data);
             if (!parsedTrade) return;
 
-            const mergedTrades = mergeTrades([parsedTrade], tradesRef.current, safeTradesLimit);
-            publishTrades(mergedTrades);
+            const nextTrades = mergeTrades([parsedTrade], tradesRef.current, safeTradesLimit);
+            publishTrades(nextTrades);
           }
         } catch (parseError) {
           setError(toErrorMessage(parseError, 'Failed to parse market stream payload'));
@@ -514,7 +487,6 @@ export const useRealTimeOrderBook = ({
 
       ws.onclose = () => {
         if (disposed) return;
-
         setConnected(false);
         clearReconnectTimer();
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, RECONNECT_DELAY_MS);
@@ -530,19 +502,14 @@ export const useRealTimeOrderBook = ({
       clearReconnectTimer();
       closeSocket();
     };
-  }, [
-    marketSymbol,
-    normalizedDepth,
-    safeTradesLimit,
-    publishSnapshot,
-    publishTrades,
-    scheduleFlush,
-  ]);
+  }, [marketSymbol, normalizedDepth, safeTradesLimit, publishSnapshot, publishTrades]);
 
   return {
     loading,
     error,
     connected,
     marketSymbol,
+    snapshot,
+    trades,
   };
 };
