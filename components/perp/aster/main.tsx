@@ -152,14 +152,14 @@ export default function DefinedPerpMain({ tokenSymbol }: DefinedPerpMainProps) {
             
             <ChartBox tokenSymbol={selectedSymbol} onSymbolChange={handleSymbolChange} />
 
-            {/* <OrderBox
+            <OrderBox
               network={network}
               userOrders={userOrders}
               orderCategory="perpetual"
               walletAddress=""
               isConnected={isConnected}
               tokenInfo={perpTokenInfo}
-            /> */}
+            />
           </div>
 
           <div

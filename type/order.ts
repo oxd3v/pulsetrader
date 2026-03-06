@@ -120,6 +120,11 @@ export type ORDER_TYPE = {
     estFeeLocked?:string;
     feeInUsd: string;
   };
+  perpetual?:{
+    isLong: boolean,
+    leverage: number,
+    
+  },
   additional?: {
     realizedPnl?: string;
     walletAddress?: string;

@@ -43,6 +43,7 @@ import {
 } from "@/lib/fund/fundHelper";
 import { ZeroAddress } from "ethers";
 
+import { SINGLE_PERPETUAL_STRATEGY, SINGLE_SPOT_STRATEGY_ } from "@/constants/common/order";
 import { chains } from "@/constants/common/chain";
 
 // Define missing types
@@ -603,7 +604,7 @@ const WalletSelector = ({
 
   // Single wallet strategies check
   const isSingleWalletStrategy = useMemo(() => {
-    const singleWalletStrategies = ["limit", "scalp", "algo"];
+    const singleWalletStrategies = category == 'perpetual' ? SINGLE_PERPETUAL_STRATEGY : SINGLE_SPOT_STRATEGY_;
     return singleWalletStrategies.includes(selectedStrategy?.id);
   }, [selectedStrategy?.id]);
 

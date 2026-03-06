@@ -22,7 +22,7 @@ const getTheme = () => {
 };
 
 const TradingViewAdvancedChart = React.memo(
-  ({symbol }) => {
+  ({  symbol, }) => {
     // --- State & Refs ---
     const [chartReady, setChartReady] = useState(false);
     const chartContainerRef = useRef(null);
@@ -216,7 +216,9 @@ const TradingViewAdvancedChart = React.memo(
 
       const initWidget = () => {
         if (window.TradingView && chartContainerRef.current) {
-          const dataFeed = new DataFeed(symbol);
+          const dataFeed = new DataFeed(
+            symbol
+          );
           const currentTheme = getTheme();
           const dynamicOverrides = getDynamicChartOverrides(currentTheme);
 
@@ -226,7 +228,7 @@ const TradingViewAdvancedChart = React.memo(
             library_path: "/charting_library/",
             autosize: true,
             symbol: symbol,
-            interval: "1D",
+            interval: "60",
             timezone: "Etc/UTC",
             theme: currentTheme,
             style: "1",

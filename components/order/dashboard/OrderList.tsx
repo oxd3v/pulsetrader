@@ -9,7 +9,7 @@ import { RiRefreshLine } from "react-icons/ri";
 import { ORDER_TYPE } from "@/type/order";
 
 // Hooks & Store
-import { useSpotOrder } from "@/hooks/useSpotOrder";
+import { useSpotOrder } from "@/hooks/useOrder";
 
 // Components
 import StrategyGrouped from "./StrategyGrouped";

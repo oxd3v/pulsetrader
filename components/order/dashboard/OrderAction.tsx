@@ -15,7 +15,7 @@ import { RiHistoryFill } from "react-icons/ri";
 import { ORDER_TYPE } from "@/type/order";
 
 // Hooks
-import { useSpotOrder } from "@/hooks/useSpotOrder";
+import { useSpotOrder } from "@/hooks/useOrder";
 import ConfirmationModal from "@/components/common/Confirmation/ConfirmationBox";
 
 // Store

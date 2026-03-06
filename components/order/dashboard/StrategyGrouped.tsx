@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 import { TiWaves } from "react-icons/ti";
 import { ORDER_TYPE } from "@/type/order";
-import { useSpotOrder } from "@/hooks/useSpotOrder";
+import { useSpotOrder } from "@/hooks/useOrder";
 
 import OrderCard from "./OrderCard";
 import ConfirmationModal from "@/components/common/Confirmation/ConfirmationBox";

@@ -27,7 +27,7 @@ import SelectWallet from "@/components/walletManager/selection/selectWalletToCre
 import ConfirmationModal from "../common/Confirmation/ConfirmationBox";
 
 // hook
-import { useSpotOrder } from "@/hooks/useSpotOrder";
+import { useSpotOrder } from "@/hooks/useOrder";
 
 //library
 import { fetchCodexTokenPrice } from "@/lib/oracle/codex";

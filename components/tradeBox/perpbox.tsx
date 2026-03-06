@@ -3,7 +3,7 @@ import { ORDER_TYPE } from "@/type/order";
 
 import { MIN_ORDER_SIZE, MAX_GRID_NUMBER } from "@/constants/common/order";
 import { CollateralTokens } from "@/constants/common/tokens";
-import { SpotStrategies } from "@/constants/common/frontend";
+import { PerpetualStrategies } from "@/constants/common/frontend";
 import { FiChevronDown, FiInfo } from "react-icons/fi";
 import { ZeroAddress } from "ethers";
 
@@ -87,7 +87,7 @@ const RenderingTechnicalExit = ({
   );
 };
 
-interface spotTradeBoxProps {
+interface PerpTradeBoxProp {
   tokenInfo: any;
   chainId: number;
   isConnected: boolean;
@@ -96,15 +96,15 @@ interface spotTradeBoxProps {
   userPrevOrders?: any[];
 }
 
-export default function spotTradeBox({
+export default function PerpTradeBox({
   tokenInfo,
   chainId,
   isConnected,
   user,
   userWallets = [],
   userPrevOrders = [],
-}: spotTradeBoxProps) {
-  const { configureSpotOrder, addSpotOrder } = useSpotOrder();
+}: PerpTradeBoxProp) {
+  const { configurePerpOrder, addSpotOrder } = useSpotOrder();
 
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -114,7 +114,7 @@ export default function spotTradeBox({
 
   // Strategy & Token State
   const [isTechnicalExit, setIsTechnicalExit] = useState(false);
-  const [selectedStrategy, setSelectedStrategy] = useState(SpotStrategies[0]);
+  const [selectedStrategy, setSelectedStrategy] = useState(PerpetualStrategies[0]);
   const [collateralToken, setCollateralToken] = useState<any>(
     CollateralTokens[chainId][ZeroAddress],
   );
@@ -258,7 +258,7 @@ export default function spotTradeBox({
     setInitialOrderSize(value);
   };
 
-  const handleStrategyChange = (strategy: (typeof SpotStrategies)[0]) => {
+  const handleStrategyChange = (strategy: (typeof PerpetualStrategies)[0]) => {
     setSelectedStrategy(strategy);
     setGridNumber(1);
     setShowStrategyDropdown(false);
@@ -550,7 +550,6 @@ export default function spotTradeBox({
       if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
         return false;
       }
-      return true;
     };
     setReadyToSubmitOrder(isReadyToCreateOrder())
     if (shouldConfigureOrder()) {
@@ -587,7 +586,7 @@ export default function spotTradeBox({
         slippage,
         orderNetworkFee,
       };
-      const _estOrders = configureSpotOrder(orderConfig);
+      const _estOrders = configurePerpOrder(orderConfig);
 
       setEstOrders(_estOrders);
     } else {
@@ -701,7 +700,7 @@ export default function spotTradeBox({
         {/* Strategy Dropdown Menu */}
         {showStrategyDropdown && (
           <div className="absolute top-full h-[400px] left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg z-50 overflow-y-auto">
-            {SpotStrategies.map((strategy) => (
+            {PerpetualStrategies.map((strategy) => (
               <div
                 key={strategy.id}
                 onClick={() => handleStrategyChange(strategy)}

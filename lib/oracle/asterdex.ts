@@ -115,7 +115,7 @@ export const getAsterKLines = async ({
 
     return { candles, success: true };
   } catch (error) {
-    console.error('Error fetching klines:', error);
+    //console.error('Error fetching klines:', error);
     return {
       candles: [],
       success: false,

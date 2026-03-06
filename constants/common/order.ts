@@ -36,3 +36,5 @@ export const ORDER_TRADE_FEE = BigInt(10);
 export const DEFAULT_SOLANA_PRIORITY_FEE = BigInt(50_000);
 export const SOLANA_BASE_FEE = BigInt(5000);
 export const DEFAULT_SOLANA_COMPUTE_UNITS = BigInt(250_000);
+export const SINGLE_PERPETUAL_STRATEGY = ['limit','dca','grid','algo'];
+export const SINGLE_SPOT_STRATEGY_ = ['limit','algo'];
