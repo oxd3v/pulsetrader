@@ -6,7 +6,7 @@ import { ORDER_TYPE } from '@/type/order';
 import { mockWallets } from '@/constants/common/mock';
 
 export const store = create((set) => ({
-    network: 43114,
+    network: 42161,
     setNetwork: (network: number) => set({ network }),
     signature:null,
     setSignature: (signature:string)=> set({signature}),

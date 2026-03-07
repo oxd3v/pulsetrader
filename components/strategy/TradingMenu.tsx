@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FiInfo } from "react-icons/fi";
+import { useStore } from "@/store/useStore";
+import { useShallow } from "zustand/shallow";
 
 const FUTURES_PROTOCOL = [
   {
@@ -23,7 +25,7 @@ const FUTURES_PROTOCOL = [
   {
     id: "gmx",
     name: "GMX",
-    assetIdentifier: 'BTCUSDT',
+    assetIdentifier: 'BTC',
     imageUrl:
       "https://raw.githubusercontent.com/gmx-io/gmx-assets/6ca89def873126e2d46bab65651cf940b2597923/GMX-Assets/SVG/GMX.svg",
   },
@@ -32,7 +34,11 @@ const FUTURES_PROTOCOL = [
 export default function TradingStrategyMenu() {
   const [selectedType, setSelectedType] = useState<any>(null);
   const router = useRouter();
-
+  const { setNetwork  } = useStore(
+      useShallow((state: any) => ({
+        setNetwork: state.setNetwork,
+      }))
+    );
   return (
     <div className="h-full  p-8">
       <div className="max-w-4xl mx-auto">
@@ -108,6 +114,7 @@ export default function TradingStrategyMenu() {
                     <div
                       className="bg-black p-4 rounded-lg hover:bg-gray-800 cursor-pointer transition-all"
                       onClick={() => {
+                        setNetwork(42161)
                         router.push(`/strategy/perp/${protcol.id}/${protcol.assetIdentifier}`);
                       }}
                     >

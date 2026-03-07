@@ -1,4 +1,4 @@
-import DefinedPerpMain from "@/components/perp/aster/main";
+import DefinedPerpMain from "@/components/perp/aster/mainbox";
 
 export default async function PerpMain({
   params,

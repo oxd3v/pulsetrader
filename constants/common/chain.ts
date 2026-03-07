@@ -21,7 +21,7 @@ export const chainConfig = {
       address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     },
     imageUrl: `https://etherscan.io/images/svg/brands/ethereum-original.svg`,
-    isPerpetual: true,
+    isPerpetual: false,
     isActive: true,
   },
   [chains.Avalanche]: {
@@ -57,7 +57,7 @@ export const chainConfig = {
       address: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
     },
     imageUrl: `https://arbitrum.io/arb_logo_color.svg`,
-    isPerpetual: false,
+    isPerpetual: true,
     isActive: true,
   },
   [chains.Solana]: {

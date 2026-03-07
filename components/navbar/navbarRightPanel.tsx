@@ -17,7 +17,7 @@ import { useUserAuth } from "@/hooks/useAuth";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
 
-export default function NavbarRight() {
+export default function NavbarRight({pathname}:{pathname:any}) {
   const { checkUser, disconnect } = useUserAuth();
   const { setNetwork, network, user, isConnected } = useStore(
     useShallow((state: any) => ({
@@ -27,6 +27,8 @@ export default function NavbarRight() {
       isConnected: state.isConnected,
     }))
   );
+
+  console.log(pathname, 2)
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ export default function NavbarRight() {
     <div className="flex items-center gap-2 md:gap-4">
       {/* 1. Chain Selection */}
       <div className="">
-        <ChainSelection selectChain={network} setSelectChain={setNetwork} />
+        <ChainSelection selectChain={network} setSelectChain={setNetwork} pathName={pathname}/>
       </div>
 
       {/* 2. Theme Toggle */}

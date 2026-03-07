@@ -71,6 +71,7 @@ export const useSpotOrder = () => {
       levrageMultiplier,
       isLong,
       orderNetworkFee,
+      protocol,
     } = config;
 
     const estOrders: ORDER_TYPE[] = [];
@@ -105,6 +106,7 @@ export const useSpotOrder = () => {
         });
         estOrders.push({
           // ... (order object unchanged) ...
+          protocol,
           user: {},
           wallet: {},
           chainId,
@@ -127,6 +129,9 @@ export const useSpotOrder = () => {
             collateralToken,
             outputToken,
             pairAddress: orderToken.pairAddress,
+            ...(orderToken.marketTokenAddress && {
+              marketTokenAddress: orderToken.marketTokenAddress,
+            }),
           },
           amount: {
             orderSize: rawSize.toString(),
@@ -178,6 +183,7 @@ export const useSpotOrder = () => {
     } else {
       estOrders.push({
         // ... (order object unchanged) ...
+        protocol,
         user: {},
         wallet: {},
         chainId,
@@ -203,6 +209,9 @@ export const useSpotOrder = () => {
           collateralToken,
           outputToken,
           pairAddress: orderToken.pairAddress,
+          ...(orderToken.marketTokenAddress && {
+            marketTokenAddress: orderToken.marketTokenAddress,
+          }),
         },
         amount: {
           orderSize: baseAmount.toString(),
@@ -482,6 +491,7 @@ export const useSpotOrder = () => {
     indexToken,
     category,
     isLong,
+    protocol,
     user,
   }: AddOrderProps) => {
     let orderAddResult = { added: false, error: null as string | null };
@@ -570,6 +580,7 @@ export const useSpotOrder = () => {
         category,
         name,
         isLong,
+        protocol,
       });
 
       if (!apiResponse.success) {

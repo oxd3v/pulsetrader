@@ -407,11 +407,11 @@ export const Tokens = {
   [chains.Arbitrum]:{
     [ZeroAddress]: {
       address: ZeroAddress,
-      name: "AVALANCHE",
-      symbol: "AVAX",
+      name: "ETHERIUM",
+      symbol: "ETH",
       decimals: 18,
       imageUrl:
-        "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
+        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
       isNative:true,
       isSpot: true,
       isStable: false,
@@ -499,11 +499,11 @@ export const CollateralTokens = {
   [chains.Arbitrum]:{
     [ZeroAddress]: {
       address: ZeroAddress,
-      name: "AVALANCHE",
-      symbol: "AVAX",
+      name: "ETHERIUM",
+      symbol: "ETH",
       decimals: 18,
       imageUrl:
-        "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
+        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
       isNative:true,
       isSpot: true,
       isStable: false,

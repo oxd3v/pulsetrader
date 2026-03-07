@@ -22,7 +22,6 @@ import OrderNameValidationInput from "./TradeBoxCommon/orderNameValidation";
 import GridInput from "./TradeBoxCommon/GridInput";
 import NumberInput from "./TradeBoxCommon/NumberInput";
 import EstSpotOrders from "@/components/order/estimate/estSpotOrder";
-import LeverageInput from "./TradeBoxCommon/LeverageInput";
 import SelectWallet from "@/components/walletManager/selection/selectWalletToCreateOrder";
 import ConfirmationModal from "../common/Confirmation/ConfirmationBox";
 
@@ -88,24 +87,26 @@ const RenderingTechnicalExit = ({
   );
 };
 
-interface DefinedTradeBoxProps {
+interface spotTradeBoxProps {
   tokenInfo: any;
   chainId: number;
+  protocol?: string;
   isConnected: boolean;
   user?: any;
   userWallets?: any[];
   userPrevOrders?: any[];
 }
 
-export default function DefinedTradeBox({
+export default function spotTradeBox({
   tokenInfo,
   chainId,
+  protocol,
   isConnected,
   user,
   userWallets = [],
   userPrevOrders = [],
-}: DefinedTradeBoxProps) {
-  const { configureOrder, addSpotOrder } = useSpotOrder();
+}: spotTradeBoxProps) {
+  const { configurePerpOrder, addSpotOrder } = useSpotOrder();
 
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -141,12 +142,9 @@ export default function DefinedTradeBox({
   const [gridMultiplier, setGridMultiplier] = useState<number>(1);
   const [orderSizeMultiplier, setOrderSizeMultiplier] = useState<number>(1);
 
-  const [leverage, setLeverage] = useState(1);
-  const [leverageMultiplier, setLevrageMultiplier] = useState(1);
-
   // Risk Management State
   const [tpPercentage, setTpPercentage] = useState<number>(10);
-  const [slPercentage, setSlPercentage] = useState<number>(30);
+  const [slPercentage, setSlPercentage] = useState<number>(10);
   const [isActiveStopLoss, setIsActiveStopLoss] = useState<boolean>(false);
 
   const [isTrailingMode, setIsTrailingMode] = useState<boolean>(false);
@@ -163,9 +161,29 @@ export default function DefinedTradeBox({
   const [areWalletsReady, setWalletsReady] = useState<boolean>(false);
   const [estOrders, setEstOrders] = useState<ORDER_TYPE[]>([]);
 
+  const [leverage, setLeverage] = useState(1);
+  const [leverageMultiplier, setLevrageMultiplier] = useState(1);
+  const [isLong, setIsLong] = useState(true);
+
+  //order submission error
+  const [submitText, setSubmitText] = useState("Create Order");
+  const [readyToSubmitOrder, setReadyToSubmitOrder] = useState(false);
+
   // Validation State
   const [isOrderNameValidate, setIsOrderNameValidate] =
     useState<boolean>(false);
+
+  const negativeGridDecrementalPriceProtection = () => {
+    if (gridDistance > 0 && gridNumber > 1 && gridMultiplier > 0) {
+      let fristCal = gridMultiplier ** (gridNumber - 1) - 1;
+      let secounCal = fristCal / (gridMultiplier - 1);
+      let lastPercentage = gridDistance * secounCal;
+      if (lastPercentage >= 100) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   // ========================================================================
   // Effects
@@ -295,12 +313,38 @@ export default function DefinedTradeBox({
 
   const isReadyToCreateOrder = (): boolean => {
     // Validate trailing mode
+    let _submitText = "Create Order";
+    if (selectedStrategy.id === "algo") {
+      if (!technicalEntry) {
+        _submitText = "Set entry logic";
+        return false;
+      }
+    } else {
+      if (selectedStrategy.id == "sellToken" && !isTechnicalExit) {
+        if (Number(tpPrice) <= 0 || tpPrice === "") {
+          _submitText = "Set exit price";
+          return false;
+        }
+      } else {
+        // Validate entry price for other strategies
+        if (Number(entryPrice) <= 0 || entryPrice === "") {
+          _submitText = "Set entry price";
+          return false;
+        }
+      }
+    }
+
+    if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
+      _submitText = `Enter valid order size`;
+      return false;
+    }
     if (
       isTrailingMode &&
       (slPercentage === 0 ||
         slPercentage.toString() === "" ||
         slPercentage == 100)
     ) {
+      _submitText = "Slippage required in trailing mode";
       return false;
     }
     // Validate re-entrance
@@ -308,51 +352,53 @@ export default function DefinedTradeBox({
       isReEntrance &&
       (reEntrancePercentage <= 0 || reEntrancePercentage.toString() === "")
     ) {
+      _submitText = "Set re-entrance % in re-entrance mode";
+      return false;
       return false;
     }
 
     if (gridNumber < 1 || gridNumber > MAX_GRID_NUMBER) {
+      _submitText = `Grid must be lower then ${MAX_GRID_NUMBER + 1} and not zero`;
       return false;
-    }
-
-    // Validate technical entry for algo strategy
-    if (selectedStrategy.id === "algo") {
-      if (!technicalEntry) {
-        return false;
-      }
-    } else {
-      if (selectedStrategy.id != "sellToken") {
-        // Validate entry price for other strategies
-        if (Number(entryPrice) <= 0 || entryPrice === "") {
-          return false;
-        }
-      }
     }
 
     if (selectedStrategy.id == "sellToken" && !isTechnicalExit) {
       if (Number(tpPrice) <= 0 || tpPrice === "") {
+        _submitText = `Enter valid TP price`;
         return false;
       }
     }
 
     if (isTechnicalExit) {
       if (!technicalExit) {
+        _submitText = `Set exit logic`;
+        return false;
+      }
+    } else {
+      if (tpPercentage <= 0) {
+        _submitText = `Set TP percentage`;
+        return false;
+      }
+      if (isActiveStopLoss && slPercentage <= 0) {
+        _submitText = `Set SL percentage`;
         return false;
       }
     }
 
     // Validate basic order parameters
-    if (
-      Number(initialOrderSize) <= 0 ||
-      initialOrderSize == "" ||
-      slippage.toString() === "" ||
-      slippage <= 0.4
-    ) {
+    if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
+      _submitText = `Enter valid order size`;
+      return false;
+    }
+
+    if (slippage.toString() === "" || slippage <= 0.4) {
+      _submitText = `Slippage should be greater then 0.4`;
       return false;
     }
 
     // Validate Minimum USD Value
     if (estimatedUsdValue < MIN_ORDER_SIZE) {
+      _submitText = `Minimum order size $${MIN_ORDER_SIZE} `;
       return false;
     }
 
@@ -361,11 +407,13 @@ export default function DefinedTradeBox({
       ["limit", "scalp", "algo"].includes(selectedStrategy.id) &&
       gridNumber !== 1
     ) {
+      _submitText = `Order configuration not metch refresh please`;
       return false;
     }
 
     // Validate grid configuration
     if (gridNumber.toString() === "" || gridNumber === 0) {
+      _submitText = `Order configuration not metch refresh please`;
       return false;
     }
 
@@ -378,14 +426,36 @@ export default function DefinedTradeBox({
         gridMultiplier.toString() === "" ||
         orderSizeMultiplier.toString() === ""
       ) {
+        _submitText = `Set valid grid configuration`;
         return false;
+      } else {
+        if (
+          selectedStrategy.id != "sellToken" &&
+          negativeGridDecrementalPriceProtection()
+        ) {
+          _submitText = `Grid multiplier is too high set negative target`;
+          return false;
+        }
       }
+    }
+
+    if (!isConnected) {
+      _submitText = `Connect your wallet`;
+      return false;
     }
 
     // Validate order name
     if (!isOrderNameValidate || orderName.trim() === "") {
+      _submitText = `set Unique name`;
       return false;
     }
+
+    if (!areWalletsReady) {
+      _submitText = `Select wallet`;
+      return false;
+    }
+
+    setSubmitText(_submitText);
 
     return true;
   };
@@ -435,7 +505,8 @@ export default function DefinedTradeBox({
         name: orderName,
         strategy: selectedStrategy.id,
         indexToken: tokenInfo.address,
-        category: "Spot",
+        category: "perpetual",
+        protocol,
         user,
       });
 
@@ -461,7 +532,37 @@ export default function DefinedTradeBox({
   // ========================================================================
 
   useEffect(() => {
-    if (isReadyToCreateOrder()) {
+    const shouldConfigureOrder = () => {
+      // Validate technical entry for algo strategy
+      if (isTechnicalExit) {
+        if (!technicalExit) {
+          return false;
+        }
+      }
+      if (selectedStrategy.id === "algo") {
+        if (!technicalEntry) {
+          return false;
+        }
+      } else {
+        if (selectedStrategy.id == "sellToken" && !isTechnicalExit) {
+          if (Number(tpPrice) <= 0 || tpPrice === "") {
+            return false;
+          }
+        } else {
+          // Validate entry price for other strategies
+          if (Number(entryPrice) <= 0 || entryPrice === "") {
+            return false;
+          }
+        }
+      }
+
+      if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
+        return false;
+      }
+      return true;
+    };
+    setReadyToSubmitOrder(isReadyToCreateOrder());
+    if (shouldConfigureOrder()) {
       const orderConfig: any = {
         gridNumber,
         targetPrice: entryPrice,
@@ -476,6 +577,8 @@ export default function DefinedTradeBox({
         outputToken,
         orderToken: {
           address: tokenInfo.address,
+          pairAddress: tokenInfo.pairAddress,
+          marketTokenAddress: tokenInfo.marketTokenAddress,
           decimals: tokenInfo.decimals,
           symbol: tokenInfo.symbol,
         },
@@ -495,7 +598,7 @@ export default function DefinedTradeBox({
         slippage,
         orderNetworkFee,
       };
-      const _estOrders = configureOrder(orderConfig);
+      const _estOrders = configurePerpOrder(orderConfig);
 
       setEstOrders(_estOrders);
     } else {
@@ -525,12 +628,13 @@ export default function DefinedTradeBox({
     isOrderNameValidate,
     orderNetworkFee,
     estimatedUsdValue, // added dependency
+    areWalletsReady,
   ]);
 
   const MemoizedWalletSelector = useMemo(
     () => (
       <SelectWallet
-        category="spot"
+        category="perpetual"
         orders={userPrevOrders}
         availableWallets={userWallets}
         gridsByWallet={gridsByWallet}
@@ -670,6 +774,86 @@ export default function DefinedTradeBox({
         {/* ======================================================== */}
         {/* Initial Setup Section */}
         {/* ======================================================== */}
+
+        <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
+          <div className="space-y-1 md:space-y-2">
+            <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-lg">
+              Perp Settings
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Configure future order settings
+            </p>
+          </div>
+
+          <div className="mb-2 md:mb-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-1 sm:p-1.5 rounded-xl flex gap-1 sm:gap-2 shadow-sm">
+              <button
+                className={`flex-1 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base transition-all duration-200
+            ${
+              isLong
+                ? "bg-green-500 text-white shadow-lg scale-[1.02] hover:bg-green-600"
+                : "text-gray-600 hover:bg-gray-100/80"
+            }`}
+                onClick={() => setIsLong(true)}
+              >
+                Long Position
+              </button>
+              <button
+                className={`flex-1 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base transition-all duration-200
+            ${
+              isLong === false
+                ? "bg-red-500 text-white shadow-lg scale-[1.02] hover:bg-red-600"
+                : "text-gray-600 hover:bg-gray-100/80"
+            }`}
+                onClick={() => setIsLong(false)}
+              >
+                Short Position
+              </button>
+            </div>
+          </div>
+
+          <div className="grid xl:grid-cols-2 gap-4">
+            <NumberInput
+              inputLabel="Levrager"
+              toolTipMessage="leverage"
+              value={leverage}
+              onChange={setLeverage}
+              notValid={Number(leverage) > 1 && (leverage === 0 || !leverage)}
+            />
+            <NumberInput
+              inputLabel="Levrager Multiplier"
+              toolTipMessage="leverage Multiplier"
+              value={leverageMultiplier}
+              onChange={setLevrageMultiplier}
+              notValid={
+                Number(leverageMultiplier) > 1 &&
+                (leverageMultiplier === 0 || !leverageMultiplier)
+              }
+            />
+          </div>
+          <div className="grid xl:grid-cols-2 gap-4">
+            <div className="space-y-1 md:space-y-2">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                Margin Type
+                <InfoTooltip
+                  id={`MarginType-tooltip`}
+                  content={"Order Margin type"}
+                />
+              </label>
+              <div className="flex gap-2 font-bold text-md">ISOLATED</div>
+            </div>
+            <div className="space-y-1 md:space-y-2">
+              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                Position Mode
+                <InfoTooltip
+                  id={`PositionMode-tooltip`}
+                  content={"Order Margin type"}
+                />
+              </label>
+              <div className="flex gap-2 font-bold text-md">HEDGE</div>
+            </div>
+          </div>
+        </div>
 
         <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
           <div className="space-y-1 md:space-y-2">
@@ -814,6 +998,8 @@ export default function DefinedTradeBox({
           />
         </div>
 
+        
+
         {/* ======================================================== */}
         {/* Grid Configuration Section */}
         {/* ======================================================== */}
@@ -876,59 +1062,6 @@ export default function DefinedTradeBox({
               )}
             </div>
           )}
-        <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
-          <div className="space-y-1 md:space-y-2">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-lg">
-              Leverage Settings
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Configure future order settings
-            </p>
-          </div>
-
-          <div className="grid xl:grid-cols-2 gap-4">
-            <NumberInput
-              inputLabel="Levrager"
-              toolTipMessage="leverage"
-              value={leverage}
-              onChange={setLeverage}
-              notValid={Number(leverage) > 1 && (leverage === 0 || !leverage)}
-            />
-            <NumberInput
-              inputLabel="Levrager Multiplier"
-              toolTipMessage="leverage Multiplier"
-              value={leverageMultiplier}
-              onChange={setLevrageMultiplier}
-              notValid={
-                Number(leverageMultiplier) > 1 &&
-                (leverageMultiplier === 0 || !leverageMultiplier)
-              }
-            />
-          </div>
-          <div className="grid xl:grid-cols-2 gap-4">
-            <div className="space-y-1 md:space-y-2">
-              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                Margin Type
-                <InfoTooltip
-                  id={`MarginType-tooltip`}
-                  content={"Order Margin type"}
-                />
-              </label>
-              <div className="flex gap-2 font-bold text-md">ISOLATED</div>
-            </div>
-            <div className="space-y-1 md:space-y-2">
-              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                Position Mode
-                <InfoTooltip
-                  id={`PositionMode-tooltip`}
-                  content={"Order Margin type"}
-                />
-              </label>
-              <div className="flex gap-2 font-bold text-md">HEDGE</div>
-            </div>
-          </div>
-        </div>
-        {/* <LeverageInput leverage={leverage} setLevrage={setLeverage} leverageMultiplier={leverageMultiplier} setLevrageMultiplier={setLevrageMultiplier}/> */}
 
         {/* ======================================================== */}
         {/* Risk Management Section */}
@@ -1062,7 +1195,7 @@ export default function DefinedTradeBox({
       {/* Action Buttons */}
       {/* ============================================================ */}
 
-      {/* {isConnected == false ? (
+      {isConnected == false ? (
         <div className="flex gap-0.5 items-center">
           {estOrders.length > 0 && (
             <button
@@ -1095,7 +1228,7 @@ export default function DefinedTradeBox({
               !areWalletsReady ||
               estOrders.length === 0 ||
               creationPending ||
-              !isReadyToCreateOrder()
+              !readyToSubmitOrder
             }
             onClick={() => setIsConfirmationOpen(true)}
             className={`grow py-3 md:py-4 ${
@@ -1104,22 +1237,15 @@ export default function DefinedTradeBox({
               !areWalletsReady ||
               estOrders.length === 0 ||
               creationPending ||
-              !isReadyToCreateOrder()
+              !readyToSubmitOrder
                 ? "bg-blue-200 dark:bg-blue-900/30 pointer-events-none opacity-50"
                 : "bg-blue-500 hover:bg-blue-600"
             } font-bold text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
           >
-            {creationPending ? "Creating..." : "Create Order"}
+            {creationPending ? "Creating..." : submitText}
           </button>
         </div>
-      )} */}
-      <button
-            className={`grow py-3 md:py-4 ${
-              estOrders.length > 0 ? "rounded-e-xl" : "rounded-xl"
-            } bg-gray-50 dark:bg-gray-900 font-bold text-black dark:text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
-          >
-            Coming soon
-          </button>
+      )}
 
       {openEstOrderModal && estOrders.length > 0 && (
         <EstSpotOrders

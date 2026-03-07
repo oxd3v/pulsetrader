@@ -62,6 +62,7 @@ export type LimitType = {
 
 export type ORDER_TYPE = {
   _id?: string;
+  protocol?: string;
   user: any;
   wallet: any;
   chainId: number;

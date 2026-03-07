@@ -6,13 +6,16 @@ import Image from "next/image";
 export default function ChainSelection({
   selectChain,
   setSelectChain,
+  pathName
 }: {
   selectChain: number;
   setSelectChain: (c: number) => void;
+  pathName:any
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
+  
+  const filterChain = Object.values(chainConfig).filter(n=> pathName?.includes('perp') && n.isPerpetual == true )
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -47,7 +50,7 @@ export default function ChainSelection({
       {isOpen && (
         <div className="absolute top-full right-0 mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
           <div className="p-1">
-            {Object.values(chainConfig).filter(c=>c.isActive == true).map((chain: any) => (
+            {filterChain.filter(c=>c.isActive == true).map((chain: any) => (
               <button
                 key={chain.chainId}
                 onClick={() => {

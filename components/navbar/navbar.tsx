@@ -12,6 +12,7 @@ export default function Navbar() {
   const [showBetaWarning, setShowBetaWarning] = useState(true);
   const [showComingSoon, setShowComingSoon] = useState(true);
   const isHome = pathname === "/";
+  console.log(pathname)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -56,7 +57,7 @@ export default function Navbar() {
                 Beta
               </span>
             </Link>
-            <NavbarRight />
+            <NavbarRight pathname={pathname}/>
           </div>
         </div>
       </nav>
