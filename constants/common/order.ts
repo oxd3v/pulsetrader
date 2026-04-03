@@ -1,4 +1,4 @@
-export const MIN_ORDER_SIZE = 1;
+export const MIN_ORDER_SIZE = 0.1;
 export const MAX_GRID_NUMBER = 5;
 
 import { chains } from "./chain";
@@ -13,7 +13,7 @@ export const GAS_LIMIT = {
       increaseOrderGasLimit: BigInt(3000000),
       decreaseOrderGasLimit: BigInt(7000000),
     },
-  },  
+  },
   ["SPOT"]: {
     [chains.Avalanche]: BigInt(6000000), // with transfer and approve gas limit
     [chains.Solana]: BigInt(1700000), // with transfer gas limit
@@ -29,7 +29,7 @@ export const GAS_BUFFER = {
   [chains.Arbitrum]: 40000,
 };
 
-export const  DEFAULT_GAS_PRICE = {
+export const DEFAULT_GAS_PRICE = {
   [chains.Avalanche]: BigInt(2000000000),
   [chains.Ethereum]: BigInt(1000000000),
   [chains.Solana]: BigInt(10000000),
@@ -44,8 +44,8 @@ export const ORDER_TRADE_FEE_EXEMPT_STATUS = Object.freeze([
 export const DEFAULT_SOLANA_PRIORITY_FEE = BigInt(50_000);
 export const SOLANA_BASE_FEE = BigInt(5000);
 export const DEFAULT_SOLANA_COMPUTE_UNITS = BigInt(250_000);
-export const SINGLE_PERPETUAL_STRATEGY = ['limit','dca','grid','algo'];
-export const SINGLE_SPOT_STRATEGY_ = ['limit','algo'];
+export const SINGLE_PERPETUAL_STRATEGY = ['limit', 'dca', 'grid', 'algo'];
+export const SINGLE_SPOT_STRATEGY_ = ['limit', 'algo'];
 export const ORDER_FEE_COLLECTION_GAS_FEE = {
   [chains.Avalanche]: BigInt(14000000000000),
   [chains.Ethereum]: BigInt(50000000000000),

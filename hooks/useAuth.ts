@@ -25,7 +25,7 @@ import {
 import { normalizeClientOrders } from "@/utility/orderUtility";
 
 // Notification Config (Optional: If you want to use it directly in hook for Toast defaults)
-import { NOTIFICATION_CONFIG } from "@/constants/config/notification";
+//import { NOTIFICATION_CONFIG } from "@/constants/config/notification";
 
 export const useUserAuth = () => {
   const {
@@ -117,7 +117,7 @@ export const useUserAuth = () => {
             setSignature(signature);
           }
         } catch (e) { }
-      }else{
+      } else {
         notifyWithResponseError(
           "error",
           "Please connect your account.",
@@ -156,7 +156,7 @@ export const useUserAuth = () => {
         return checkResult;
       }
 
-      
+
 
       updateGlobalUserState(apiResponse.data);
       checkResult.connected = true;

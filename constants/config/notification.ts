@@ -52,6 +52,11 @@ export const NOTIFICATION_CONFIG: Record<
     message:
       "Deposit first. If already deposited, wait for DEX account contract confirmation. Try again later.",
   },
+  ["ALREADY_APPROVED"]: {
+    title: "Already Approved",
+    message:
+      "Agent already approved",
+  },
   ["INSUFFICIENT_DEX_BALANCE_FOR_AGENT"]: {
     title: "Deposit First",
     message:

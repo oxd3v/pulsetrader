@@ -11,7 +11,7 @@ import {
 } from "react-icons/fi";
 import { safeFormatNumber, safeParseUnits } from "@/utility/handy";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
-
+import { usePerpAccount } from "@/hooks/usePerpAccount";
 type DexName = "asterdex" | "hyperliquid";
 
 interface PerpBalances {
@@ -69,6 +69,9 @@ function fmtUsd(val: string): string {
 }
 
 export default function PerpTab({ selectedWallet, chainId, perpBalances, onRefresh }: PerpTabProps) {
+  const { approveAgent } = usePerpAccount();
+
+
   const [activeDex, setActiveDex] = useState<DexName>("asterdex");
   const [isDepositing, setIsDepositing] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -127,19 +130,14 @@ export default function PerpTab({ selectedWallet, chainId, perpBalances, onRefre
   const handleApproveAgent = async () => {
     setIsApproving(true);
     try {
-      const res = await Service.approveAgent({
-        mainWalletId: selectedWallet._id,
-        dex: activeDex,
-      }) as PerpServiceResponse;
-      if (res?.success || res?.data?.success) {
-        toast.success(`Agent approved for ${DEX_CONFIG[activeDex].label}.`);
-      } else {
-        const msg = res?.data?.message || res?.message || "Failed to approve agent";
-        if (msg === "ALREADY_APPROVED") toast.success("Agent already approved.");
-        else toast.error(msg);
-      }
+      // const res = await Service.approveAgent({
+      //   mainWalletId: selectedWallet._id,
+      //   dex: activeDex,
+      // }) as PerpServiceResponse;
+      await approveAgent({ mainWalletId: selectedWallet._id, dex: activeDex })
+
     } catch {
-      toast.error(`Error approving agent for ${activeDex}`);
+      //toast.error(`Error approving agent for ${activeDex}`);
     } finally {
       setIsApproving(false);
     }

@@ -24,6 +24,7 @@ export const notify = (
 ) => {
   const config = NOTIFICATION_CONFIG[key] ?? NOTIFICATION_CONFIG.SERVER_ERROR;
   const message = fallback || config.message;
+  console.log(message)
   if (type === "success") {
     toast.success(message);
   } else {
@@ -60,7 +61,7 @@ export const notifyFromApiError = (message: string | undefined | null) => {
   return "SERVER_ERROR";
 };
 
-export const handleServerErrorToast = ({err, messageKey=undefined}:{err: any, messageKey?:string}) => {
+export const handleServerErrorToast = ({ err, messageKey = undefined }: { err: any, messageKey?: string }) => {
   const raw =
     err?.response?.data?.message ||
     err?.response?.data?.error ||

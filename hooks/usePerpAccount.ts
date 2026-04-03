@@ -1,18 +1,38 @@
 import { ethers } from "ethers";
 import { useEffect, useState, useCallback } from "react";
 import ApiService from '@/service/api-service';
-import { handleServerErrorToast } from "@/lib/utils";
-import toast from "react-hot-toast";
+import { handleServerErrorToast, notify, notifyFromApiError, notifyWithResponseError } from "@/lib/utils";
+import { useStore } from "@/store/useStore";
+import { useShallow } from "zustand/shallow";
 
 export const usePerpAccount = () => {
-
+    const {
+        isConnected,
+        setUser,
+        setUserOrders,
+        setUserWallets,
+        setUserHistories,
+        setIsConnected,
+        setSignature,
+    } = useStore(
+        useShallow((state: any) => ({
+            isConnected: state.isConnected,
+            setUser: state.setUser,
+            setUserOrders: state.setUserOrders,
+            setUserWallets: state.setUserWallets,
+            setUserHistories: state.setUserHistories,
+            setIsConnected: state.setIsConnected,
+            setSignature: state.setSignature,
+        })),
+    );
     // Helper: Check if MetaMask is injected
     const getPerpBalance = useCallback(async ({ account, perpDex }: { account: string, perpDex: string }) => {
         let response = await ApiService.getPerpBalance({ account, perpDex });
         return response;
     }, []);
 
-    const approveAgent = useCallback(async ({ mainWalletId, agentWallet, dex }: { mainWalletId: string, agentWallet: string, dex: string }) => {
+    const approveAgent = useCallback(async ({ mainWalletId, dex }: { mainWalletId: string, dex: string }) => {
+
         let approveResult = {
             approved: false,
             error: null as string | null
@@ -20,15 +40,23 @@ export const usePerpAccount = () => {
         try {
             let response: any = await ApiService.approveAgent({
                 mainWalletId,
-                agentWallet,
                 dex
             });
-            if (response?.success) {
-                approveResult.approved = true;
+            if (response?.success == false) {
+                notify('error', response.message);
             }
+            setUserWallets(response.data.wallets);
+            approveResult.approved = true;
+            if (response?.success == true && response.message == 'ALREADY_APPROVED') {
+                notify('success', 'Agent already approved');
+            } else {
+                notify('success', 'Agent approved successfully');
+            }
+
             return approveResult;
 
         } catch (err) {
+            console.log(err)
             let key = handleServerErrorToast({ err });
             approveResult.error = key;
             return approveResult;
