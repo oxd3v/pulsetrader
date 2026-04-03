@@ -37,10 +37,11 @@ import {
   getWalletTokenBalance,
 } from "@/lib/blockchain/balance";
 import { spotNetworkFee } from "@/lib/blockchain/gas";
+
 import {
   getOrderCosts,
-  calculateExistingLockedFunds,
-} from "@/lib/fund/fundHelper";
+  calculateExistingLockedFunds, calculateWalletTokenAllocation
+} from "@/utility/orderUtility";
 import { ZeroAddress } from "ethers";
 
 import { SINGLE_PERPETUAL_STRATEGY, SINGLE_SPOT_STRATEGY_ } from "@/constants/common/order";
@@ -59,17 +60,22 @@ interface WalletData {
   totalActiveOrders: number;
   lockedFundBalance: bigint; // From EXISTING orders
   totalCollateralPending: bigint; // From EXISTING orders
-  balance: bigint;
-  tokenBalance: bigint;
+  balance: bigint; // Native balance for gas
+  tokenBalance: bigint; // ERC20 collateral balance
+  feeTokenPending: Record<string, bigint>;
+  feeTokenBalances: Record<string, bigint>;
 }
 
 interface WalletEstimates {
-  estAmount: bigint; // From NEW orders
-  estCost: bigint; // From NEW orders
+  estAmount: bigint; // From NEW orders (collateral)
+  estCost: bigint; // From NEW orders (gas + native collateral if applicable)
+  estFeeAmount: bigint; // From NEW orders (Pulse fee)
+  estFeeByToken: Record<string, bigint>;
 }
 
 interface WalletSelectorProps {
   category: string;
+  protocol?: string;
   availableWallets: WalletConfig[];
   orders: Order[];
   gridsByWallet: Record<number, WalletConfig>;
@@ -77,12 +83,59 @@ interface WalletSelectorProps {
   areWalletsReady: boolean;
   setWalletsReady: (ready: boolean) => void;
   chainId: number;
-  setOrderNetworkFee: (fee: string) => void;
   collateralToken: OrderTokenType;
+  feeToken?: OrderTokenType | null;
   selectedStrategy: any;
   estOrders: Order[];
   user: any;
 }
+
+const toBigIntBalance = (value: unknown, decimals: number): bigint => {
+  if (value === null || value === undefined) return BigInt(0);
+  if (typeof value === "bigint") return value;
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return BigInt(0);
+    try {
+      return safeParseUnits(String(value), decimals);
+    } catch {
+      return BigInt(0);
+    }
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return BigInt(0);
+    if (trimmed.includes(".")) {
+      try {
+        return safeParseUnits(trimmed, decimals);
+      } catch {
+        return BigInt(0);
+      }
+    }
+    if (/^-?\d+$/.test(trimmed)) {
+      try {
+        return BigInt(trimmed);
+      } catch {
+        return BigInt(0);
+      }
+    }
+    try {
+      return safeParseUnits(trimmed, decimals);
+    } catch {
+      return BigInt(0);
+    }
+  }
+
+  return BigInt(0);
+};
+
+const createEmptyWalletEstimate = (): WalletEstimates => ({
+  estAmount: BigInt(0),
+  estCost: BigInt(0),
+  estFeeAmount: BigInt(0),
+  estFeeByToken: {},
+});
 
 // ============================================
 // OPTIMIZED WALLET CARD COMPONENT
@@ -96,6 +149,7 @@ interface WalletCardProps {
   onSelect?: (wallet: WalletConfig) => void | Promise<void>;
   onRemove: (wallet: WalletConfig) => void;
   collateralToken: OrderTokenType;
+  feeToken?: OrderTokenType | null;
   estOrders: Order[];
   selectedGrids: number[];
   selectGrid?: (wallet: WalletConfig, order: Order) => void;
@@ -112,20 +166,32 @@ const WalletCard = React.memo(
     onSelect,
     onRemove,
     collateralToken,
+    feeToken,
     estOrders,
     selectedGrids,
     selectGrid,
     chainId,
-    estimates = { estAmount: BigInt(0), estCost: BigInt(0) },
+    estimates = createEmptyWalletEstimate(),
   }: WalletCardProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Derived state for validation (only if data is loaded)
-    const { hasInsufficientBalance, hasInsufficientTokens } = useMemo(() => {
+    const {
+      hasInsufficientBalance,
+      hasInsufficientTokens,
+      hasInsufficientFeeToken,
+      selectedFeeTokenBalance,
+      selectedFeeTokenLocked,
+      showFeeTokenCard,
+    } = useMemo(() => {
       if (!walletData) {
         return {
           hasInsufficientBalance: false,
           hasInsufficientTokens: false,
+          hasInsufficientFeeToken: false,
+          selectedFeeTokenBalance: BigInt(0),
+          selectedFeeTokenLocked: BigInt(0),
+          showFeeTokenCard: false,
         };
       }
       const availableBalance =
@@ -133,16 +199,38 @@ const WalletCard = React.memo(
       const availableTokens =
         walletData.tokenBalance - walletData.totalCollateralPending;
 
+      const feeTokenAddress = feeToken?.address?.toLowerCase();
+      const showFeeTokenCard =
+        Boolean(feeTokenAddress) &&
+        feeTokenAddress !== ZeroAddress.toLowerCase();
+
+      const selectedFeeTokenBalance =
+        (feeTokenAddress && walletData.feeTokenBalances[feeTokenAddress]) || BigInt(0);
+      const selectedFeeTokenLocked =
+        (feeTokenAddress && walletData.feeTokenPending[feeTokenAddress]) || BigInt(0);
+
       const hasInsufficientBalance =
         availableBalance < (estimates.estCost || BigInt(0));
       const hasInsufficientTokens =
-        availableTokens < (estimates.estAmount || BigInt(0));
+        availableTokens <
+        (estimates.estAmount || BigInt(0)) +
+        (!showFeeTokenCard && feeTokenAddress
+          ? estimates.estFeeAmount || BigInt(0)
+          : BigInt(0));
+      const hasInsufficientFeeToken =
+        showFeeTokenCard &&
+        selectedFeeTokenBalance - selectedFeeTokenLocked <
+        (estimates.estFeeAmount || BigInt(0));
 
       return {
         hasInsufficientBalance,
         hasInsufficientTokens,
+        hasInsufficientFeeToken,
+        selectedFeeTokenBalance,
+        selectedFeeTokenLocked,
+        showFeeTokenCard,
       };
-    }, [walletData, estimates]);
+    }, [walletData, estimates, feeToken]);
 
     const handleSelectWallet = useCallback(async () => {
       if (onSelect) await onSelect(wallet);
@@ -201,11 +289,10 @@ const WalletCard = React.memo(
     if (!walletData) {
       return (
         <div
-          className={`rounded-lg border transition-all ${
-            isSelected
-              ? "border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
-              : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
-          }`}
+          className={`group relative rounded-xl border backdrop-blur-sm transition-all duration-300 overflow-hidden ${isSelected
+            ? "border-blue-500/60 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-900/20 dark:to-indigo-900/10 shadow-sm shadow-blue-500/10"
+            : "border-gray-200/80 dark:border-gray-700/80 bg-white/50 dark:bg-gray-800/50 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5"
+            }`}
         >
           <div
             className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -213,18 +300,16 @@ const WalletCard = React.memo(
           >
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
-                className={`p-1.5 rounded ${
-                  isSelected
-                    ? "bg-blue-100 dark:bg-blue-900"
-                    : "bg-gray-100 dark:bg-gray-800"
-                }`}
+                className={`p-1.5 rounded ${isSelected
+                  ? "bg-blue-100 dark:bg-blue-900"
+                  : "bg-gray-100 dark:bg-gray-800"
+                  }`}
               >
                 <HiWallet
-                  className={`w-4 h-4 ${
-                    isSelected
-                      ? "text-blue-600 dark:text-blue-300"
-                      : "text-gray-600 dark:text-gray-300"
-                  }`}
+                  className={`w-4 h-4 ${isSelected
+                    ? "text-blue-600 dark:text-blue-300"
+                    : "text-gray-600 dark:text-gray-300"
+                    }`}
                 />
               </div>
               <div className="min-w-0 flex-1">
@@ -258,37 +343,35 @@ const WalletCard = React.memo(
     // Full view with data
     return (
       <div
-        className={`rounded-lg border transition-all ${
-          isSelected
-            ? "border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
-            : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
-        } ${
-          (hasInsufficientBalance || hasInsufficientTokens) && isSelected
-            ? "border-red-300 dark:border-red-500"
+        className={`group relative rounded-xl border backdrop-blur-sm transition-all duration-300 overflow-hidden ${isSelected
+          ? "border-blue-500/60 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-900/20 dark:to-indigo-900/10 shadow-sm shadow-blue-500/10"
+          : "border-gray-200/80 dark:border-gray-700/80 bg-white/50 dark:bg-gray-800/50 hover:border-blue-400 hover:shadow-md hover:shadow-blue-500/5 hover:-translate-y-0.5"
+          } ${(hasInsufficientBalance ||
+            hasInsufficientTokens ||
+            hasInsufficientFeeToken) &&
+            isSelected
+            ? "border-red-400/60 dark:border-red-500/60 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-900/20 dark:to-orange-900/10 shadow-red-500/10"
             : ""
-        }`}
+          }`}
       >
         {/* Header */}
         <div
-          className={`flex items-center justify-between p-3 cursor-pointer ${
-            !isSelected && "hover:bg-gray-50 dark:hover:bg-gray-800"
-          }`}
+          className={`flex items-center justify-between p-3 cursor-pointer ${!isSelected && "hover:bg-gray-50 dark:hover:bg-gray-800"
+            }`}
           onClick={!isSelected ? handleSelectWallet : undefined}
         >
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
-              className={`p-1.5 rounded ${
-                isSelected
-                  ? "bg-blue-100 dark:bg-blue-900"
-                  : "bg-gray-100 dark:bg-gray-800"
-              }`}
+              className={`p-1.5 rounded ${isSelected
+                ? "bg-blue-100 dark:bg-blue-900"
+                : "bg-gray-100 dark:bg-gray-800"
+                }`}
             >
               <HiWallet
-                className={`w-4 h-4 ${
-                  isSelected
-                    ? "text-blue-600 dark:text-blue-300"
-                    : "text-gray-600 dark:text-gray-300"
-                }`}
+                className={`w-4 h-4 ${isSelected
+                  ? "text-blue-600 dark:text-blue-300"
+                  : "text-gray-600 dark:text-gray-300"
+                  }`}
               />
             </div>
             <div className="min-w-0 flex-1">
@@ -308,6 +391,30 @@ const WalletCard = React.memo(
                   {walletData.totalActiveOrders} active
                 </span>
               )}
+              <div className="hidden 3xl:block flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] mt-1.5">
+                <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                  <FaCoins className="w-3 h-3" />
+                  <span>
+                    Balance: {formatBalance(collateralToken.address !== ZeroAddress ? walletData.tokenBalance : walletData.balance, collateralToken.address !== ZeroAddress ? collateralToken.decimals : (nativeToken?.decimals || 18))} {collateralToken.address !== ZeroAddress ? collateralToken.symbol : nativeToken?.symbol}
+                  </span>
+                </div>
+                {(collateralToken.address !== ZeroAddress ? walletData.totalCollateralPending : walletData.lockedFundBalance) > BigInt(0) && (
+                  <div className="flex items-center gap-1 text-red-500 dark:text-red-400">
+                    <FaLock className="w-3 h-3" />
+                    <span>
+                      Locked: {formatBalance(collateralToken.address !== ZeroAddress ? walletData.totalCollateralPending : walletData.lockedFundBalance, collateralToken.address !== ZeroAddress ? collateralToken.decimals : (nativeToken?.decimals || 18))} {collateralToken.address !== ZeroAddress ? collateralToken.symbol : nativeToken?.symbol}
+                    </span>
+                  </div>
+                )}
+                {(collateralToken.address !== ZeroAddress ? estimates.estAmount : estimates.estCost) > BigInt(0) && (
+                  <div className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                    <TbGridDots className="w-3 h-3" />
+                    <span>
+                      Est. Amount: {formatBalance(collateralToken.address !== ZeroAddress ? estimates.estAmount : estimates.estCost, collateralToken.address !== ZeroAddress ? collateralToken.decimals : (nativeToken?.decimals || 18))} {collateralToken.address !== ZeroAddress ? collateralToken.symbol : nativeToken?.symbol}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -346,9 +453,9 @@ const WalletCard = React.memo(
         {isSelected && isExpanded && (
           <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-3">
             {/* Balance Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 mb-3">
               {/* Native Token Balance */}
-              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="p-3.5 bg-white/80 dark:bg-gray-800/80 rounded-xl border border-gray-200/80 dark:border-gray-700/80 shadow-sm backdrop-blur-md transition-all hover:shadow-md group/card">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <img
@@ -390,19 +497,18 @@ const WalletCard = React.memo(
                   </div>
 
                   <div
-                    className={`p-2 rounded ${
-                      hasInsufficientBalance
-                        ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-                        : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                    }`}
+                    className={`p-2.5 rounded-lg transition-all ${hasInsufficientBalance
+                      ? "bg-red-50/80 dark:bg-red-900/20 border border-red-200/80 dark:border-red-800/80"
+                      : "bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/80"
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                        Est. Gas (New)
+                        Est. Cost (Gas {collateralToken.address === ZeroAddress ? "+ Base" : ""})
                       </span>
                       <InfoTooltip
                         id="Est_networkFee"
-                        content={`Calculate network tx fee for buy and sell swap (Only sell for sell strategy ) trade with buffer including token approval. Surplus fee amount will keep in wallet`}
+                        content={`Estimated native token cost for the transaction (Gas fee plus swap value if trading native token).`}
                       />
                     </div>
                     <div className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -414,7 +520,7 @@ const WalletCard = React.memo(
                     {hasInsufficientBalance && (
                       <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
                         <FiAlertCircle className="w-3 h-3" />
-                        <span>Insufficient for gas</span>
+                        <span>Insufficient gas balance</span>
                       </div>
                     )}
                   </div>
@@ -423,7 +529,7 @@ const WalletCard = React.memo(
 
               {/* Collateral Token Balance */}
               {collateralToken.address !== ZeroAddress && (
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-3.5 bg-white/80 dark:bg-gray-800/80 rounded-xl border border-gray-200/80 dark:border-gray-700/80 shadow-sm backdrop-blur-md transition-all hover:shadow-md group/card">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <img
@@ -465,11 +571,10 @@ const WalletCard = React.memo(
                     </div>
 
                     <div
-                      className={`p-2 rounded ${
-                        hasInsufficientTokens
-                          ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-                          : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                      }`}
+                      className={`p-2.5 rounded-lg transition-all ${hasInsufficientTokens
+                        ? "bg-red-50/80 dark:bg-red-900/20 border border-red-200/80 dark:border-red-800/80"
+                        : "bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/80"
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -477,7 +582,7 @@ const WalletCard = React.memo(
                         </span>
                         <InfoTooltip
                           id="Est_collateralAmount"
-                          content={`Calculate collateral amount with trade fee .`}
+                          content={`Estimated collateral token required for this order.`}
                         />
                       </div>
                       <div className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -496,6 +601,81 @@ const WalletCard = React.memo(
                   </div>
                 </div>
               )}
+
+              {/* Fee Token Balance
+              {showFeeTokenCard && feeToken && (
+                <div className="p-3.5 bg-white/80 dark:bg-gray-800/80 rounded-xl border border-gray-200/80 dark:border-gray-700/80 shadow-sm backdrop-blur-md transition-all hover:shadow-md group/card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={feeToken.imageUrl}
+                        className="w-5 h-5 rounded-full"
+                        alt={feeToken.symbol}
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {feeToken.symbol}
+                      </span>
+                    </div>
+                    <FaCoins className="w-4 h-4 text-gray-400" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        Wallet Balance
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatBalance(
+                          selectedFeeTokenBalance,
+                          feeToken.decimals,
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
+                        <FaLock className="w-3 h-3 text-red-400" />
+                        Locked Balance
+                      </div>
+                      <div className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        {formatBalance(
+                          selectedFeeTokenLocked,
+                          feeToken.decimals,
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      className={`p-2.5 rounded-lg transition-all ${hasInsufficientFeeToken
+                        ? "bg-red-50/80 dark:bg-red-900/20 border border-red-200/80 dark:border-red-800/80"
+                        : "bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/80"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          Est. Fee Token
+                        </span>
+                        <InfoTooltip
+                          id="Est_feeTokenAmount"
+                          content="Reserved Pulse fee amount for pending and active orders."
+                        />
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatBalance(
+                          estimates.estFeeAmount,
+                          feeToken.decimals,
+                        )}
+                      </div>
+                      {hasInsufficientFeeToken && (
+                        <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
+                          <FiAlertCircle className="w-3 h-3" />
+                          <span>Insufficient fee token</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )} */}
             </div>
 
             {/* Grid Selection */}
@@ -523,11 +703,10 @@ const WalletCard = React.memo(
                         }
                       }}
                       className={`
-                        px-2 py-1 text-xs rounded-lg transition-all
-                        ${
-                          selectedGrids.includes(order.sl)
-                            ? "bg-blue-500 text-white shadow-sm"
-                            : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                        px-2 py-1 text-xs rounded-lg transition-all font-medium border
+                        ${selectedGrids.includes(order.sl)
+                          ? "bg-blue-500 text-white shadow-md shadow-blue-500/20 border-blue-500"
+                          : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:shadow-sm"
                         }
                       `}
                     >
@@ -543,7 +722,9 @@ const WalletCard = React.memo(
         {/* Warning indicator when collapsed */}
         {isSelected &&
           !isExpanded &&
-          (hasInsufficientBalance || hasInsufficientTokens) && (
+          (hasInsufficientBalance ||
+            hasInsufficientTokens ||
+            hasInsufficientFeeToken) && (
             <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-2">
               <div className="flex items-center gap-2 text-xs text-red-500">
                 <FiAlertCircle className="w-3 h-3 flex-shrink-0" />
@@ -553,6 +734,11 @@ const WalletCard = React.memo(
                     ? " and "
                     : ""}
                   {hasInsufficientTokens ? "tokens" : ""}
+                  {(hasInsufficientBalance || hasInsufficientTokens) &&
+                    hasInsufficientFeeToken
+                    ? " and "
+                    : ""}
+                  {hasInsufficientFeeToken ? "fee token" : ""}
                 </span>
               </div>
             </div>
@@ -570,6 +756,7 @@ WalletCard.displayName = "WalletCard";
 
 const WalletSelector = ({
   category,
+  protocol,
   availableWallets,
   orders,
   gridsByWallet,
@@ -577,8 +764,8 @@ const WalletSelector = ({
   areWalletsReady,
   setWalletsReady,
   chainId,
-  setOrderNetworkFee,
   collateralToken,
+  feeToken,
   selectedStrategy,
   estOrders,
   user,
@@ -594,6 +781,8 @@ const WalletSelector = ({
 
   const [gasFee, setGasFee] = useState<bigint>(BigInt(0));
   const isMounted = useRef(true);
+  const fetchGenByAddressRef = useRef<Record<string, number>>({});
+  const selectedFeeTokenAddress = feeToken?.address?.toLowerCase();
 
   useEffect(() => {
     isMounted.current = true;
@@ -604,13 +793,13 @@ const WalletSelector = ({
 
   // Single wallet strategies check
   const isSingleWalletStrategy = useMemo(() => {
-    const singleWalletStrategies = category == 'perpetual' ? SINGLE_PERPETUAL_STRATEGY : SINGLE_SPOT_STRATEGY_;
+    const singleWalletStrategies = category === 'perpetual' ? SINGLE_PERPETUAL_STRATEGY : SINGLE_SPOT_STRATEGY_;
     return singleWalletStrategies.includes(selectedStrategy?.id);
-  }, [selectedStrategy?.id]);
+  }, [category, selectedStrategy?.id]);
 
   // Filter available wallets based on chain ID and normalize ID
   const filteredAvailableWallets = useMemo(() => {
-    return availableWallets
+    return availableWallets.filter((wallet) => !wallet.isAgentWallet)
       ?.filter((wallet) => {
         const network = (wallet as any).network;
         if (chainId === chains.Solana) {
@@ -630,7 +819,6 @@ const WalletSelector = ({
       try {
         const fee = await spotNetworkFee(chainId);
         setGasFee(fee);
-        setOrderNetworkFee(fee.toString());
       } catch (error) {
         setGasFee(BigInt(0));
       }
@@ -659,6 +847,9 @@ const WalletSelector = ({
       force = false,
     ): Promise<WalletData | undefined> => {
       const address = wallet.address.toLowerCase();
+      const myGen =
+        (fetchGenByAddressRef.current[address] =
+          (fetchGenByAddressRef.current[address] ?? 0) + 1);
 
       // If not forced and data already exists, return cached data
       if (!force && walletDataMap[address]) {
@@ -674,45 +865,120 @@ const WalletSelector = ({
 
       try {
         const walletOrders = ordersByWallet.get(wallet._id) || [];
-
-        const lockedFunds = calculateExistingLockedFunds(
+        const walletLockedFunds = calculateExistingLockedFunds(
           walletOrders,
           wallet._id,
-          collateralToken.address,
+          collateralToken?.address || ZeroAddress,
           gasFee,
           user,
+          false // isPerpetual parameter (spot = false)
         );
+
+        const trackedFeeTokens = new Map<
+          string,
+          { address: string; decimals: number; chainId: number }
+        >();
+
+        const addTrackedFeeToken = (
+          tokenAddress?: string,
+          tokenDecimals?: number,
+          tokenChainId?: number
+        ) => {
+          if (!tokenAddress || tokenDecimals == null || tokenChainId == null) return;
+
+          const normalizedAddress = tokenAddress.toLowerCase();
+          if (normalizedAddress === ZeroAddress.toLowerCase()) {
+            return;
+          }
+
+          trackedFeeTokens.set(normalizedAddress, {
+            address: tokenAddress,
+            decimals: tokenDecimals,
+            chainId: tokenChainId
+          });
+        };
+
+        addTrackedFeeToken(feeToken?.address, feeToken?.decimals, chainId);
+
+        walletOrders.forEach((order) => {
+          addTrackedFeeToken(order.feeToken?.address, order.feeToken?.decimals, chainId);
+        });
+
+
 
         const fetchPromise = Promise.all([
           getWalletBalance({ walletAddress: wallet.address, chainId }),
-          collateralToken.address !== ZeroAddress
+          collateralToken?.address && collateralToken.address !== ZeroAddress
             ? getWalletTokenBalance({
-                walletAddress: wallet.address,
-                tokenAddress: collateralToken.address,
-                chainId,
-              })
+              walletAddress: wallet.address,
+              tokenAddress: collateralToken.address,
+              chainId,
+            })
             : Promise.resolve(BigInt(0)),
+          Promise.all(
+            Array.from(trackedFeeTokens.entries()).map(
+              async ([normalizedAddress, tokenConfig]) => [
+                normalizedAddress,
+                await getWalletTokenBalance({
+                  walletAddress: wallet.address,
+                  tokenAddress: tokenConfig.address,
+                  chainId,
+                }),
+                tokenConfig.decimals,
+              ],
+            ),
+          ),
         ]);
 
-        const [balance, tokenBalance] = (await Promise.race([
+        const [balance, tokenBalance, trackedFeeTokenBalances] = (await Promise.race([
           fetchPromise,
           timeoutPromise,
-        ])) as [any, any];
+        ])) as [any, any, Array<[string, any, number]>];
 
         if (!isMounted.current) return undefined;
+        if (fetchGenByAddressRef.current[address] !== myGen) return undefined;
+
+        const feeTokenBalances = trackedFeeTokenBalances.reduce<
+          Record<string, bigint>
+        >((acc, [normalizedAddress, trackedBalance, decimals]) => {
+          acc[normalizedAddress] = toBigIntBalance(trackedBalance, decimals);
+          return acc;
+        }, {});
+
+        // --- NEW EXACT ALLOCATION CALCULATION ---
+        const exactLockedCollateral = calculateWalletTokenAllocation({
+          orders: walletOrders,
+          walletId: wallet._id,
+          tokenAddress: collateralToken?.address || ZeroAddress
+        });
+
+        const exactFeeTokenPending: Record<string, bigint> = {};
+        Array.from(trackedFeeTokens.keys()).forEach((address) => {
+          exactFeeTokenPending[address] = calculateWalletTokenAllocation({
+            orders: walletOrders,
+            walletId: wallet._id,
+            tokenAddress: address
+          });
+        });
 
         const newData: WalletData = {
           config: wallet,
-          ...lockedFunds,
+          totalActiveOrders: walletLockedFunds.totalActiveOrders,
+          lockedFundBalance: walletLockedFunds.lockedFundBalance, // Native Gas Locks
+          totalCollateralPending: exactLockedCollateral,          // Replaced generic collateral pending
+          feeTokenPending: exactFeeTokenPending,                  // Replaced generic fee token pending
           balance:
             typeof balance === "string"
               ? safeParseUnits(balance, 18)
               : BigInt(balance),
           tokenBalance:
             typeof tokenBalance === "string"
-              ? safeParseUnits(tokenBalance, collateralToken.decimals)
-              : BigInt(tokenBalance),
+              ? safeParseUnits(tokenBalance, collateralToken?.decimals || 18)
+              : BigInt(tokenBalance || 0),
+          feeTokenBalances,
         };
+
+        if (fetchGenByAddressRef.current[address] !== myGen) return undefined;
 
         // Update state
         setWalletDataMap((prev) => ({
@@ -724,7 +990,6 @@ const WalletSelector = ({
       } catch (error) {
         if (isMounted.current) {
           //console.error("Wallet data fetch error:", error);
-          // Only toast if it was a real user interaction error, not just a background check
           if (force)
             toast.error(
               `Failed to load data for ${wallet.address.slice(0, 6)}...`,
@@ -741,7 +1006,7 @@ const WalletSelector = ({
         }
       }
     },
-    [ordersByWallet, collateralToken, gasFee, chainId, user, walletDataMap],
+    [ordersByWallet, collateralToken, gasFee, chainId, user, walletDataMap, feeToken],
   );
 
   // Centralized Estimation Logic (Memoized)
@@ -750,14 +1015,13 @@ const WalletSelector = ({
 
     // Initialize zero estimates for all known wallets (selected or loaded)
     Object.keys(walletDataMap).forEach((address) => {
-      estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
+      estimates[address] = createEmptyWalletEstimate();
     });
 
     // Also ensure selected wallets have an entry even if data not loaded yet
     selectedWallets.forEach((w) => {
       const addr = w.address.toLowerCase();
-      if (!estimates[addr])
-        estimates[addr] = { estAmount: BigInt(0), estCost: BigInt(0) };
+      if (!estimates[addr]) estimates[addr] = createEmptyWalletEstimate();
     });
 
     // Iterate through assigned grids and sum up costs
@@ -767,21 +1031,31 @@ const WalletSelector = ({
         const address = walletConfig.address.toLowerCase();
 
         // Ensure entry exists
-        if (!estimates[address])
-          estimates[address] = { estAmount: BigInt(0), estCost: BigInt(0) };
+        if (!estimates[address]) estimates[address] = createEmptyWalletEstimate();
 
         const costs = getOrderCosts({
           order,
-          collateralTokenAddress: collateralToken.address,
+          collateralTokenAddress: collateralToken?.address || ZeroAddress,
           gasFee,
           user,
+          treatCollateralTokenAsWalletBalance: true, // true for spot typically if native collateral
         });
 
-        if (collateralToken.address !== ZeroAddress) {
-          estimates[address].estAmount += costs.orderAmount;
+        if (collateralToken?.address && collateralToken.address !== ZeroAddress) {
+          estimates[address].estAmount += costs.walletOrderAmount;
           estimates[address].estCost += costs.orderGasFee;
         } else {
-          estimates[address].estCost += costs.orderGasFee + costs.orderAmount;
+          estimates[address].estCost += costs.orderGasFee + costs.walletOrderAmount;
+        }
+
+        if (costs.feeTokenAmount > BigInt(0) && costs.feeTokenAddress) {
+          estimates[address].estFeeByToken[costs.feeTokenAddress] =
+            (estimates[address].estFeeByToken[costs.feeTokenAddress] || BigInt(0)) +
+            costs.feeTokenAmount;
+
+          if (selectedFeeTokenAddress === costs.feeTokenAddress) {
+            estimates[address].estFeeAmount += costs.feeTokenAmount;
+          }
         }
       }
     });
@@ -795,6 +1069,7 @@ const WalletSelector = ({
     collateralToken.address,
     gasFee,
     user,
+    selectedFeeTokenAddress,
   ]);
 
   // Readiness Check
@@ -815,9 +1090,20 @@ const WalletSelector = ({
       const availableNative = data.balance - data.lockedFundBalance;
       const availableTokens = data.tokenBalance - data.totalCollateralPending;
 
+      const hasFeeTokenLiquidity = Object.entries(
+        estimate.estFeeByToken || {},
+      ).every(([tokenAddress, feeAmount]) => {
+        const availableFeeToken =
+          (data.feeTokenBalances[tokenAddress] || BigInt(0)) -
+          (data.feeTokenPending[tokenAddress] || BigInt(0));
+
+        return availableFeeToken >= feeAmount;
+      });
+
       return (
         availableNative >= estimate.estCost &&
-        availableTokens >= estimate.estAmount
+        availableTokens >= estimate.estAmount &&
+        hasFeeTokenLiquidity
       );
     });
 
@@ -869,13 +1155,10 @@ const WalletSelector = ({
       let data: WalletData | undefined = walletDataMap[address];
 
       // If no data, fetch it first.
-      // IMPORTANT: Use the return value 'newData' for logic, not the state.
       if (!data) {
-        // Show loading indicator in UI immediately via setLoadingWallets inside fetcher
         data = await fetchSingleWalletData(wallet);
       }
 
-      // If data is STILL missing after await, it meant fetch failed (error caught inside fetcher)
       if (!data) {
         toast.error("Failed to load wallet data. Please try again.");
         return;
@@ -892,20 +1175,6 @@ const WalletSelector = ({
         toast.error("Already have enough wallets for the number of orders");
         return;
       }
-
-      // Check sufficiency using the FRESH 'data' variable
-      const availableNative = data.balance - data.lockedFundBalance;
-      const availableTokens = data.tokenBalance - data.totalCollateralPending;
-
-      // We might not have estimates for this specific wallet yet in the memoized map,
-      // but initially, the cost to add a wallet is effectively 0 until grids are assigned.
-      // However, strict checking can be done if we pre-calculate what cost it *would* take.
-      // For now, we check if it has AT LEAST 0 or basic minimums if needed.
-      // Since estimatesByWallet relies on gridsByWallet which hasn't updated yet,
-      // we just check if it's not negative or effectively unusable.
-
-      // (Optional) Simple sanity check: if user has 0 balance, warn them?
-      // For now, we allow selection and let the card show the red warning if funds are low.
 
       // Update state
       const newSelected = [...selectedWallets, wallet];
@@ -1027,13 +1296,15 @@ const WalletSelector = ({
             </button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
             {selectedWallets.map((wallet) => {
               const address = wallet.address.toLowerCase();
               const data = walletDataMap[address];
               const estimates = estimatesByWallet[address] || {
                 estCost: BigInt(0),
                 estAmount: BigInt(0),
+                estFeeAmount: BigInt(0),
+                estFeeByToken: {},
               };
 
               // Calculate which grids belong to this wallet
@@ -1050,6 +1321,7 @@ const WalletSelector = ({
                   isSelected={true}
                   onRemove={handleRemoveWallet}
                   collateralToken={collateralToken}
+                  feeToken={feeToken}
                   estOrders={estOrders}
                   selectedGrids={walletGrids}
                   selectGrid={handleGridForWallet}
@@ -1065,11 +1337,10 @@ const WalletSelector = ({
       {/* Add Wallets Toggle */}
       <button
         onClick={() => setShowWalletSelector(!showWalletSelector)}
-        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-dashed transition-all text-sm ${
-          showWalletSelector
-            ? "border-red-300 bg-red-50/30 dark:bg-red-900/10 text-red-600 dark:text-red-400"
-            : "border-blue-300 hover:border-blue-400 bg-blue-50/30 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-        }`}
+        className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-dashed transition-all duration-300 text-sm font-semibold shadow-sm hover:shadow-md ${showWalletSelector
+          ? "border-red-300/60 bg-red-50/50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-900/40"
+          : "border-blue-300/80 hover:border-blue-400/80 bg-blue-50/40 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100/50 dark:hover:bg-blue-900/40 hover:-translate-y-0.5"
+          }`}
       >
         {showWalletSelector ? (
           <>
@@ -1099,7 +1370,7 @@ const WalletSelector = ({
             <span className="text-xs text-gray-500">Click to select</span>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
             {availableWalletsList.map(({ wallet, data }) => (
               <WalletCard
                 key={wallet._id}
@@ -1110,6 +1381,7 @@ const WalletSelector = ({
                 onSelect={handleSelectWallet}
                 onRemove={handleRemoveWallet}
                 collateralToken={collateralToken}
+                feeToken={feeToken}
                 estOrders={estOrders}
                 selectedGrids={[]}
                 chainId={chainId}

@@ -12,10 +12,15 @@ const API_ENDPOINTS = {
   GET_HISTORY: '/get-history',
   ADD_TOKEN: '/add-token',
   GET_USER_HISTORIES: '/get-histories',
+  APPROVE_AGENT: '/approve-agent',
+  PERP_DEPOSIT: '/perp-deposit',
+  QUOTE_PERP_DEPOSIT: '/quote-perp-deposit',
+  GET_PERP_BALANCE: '/perp-balance',
 
   // order related endpoints
   GET_ORDER: '/get-order',
   ADD_ORDER: '/add-order',
+  CREATE_ORDER: '/create-order',
   CLOSE_ORDER: '/close-order',
   GET_ORDER_BY_NAME: '/get-order-name',
   GET_USER_ALL_ORDER: '/get-all-orders',

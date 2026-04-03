@@ -9,6 +9,10 @@ export const GAS_LIMIT = {
       increaseOrderGasLimit: BigInt(6000000),
       decreaseOrderGasLimit: BigInt(7000000),
     },
+    ["ASTERDEX"]: {
+      increaseOrderGasLimit: BigInt(3000000),
+      decreaseOrderGasLimit: BigInt(7000000),
+    },
   },  
   ["SPOT"]: {
     [chains.Avalanche]: BigInt(6000000), // with transfer and approve gas limit
@@ -33,8 +37,18 @@ export const  DEFAULT_GAS_PRICE = {
 }
 
 export const ORDER_TRADE_FEE = BigInt(10);
+export const ORDER_TRADE_FEE_EXEMPT_STATUS = Object.freeze([
+  "admin",
+  "diamond",
+]);
 export const DEFAULT_SOLANA_PRIORITY_FEE = BigInt(50_000);
 export const SOLANA_BASE_FEE = BigInt(5000);
 export const DEFAULT_SOLANA_COMPUTE_UNITS = BigInt(250_000);
 export const SINGLE_PERPETUAL_STRATEGY = ['limit','dca','grid','algo'];
 export const SINGLE_SPOT_STRATEGY_ = ['limit','algo'];
+export const ORDER_FEE_COLLECTION_GAS_FEE = {
+  [chains.Avalanche]: BigInt(14000000000000),
+  [chains.Ethereum]: BigInt(50000000000000),
+  [chains.Solana]: BigInt(500000),
+  [chains.Arbitrum]: BigInt(4500000000000),
+};

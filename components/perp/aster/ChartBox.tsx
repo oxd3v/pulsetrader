@@ -1,25 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiChevronUp, } from "react-icons/fi";
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { FiChevronUp } from "react-icons/fi";
 import { LuChartCandlestick } from "react-icons/lu";
 import { RiArrowDropDownLine } from "react-icons/ri";
 import TvChartContainer from "@/components/tradingView/perp/aster/chart";
 import OrderBook from "./OrderBook";
 import AssetSelect from "./assetSelect";
 import { formateNumberInUnit } from "@/utility/handy";
-import { useAsterMarketStats } from "@/hooks/useAsterhooks/useAsterMarketStats";
+import type { AsterMarketStats } from "@/hooks/useAsterhooks/useAsterMarketStats";
 
 interface ChartBoxProps {
   tokenSymbol: string;
   handleTokenSelect?: () => void;
   onSymbolChange?: (symbol: string) => void;
+  stats: AsterMarketStats;
+  connected: boolean;
+  loading: boolean;
+  error: string | null;
 }
 
 interface MetricItem {
   label: string;
   value: string;
-  helper?: string;
+  helper?: ReactNode;
 }
 
 const normalizeMarketSymbol = (symbol: string): string => {
@@ -97,24 +101,47 @@ const formatCountdown = (nextFundingTime: number, now: number): string => {
   return `${hoursText}:${minutesText}:${secondsText}`;
 };
 
-export default function ChartBox({
+const FundingCountdown = memo(function FundingCountdown({
+  nextFundingTime,
+}: {
+  nextFundingTime: number;
+}) {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!Number.isFinite(nextFundingTime) || nextFundingTime <= 0) {
+      return undefined;
+    }
+
+    const intervalId = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [nextFundingTime]);
+
+  return (
+    <span className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400 truncate">
+      ({formatCountdown(nextFundingTime, currentTime)})
+    </span>
+  );
+});
+
+const ChartBox = memo(function ChartBox({
   tokenSymbol,
   handleTokenSelect,
   onSymbolChange,
+  stats,
+  connected,
+  loading,
+  error,
 }: ChartBoxProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAssetSelect, setShowAssetSelect] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState(() =>
-    normalizeMarketSymbol(tokenSymbol),
+  const selectedSymbol = useMemo(
+    () => normalizeMarketSymbol(tokenSymbol),
+    [tokenSymbol],
   );
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
-
-  const {
-    stats,
-    connected: marketConnected,
-    loading: marketLoading,
-    error: marketError,
-  } = useAsterMarketStats(selectedSymbol);
 
   useEffect(() => {
     const handleResize = () => {
@@ -133,22 +160,9 @@ export default function ChartBox({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    setSelectedSymbol(normalizeMarketSymbol(tokenSymbol));
-  }, [tokenSymbol]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, []);
-
   const handleSelectSymbol = useCallback(
     (symbol: string) => {
       const normalizedSymbol = normalizeMarketSymbol(symbol);
-      setSelectedSymbol(normalizedSymbol);
       if (onSymbolChange) {
         onSymbolChange(normalizedSymbol);
       }
@@ -165,17 +179,13 @@ export default function ChartBox({
   );
 
   const metrics = useMemo<MetricItem[]>(() => {
-    const fundingCountdown = formatCountdown(
-      stats.nextFundingTime,
-      currentTime,
-    );
     return [
       { label: "Mark Price", value: formatPrice(stats.markPrice) },
       { label: "Index Price", value: formatPrice(stats.indexPrice) },
       {
         label: "Funding Rate",
         value: formatFundingRate(stats.fundingRate),
-        helper: fundingCountdown,
+        helper: <FundingCountdown nextFundingTime={stats.nextFundingTime} />,
       },
       {
         label: "Open Interest",
@@ -186,7 +196,7 @@ export default function ChartBox({
         value: formatCompactMetric(stats.quoteVolume),
       },
     ];
-  }, [currentTime, stats]);
+  }, [stats]);
 
   const changeValue = toFiniteNumber(stats.priceChangePercent);
   const hasSymbol = Boolean(selectedSymbol);
@@ -225,9 +235,9 @@ export default function ChartBox({
                       </span>
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          marketConnected
+                          connected
                             ? "bg-emerald-400"
-                            : marketLoading
+                            : loading
                               ? "bg-amber-400"
                               : "bg-red-400"
                         }`}
@@ -246,11 +256,7 @@ export default function ChartBox({
                       </p>
                       <p className="flex gap-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                         {item.value}{" "}
-                        {item.helper ? (
-                          <span className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                            ({item.helper})
-                          </span>
-                        ) : null}
+                        {item.helper ?? null}
                       </p>
                     </div>
                   ))}
@@ -273,8 +279,8 @@ export default function ChartBox({
             </div>
           </div>
 
-          {marketError ? (
-            <p className="text-[11px] text-red-500">{marketError}</p>
+          {error ? (
+            <p className="text-[11px] text-red-500">{error}</p>
           ) : null}
         </div>
 
@@ -285,8 +291,8 @@ export default function ChartBox({
               : "h-[400px] lg:h-[500px] 2xl:h-[500px]"
           }`}
         >
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-2 h-full p-2">
-            <div className="lg:col-span-4 h-full rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800">
+          <div className="lg:flex w-full h-full p-2">
+            <div className="grow h-full rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800">
               {hasSymbol ? (
                 <TvChartContainer symbol={selectedSymbol} />
               ) : (
@@ -298,7 +304,7 @@ export default function ChartBox({
               )}
             </div>
 
-            <div className="hidden lg:block h-full">
+            <div className="hidden lg:block lg:max-w-[300px] h-full">
               {hasSymbol ? (
                 <div className="w-full h-full">{memoizedOrderBook}</div>
               ) : (
@@ -321,4 +327,6 @@ export default function ChartBox({
       />
     </>
   );
-}
+});
+
+export default ChartBox;

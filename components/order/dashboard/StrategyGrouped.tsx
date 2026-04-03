@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 import { TiWaves } from "react-icons/ti";
 import { ORDER_TYPE } from "@/type/order";
-import { useSpotOrder } from "@/hooks/useOrder";
+import { useOrder } from "@/hooks/useOrder";
 
 import OrderCard from "./OrderCard";
 import ConfirmationModal from "@/components/common/Confirmation/ConfirmationBox";
@@ -41,7 +41,7 @@ export default function StrategyGroup({
   isGmxPosition,
   orderGmxPositionData,
 }: StrategyGroupProps) {
-  const { closeStrategy, deleteStrategy } = useSpotOrder();
+  const { closeStrategy, deleteStrategy } = useOrder();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showStrategyActions, setShowStrategyActions] = useState(false);
   const { orders, strategy, category, stats } = groupData;

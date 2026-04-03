@@ -28,7 +28,9 @@ export default function NavbarRight({pathname}:{pathname:any}) {
     }))
   );
 
-  console.log(pathname, 2)
+ 
+
+  
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

@@ -43,6 +43,13 @@ const UserService = {
   withdraw: (params:any) => ApiClient.post(API_ENDPOINTS.WITHDRAW_FUND, params),
   cashOutAll: (params:any) => ApiClient.post(API_ENDPOINTS.CASH_OUT_ALL_FUND, params),
   createNewWallet: (params:any) => ApiClient.post(API_ENDPOINTS.CREATE_NEW_WALLET, params),
+  
+  // perp and agent wallet related
+  approveAgent: (params:any) => ApiClient.post(API_ENDPOINTS.APPROVE_AGENT, params),
+  quotePerpDeposit: (params:any) => ApiClient.post(API_ENDPOINTS.QUOTE_PERP_DEPOSIT, params),
+  perpDeposit: (params:any) => ApiClient.post(API_ENDPOINTS.PERP_DEPOSIT, params),
+  getPerpBalance: (params:any) => ApiClient.get(API_ENDPOINTS.GET_PERP_BALANCE, { params }),
 };
 
 export default UserService;
+

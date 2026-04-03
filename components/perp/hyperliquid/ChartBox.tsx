@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiChevronUp } from "react-icons/fi";
 import { LuChartCandlestick } from "react-icons/lu";
-
+import { RiArrowDropDownLine } from "react-icons/ri";
 import TvChartContainer from "@/components/tradingView/perp/hyperliquid/chart";
 import OrderBook from "./OrderBook";
 import AssetSelect from "./assetSelect";
+import { formateNumberInUnit } from "@/utility/handy";
 import { useHyperliquidMarketStats } from "@/hooks/useHyperLiquidHooks/useHyperliquidMarketStats";
 
 interface ChartBoxProps {
@@ -39,6 +40,11 @@ const formatPrice = (value: number): string => {
     });
   }
 
+  const formatCompactMetric = (value: number): string => {
+    if (!Number.isFinite(value) || value <= 0) return "--";
+    return formateNumberInUnit(value, 2);
+  };
+
   if (value >= 1) {
     return value.toLocaleString("en-US", {
       minimumFractionDigits: 2,
@@ -65,6 +71,11 @@ const formatUsd = (value: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+const formatCompactMetric = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) return "--";
+  return formateNumberInUnit(value, 2);
 };
 
 const formatFundingRate = (value: number): string => {
@@ -164,8 +175,8 @@ export default function ChartBox({
         label: "Funding/Countdown",
         value: `${formatFundingRate(stats.fundingRate)} / ${fundingCountdown}`,
       },
-      { label: "24h Volume (USDT)", value: formatUsd(stats.quoteVolume) },
-      { label: "Open Interest (USDT)", value: formatUsd(stats.openInterestUsd) },
+      { label: "24h Volume (USDT)", value: formatCompactMetric(stats.quoteVolume) },
+      { label: "Open Interest (USDT)", value: formatCompactMetric(stats.openInterestUsd) },
     ];
   }, [currentTime, stats]);
 
@@ -175,89 +186,91 @@ export default function ChartBox({
   return (
     <>
       <div className="bg-white dark:bg-gray-900 rounded-2xl font-mono shadow-sm p-1 lg:p-2 border border-gray-100 dark:border-gray-800">
-        <div className="flex items-start justify-between gap-3 p-1">
-          <div
-            className="flex-1 min-w-0 p-1 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-            onClick={() => setShowAssetSelect(true)}
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-lg lg:text-xl 2xl:text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <span className="bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded">
-                  {selectedSymbol || "SYMBOL"}
-                </span>
-                <span className="text-sm lg:text-md text-yellow-400">Perp</span>
-              </h2>
 
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-gray-900 dark:text-gray-100 font-semibold">
-                  {formatPrice(stats.lastPrice)}
-                </span>
-                <span
-                  className={`font-semibold ${
-                    changeValue >= 0 ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {formatPercent(changeValue)}
-                </span>
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    marketConnected ? "bg-emerald-400" : marketLoading ? "bg-amber-400" : "bg-red-400"
-                  }`}
-                />
+        <div className="p-1 space-y-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div
+                className="min-w-0 flex-1 rounded-lg p-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                onClick={() => setShowAssetSelect(true)}
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-lg lg:text-xl 2xl:text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <span className="flex gap-1 items-center bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded">
+                      {selectedSymbol || "SYMBOL"} <RiArrowDropDownLine />
+                    </span>
+                    <span className="text-sm lg:text-md text-yellow-400">Perp</span>
+                  </h2>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                      {formatPrice(stats.lastPrice)}
+                    </span>
+                    <span
+                      className={`font-semibold ${changeValue >= 0 ? "text-green-500" : "text-red-500"
+                        }`}
+                    >
+                      {formatPercent(changeValue)}
+                    </span>
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${marketConnected ? "bg-emerald-400" : marketLoading ? "bg-amber-400" : "bg-red-400"
+                        }`}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Click to change
-              </span>
-            </div>
-
-            <div className="mt-2 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-              {metrics.map((item) => (
-                <div
-                  key={item.label}
-                  className="min-w-0 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 rounded px-2 py-1"
-                >
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{item.label}</p>
-                  <p className="text-sm text-gray-900 dark:text-gray-100 truncate">{item.value}</p>
+              <div className="flex justify-end gap-2">
+                <div className="flex w-full  items-stretch justify-end gap-3 xl:w-auto xl:max-w-[760px]">
+                  {metrics.map((item) => (
+                    <div key={item.label} className="">
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                        {item.label}
+                      </p>
+                      <p className="flex gap-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                        {item.value}{" "}
+                        {/* {item.helper ?? null} */}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsCollapsed(!isCollapsed);
+                  }}
+                  className="mt-1 shrink-0 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  title={isCollapsed ? "Expand chart" : "Collapse chart"}
+                >
+                  {isCollapsed ? (
+                    <LuChartCandlestick className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  ) : (
+                    <FiChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  )}
+                </button>
+              </div>
             </div>
-
-            {marketError ? (
-              <p className="mt-1 text-[11px] text-red-500">{marketError}</p>
-            ) : null}
           </div>
 
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              setIsCollapsed(!isCollapsed);
-            }}
-            className="mt-1 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            title={isCollapsed ? "Expand chart" : "Collapse chart"}
-          >
-            {isCollapsed ? (
-              <LuChartCandlestick className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            ) : (
-              <FiChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            )}
-          </button>
+          {/* {marketError ? (
+            <p className="text-[11px] text-red-500">{marketError}</p>
+          ) : null} */}
         </div>
 
+
         <div
-          className={`overflow-hidden transition-all duration-300 border-t border-gray-300 dark:border-gray-800 ${
-            isCollapsed
-              ? "h-0 border-none"
-              : "h-[400px] lg:h-[400px] 2xl:h-[400px]"
-          }`}
+          className={`overflow-hidden transition-all duration-300 border-t border-gray-300 dark:border-gray-800 ${isCollapsed
+            ? "h-0 border-none"
+            : "h-[400px] lg:h-[400px] 2xl:h-[400px]"
+            }`}
         >
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-2 h-full p-2">
-            <div className="lg:col-span-4 h-full rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800">
+          <div className="lg:flex w-full h-full p-2">
+            <div className="grow h-full rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800">
               {hasSymbol ? (
                 <div className="w-full h-full">
-                 <TvChartContainer symbol={selectedSymbol} />
+                  <TvChartContainer symbol={selectedSymbol} />
                 </div>
-                
+
               ) : (
                 <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
                   <span className="text-gray-500 dark:text-gray-400">
@@ -291,3 +304,5 @@ export default function ChartBox({
     </>
   );
 }
+
+

@@ -1,4 +1,4 @@
-import HyperliquidMain from "@/components/perp/hyperliquid/main";
+import HyperliquidMain from "@/components/perp/hyperliquid/hyperliquidMain";
 
 export default async function PerpMain({
   params,

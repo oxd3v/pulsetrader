@@ -68,24 +68,31 @@ const OrderTableRow = memo(
     const hasTechExit = order.exit.isTechnicalExit;
 
     const totalCost = useMemo(() => {
-      if (!order.executionFee) return "0";
-      return (
-        BigInt(order.executionFee.feeInUsd || "0") +
-        BigInt(order.executionFee.payInUsd || "0")
-      ).toString();
-    }, [order.executionFee]);
+      if (order.category === "spot" && order.spot?.amount?.orderSizeUsd) {
+        return order.spot.amount.orderSizeUsd;
+      }
+      if (order.category === "perpetual" && order.perp?.amount?.marginSizeUsd) {
+        return order.perp.amount.marginSizeUsd;
+      }
+      return "0";
+    }, [
+      order.category,
+      order.spot?.amount?.orderSizeUsd,
+      order.perp?.amount?.marginSizeUsd,
+    ]);
 
     const isBuy = order.orderType === "BUY";
+    const orderData = order.category === "spot" ? order.spot : order.perp;
     const amountToken = isBuy
-      ? order.orderAsset.collateralToken
-      : order.orderAsset.orderToken;
-    const amountValue = isBuy ? order.amount.orderSize : order.amount.tokenAmount;
+      ? orderData?.orderAsset?.collateralToken
+      : (orderData?.orderAsset as any)?.orderToken;
+    const amountValue = isBuy ? (orderData?.amount as any)?.orderSize : (orderData?.amount as any)?.tokenAmount;
     const formattedAmount = useMemo(() => {
-      if (!amountValue) return "0";
+      if (!amountValue || !amountToken) return "0";
       return displayNumber(
         Number(formatUnits(BigInt(amountValue), amountToken.decimals)),
       );
-    }, [amountValue, amountToken.decimals]);
+    }, [amountValue, amountToken?.decimals]);
 
     const entryPrice = order.additional?.entryPrice;
     const exitPrice = order.additional?.exitPrice;
@@ -97,8 +104,9 @@ const OrderTableRow = memo(
         <td className="px-4 py-3 whitespace-nowrap">
           <div className="flex flex-col">
             <div className="font-medium text-sm text-gray-900 dark:text-gray-200">
-              {order.orderAsset.orderToken?.symbol || "UNK"}
+              <span className={`text-xs font-bold ${order.category == 'perpetual' && order.perp?.isLong ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{order.category == 'perpetual' && order.perp?.isLong ? 'LONG' : 'SHORT'}</span> {order.category === "spot" ? order.spot?.orderAsset?.orderToken?.symbol : (order.perp?.orderAsset as any)?.symbol || "UNK"}
             </div>
+            <div className="flex items-center gap-1">
             <div className="flex items-center gap-1 text-xs text-gray-500">
               #{order._id?.slice(-6)}
               <FiCopy
@@ -106,6 +114,14 @@ const OrderTableRow = memo(
                 onClick={() => handleCopy(order._id as string, "Order ID")}
               />
             </div>
+            {order.category === "perpetual" && order.perp?.leverage && (
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                {order.perp?.leverage}x
+                <img src={order.perp.protocol === "asterdex" ? "https://static.asterindex.com/cloud-futures/static/images/aster/logo.svg" : order.perp.protocol === "hyperliquid" ? "./hyperliquidWhite.svg" : "./gmx.svg"} alt="AsterDex" className="w-10 h-4" />
+              </div>
+            )}
+            </div>
+            
           </div>
         </td>
 
@@ -113,11 +129,10 @@ const OrderTableRow = memo(
         <td className="px-4 py-3 whitespace-nowrap">
           <div className="flex flex-col">
             <span
-              className={`text-xs font-bold ${
-                order.orderType === "BUY"
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
-              }`}
+              className={`text-xs font-bold ${order.orderType === "BUY"
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
+                }`}
             >
               {order.orderType}
             </span>
@@ -199,8 +214,8 @@ const OrderTableRow = memo(
         <td className="px-4 py-3 whitespace-nowrap">
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex items-center gap-1">
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {formattedAmount} {amountToken.symbol}
+              <span className="flex gap-1 font-medium text-gray-700 dark:text-gray-300">
+                {formattedAmount} {amountToken?.symbol || "UNK"}
               </span>
             </div>
           </div>
@@ -236,11 +251,10 @@ const OrderTableRow = memo(
           <td className="px-4 py-3 whitespace-nowrap text-sm">
             {order._id && orderGmxPositionData[order._id]?.gmxPnl ? (
               <span
-                className={`font-medium ${
-                  Number(orderGmxPositionData[order._id].gmxPnl) >= 0
-                    ? "text-green-500"
-                    : "text-red-500"
-                }`}
+                className={`font-medium ${Number(orderGmxPositionData[order._id].gmxPnl) >= 0
+                  ? "text-green-500"
+                  : "text-red-500"
+                  }`}
               >
                 ${displayNumber(Number(orderGmxPositionData[order._id].gmxPnl))}
               </span>

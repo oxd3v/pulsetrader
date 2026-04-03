@@ -107,6 +107,8 @@ export default function DefinedSpotMain({
     [isDraggingH, isDraggingV],
   );
 
+  console.log(network)
+
   const onMouseUp = useCallback(() => {
     setIsDraggingH(false);
     setIsDraggingV(false);
@@ -165,9 +167,10 @@ export default function DefinedSpotMain({
       if (!isMountedRef.current) return;
 
       // Filter for valid chains
-      const validToken = response?.find((t: any) =>
-        Object.values(chains).includes(t.token.networkId),
-      );
+      // Filter for valid chains, prioritizing the current network
+      const validToken =
+        response?.find((t: any) => t.token.networkId === network) ||
+        response?.find((t: any) => Object.values(chains).includes(t.token.networkId));
 
       if (!validToken) {
         setError("Token not found on supported chains");
@@ -277,7 +280,7 @@ export default function DefinedSpotMain({
     if (!combinedTokenInfo) return null;
     return (
       <TradeBox
-        chainId={combinedTokenInfo.chainId}
+        chainId={network}
         tokenInfo={combinedTokenInfo}
         isConnected={isConnected}
         user={user}
@@ -360,9 +363,8 @@ export default function DefinedSpotMain({
                   ? `${leftWidth}%`
                   : "100%",
             }}
-            className={`h-full flex flex-col transition-all duration-300 ${
-              isTradeBoxOpen ? "hidden lg:flex" : "flex"
-            }`}
+            className={`h-full flex flex-col transition-all duration-300 ${isTradeBoxOpen ? "hidden lg:flex" : "flex"
+              }`}
           >
             {/* 1. Chart Section */}
 
@@ -381,7 +383,7 @@ export default function DefinedSpotMain({
             </div> */}
 
             {/* 2. Order/Transaction List Section */}
-            <OrderBox network={network} userOrders={userOrders} orderCategory="spot" walletAddress="" isConnected={isConnected} tokenInfo={staticInfo}/>
+            <OrderBox network={network} userOrders={userOrders} orderCategory="spot" walletAddress="" isConnected={isConnected} tokenInfo={staticInfo} />
           </div>
 
           {/* Horizontal Resize Handle (Between Left Column and TradeBox) */}

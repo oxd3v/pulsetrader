@@ -24,7 +24,6 @@ export interface GmxMarketStats {
   availableLiquidityUsd: number;
   availableLiquidityLongUsd: number;
   availableLiquidityShortUsd: number;
-  lastUpdatedAt: number;
 }
 
 interface UseGmxMarketStatsResult {
@@ -48,8 +47,7 @@ const createEmptyStats = (symbol: string): GmxMarketStats => ({
   openInterestShortUsd: 0,
   availableLiquidityUsd: 0,
   availableLiquidityLongUsd: 0,
-  availableLiquidityShortUsd: 0,
-  lastUpdatedAt: 0,
+  availableLiquidityShortUsd: 0
 });
 
 const toErrorMessage = (error: unknown, fallback: string) => {
@@ -111,6 +109,7 @@ export const useGmxMarketStats = (
 
         if (!disposed) {
           setMarket(selectedMarket);
+          //console.log(selectedMarket);
           setStats({
             symbol: selectedMarket.symbol,
             marketName: selectedMarket.marketName,
@@ -125,8 +124,7 @@ export const useGmxMarketStats = (
             availableLiquidityLongUsd:
               selectedMarket.availableLiquidityLongUsd,
             availableLiquidityShortUsd:
-              selectedMarket.availableLiquidityShortUsd,
-            lastUpdatedAt: selectedMarket.lastUpdatedAt,
+              selectedMarket.availableLiquidityShortUsd
           });
           setConnected(true);
           setError(null);

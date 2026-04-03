@@ -28,7 +28,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
-, "lib/oracle/axios.js"  ],
+    "**/*.mts",
+    "lib/oracle/axios.js",
+    "lib/blockchain/gas.js"
+  ],
   "exclude": ["node_modules"]
 }

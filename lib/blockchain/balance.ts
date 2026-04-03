@@ -25,6 +25,7 @@ export const getWalletBalance = async ({
   if (chainId == chains.Solana) {
     balance = await getSolanaBalance(walletAddress);
   } else {
+    console.log(walletAddress, chainId)
     balance = getEvmBalance({ walletAddress, chainId });
   }
   return balance;
@@ -66,6 +67,7 @@ export const getWalletTokenBalance = async ({
   if (chainId == chains.Solana) {
     balance = await getSolanaTokenBalance({ walletAddress, tokenAddress });
   } else {
+    console.log(walletAddress, tokenAddress, chainId)
     balance = await getEvmWalletTokenBalance({
       walletAddress,
       tokenAddress,

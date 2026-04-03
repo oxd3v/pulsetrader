@@ -39,124 +39,111 @@ export default function ConfirmationModal({
 
     setIsInternalLoading(true);
     try {
-      return await onConfirm();
+      await onConfirm();
     } catch (error) {
-      console.error("Confirmation action failed", error);
+      console.error(error);
     } finally {
       setIsInternalLoading(false);
     }
   };
 
-  // Determine styles based on variant
-  const getVariantStyles = () => {
-    switch (variant) {
-      case "destructive":
-        return {
-          icon: (
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full shrink-0">
-              <FiAlertTriangle className="w-6 h-6 text-red-600 dark:text-red-500" />
-            </div>
-          ),
-          button:
-            "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500",
-        };
-      case "warning":
-        return {
-          icon: (
-            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full shrink-0">
-              <FiAlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
-            </div>
-          ),
-          button:
-            "bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500",
-        };
-      default:
-        return {
-          icon: (
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full shrink-0">
-              <FiInfo className="w-6 h-6 text-blue-600 dark:text-blue-500" />
-            </div>
-          ),
-          button:
-            "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",
-        };
-    }
-  };
-
-  const styles = getVariantStyles();
   const isLoading = isInternalLoading || externalLoading;
+
+  // Visual variants mapping
+  const styles = {
+    default: {
+      icon: <FiInfo className="w-6 h-6 text-blue-500 dark:text-blue-400" />,
+      bg: "bg-blue-100 dark:bg-blue-500/20",
+      button: "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 border border-transparent",
+      iconRing: "ring-blue-50 dark:ring-blue-500/10",
+    },
+    destructive: {
+      icon: <FiAlertTriangle className="w-6 h-6 text-red-500 dark:text-red-400" />,
+      bg: "bg-red-100 dark:bg-red-500/20",
+      button: "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/25 border border-transparent",
+      iconRing: "ring-red-50 dark:ring-red-500/10",
+    },
+    warning: {
+      icon: <FiAlertTriangle className="w-6 h-6 text-amber-500 dark:text-amber-400" />,
+      bg: "bg-amber-100 dark:bg-amber-500/20",
+      button: "bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/25 border border-transparent",
+      iconRing: "ring-amber-50 dark:ring-amber-500/10",
+    },
+  }[variant];
+
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden p-4 sm:p-6 backdrop-blur-sm">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={!isLoading ? onClose : undefined}
-            className="fixed inset-0 bg-gray-900/50 transition-opacity"
-          />
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={!isLoading ? onClose : undefined}
+          className="fixed inset-0 bg-black/40 dark:bg-black/70 backdrop-blur-sm transition-opacity"
+        />
 
-          {/* Modal Content */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2 }}
-            className="relative w-full max-w-md transform rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-2xl transition-all"
-          >
-            {/* Close Button (Top Right) */}
-            {!isLoading && (
-              <button
-                onClick={onClose}
-                className="absolute right-4 top-4 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors z-10"
-              >
-                <FiX className="w-5 h-5" />
-              </button>
-            )}
+        {/* Modal Panel */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white dark:bg-[#13131a] border border-gray-200 dark:border-white/10 shadow-2xl z-10"
+        >
+          {/* Close Button */}
+          {!isLoading && (
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+            >
+              <FiX className="w-5 h-5" />
+            </button>
+          )}
 
-            <div className="p-6">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-                {/* Icon */}
-                {styles.icon}
+          <div className="p-6 sm:p-8">
+            {/* Header Icon */}
+            <div className="flex flex-col items-center text-center">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                {title}
+              </h3>
 
-                {/* Text Content */}
-                <div className="flex-1 min-w-0 text-center sm:text-left">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-6 mb-2 break-words">
-                    {title}
-                  </h3>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 break-words whitespace-normal">
-                    {description}
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={onClose}
-                  className="inline-flex w-full justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all sm:w-auto"
-                >
-                  {cancelText}
-                </button>
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={handleConfirmClick}
-                  className={`inline-flex w-full justify-center items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all sm:w-auto ${styles.button}`}
-                >
-                  {isLoading && <FiLoader className="w-4 h-4 animate-spin" />}
-                  {isLoading ? "Processing..." : confirmText}
-                </button>
+              {/* Dynamic Description Area */}
+              <div className="w-full text-left mt-3">
+                {description}
               </div>
             </div>
-          </motion.div>
-        </div>
-      )}
+
+            {/* Action Buttons */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={onClose}
+                className="inline-flex w-full justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-transparent px-5 py-3 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all sm:w-auto"
+              >
+                {cancelText}
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleConfirmClick}
+                className={`inline-flex w-full justify-center items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all sm:w-auto ${styles.button}`}
+              >
+                {isLoading ? (
+                  <>
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  confirmText
+                )}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </AnimatePresence>
   );
 }

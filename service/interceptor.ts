@@ -16,15 +16,7 @@ const ApiClient = axios.create({
 
 ApiClient.interceptors.request.use(
   async (config: any) => {
-    if (localStorage) {
-      const authToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-      if (authToken) {
-        config.headers = {
-          Authorization: `Bearer ${authToken}`,
-        };
-      }
-    }
-
+    // Auth is cookie-based on the backend.
     return config;
   },
   (error) => {

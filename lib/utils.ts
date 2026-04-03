@@ -42,21 +42,44 @@ export const notifyWithResponseError = (
   }
 };
 
-const resolveErrorKey = (err: any) => {
-  return (
-    err?.response?.data?.message ||
-    err?.response?.data?.error ||
-    err?.message ||
-    "SERVER_ERROR"
-  );
+export const notifyFromApiError = (message: string | undefined | null) => {
+  const key = String(message || "").trim() || "SERVER_ERROR";
+  if (key === "MISSING_PARAMS") {
+    notifyWithResponseError("error", "Missing request params");
+    return key;
+  }
+  if (NOTIFICATION_CONFIG[key]) {
+    notify("error", key);
+    return key;
+  }
+  if (key && key !== "SERVER_ERROR") {
+    notifyWithResponseError("error", key);
+    return key;
+  }
+  notify("error", "SERVER_ERROR");
+  return "SERVER_ERROR";
 };
 
 export const handleServerErrorToast = ({err, messageKey=undefined}:{err: any, messageKey?:string}) => {
-  let errDataMessageKey = messageKey || resolveErrorKey(err);
-  if (errDataMessageKey == "MISSING_PARAMS") {
-    notifyWithResponseError("error", err.response.data?.type || "Missing request params");
-  } else {
-    notify("error", errDataMessageKey);
+  const raw =
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    err?.message ||
+    "";
+  const key = (messageKey || String(raw).trim() || "SERVER_ERROR") as string;
+
+  if (key === "MISSING_PARAMS") {
+    notifyWithResponseError("error", err?.response?.data?.type || "Missing request params");
+    return key;
   }
-  return errDataMessageKey;
+  if (NOTIFICATION_CONFIG[key]) {
+    notify("error", key);
+    return key;
+  }
+  if (typeof raw === "string" && raw.length > 0) {
+    notifyWithResponseError("error", raw);
+    return raw;
+  }
+  notify("error", "SERVER_ERROR");
+  return "SERVER_ERROR";
 };

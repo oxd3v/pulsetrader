@@ -1,7 +1,12 @@
 export type WalletConfig = {
     _id: string,
     address: string,
-    network: 'SVM' | 'EVM'
+    network: 'SVM' | 'EVM',
+    isAgentWallet: boolean,
+    agentIds: string[],
+    agentWallet?: any,
+    isApproved?: { asterdex?: boolean; hyperliquid?: boolean },
+    user: string
 }
 
 export type User = {
@@ -12,7 +17,7 @@ export type User = {
     invitationCodes: string[],
     inviter?: string,
     invites?: [],
-    isBlock?:boolean,
+    isBlock?: boolean,
     blockReason?: string
 }
 
@@ -25,7 +30,7 @@ export type ACTIVITY_TYPE = {
     wallet: WalletConfig,
     type: string,
     chainId: number,
-    receiveToken:{
+    receiveToken: {
         address: string,
         decimals: number,
         symbol: string,
@@ -50,12 +55,12 @@ export type ACTIVITY_TYPE = {
         parsedPrice: string
     },
     txFee: {
-     feeAmount: string,
-     feeInUsd: string
+        feeAmount: string,
+        feeInUsd: string
     }
-    info:any,
+    info: any,
     txHash: string,
     indexToken: string,
     createdAt: Date,
-    updatedAt: Date, 
+    updatedAt: Date,
 }

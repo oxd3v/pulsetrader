@@ -1,22 +1,27 @@
 import { ORDER_TYPE } from "@/type/order";
 import { WalletConfig } from "@/type/common";
-import {
-  BASIS_POINT_DIVISOR_BIGINT,
-  PRECISION_DECIMALS,
-} from "@/constants/common/utils";
-import { safeParseUnits } from "@/utility/handy";
+import { BASIS_POINT_DIVISOR_BIGINT, PRECISION_DECIMALS } from "@/constants/common/utils";
+import { safeFormatNumber, safeParseUnits } from "@/utility/handy";
 import { chains } from "@/constants/common/chain";
 import { userDeafultTokens } from "@/constants/common/tokens";
 import { USER_LEVEL } from "@/constants/common/user";
 import OrderService from "@/service/order-service";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
-import { getGridMultiplierNthValue, getGridNthPrice } from "@/utility/order";
 import {
   handleServerErrorToast,
   notify,
+  notifyFromApiError,
   notifyWithResponseError,
 } from "@/lib/utils";
+import {
+  isTradeFeeExemptStatus,
+  getGridMultiplierNthValue,
+  getGridNthPrice,
+  ORDER_TRADE_FEE_BIGINT,
+  validateCollateralIsStable,
+} from "@/utility/orderUtility";
+import { convertToUsd } from "@/utility/number";
 
 interface AddOrderProps {
   estOrders: ORDER_TYPE[];
@@ -32,12 +37,13 @@ interface AddOrderProps {
   user: any;
 }
 
-export const useSpotOrder = () => {
+export const useOrder = () => {
   const { setUserOrders } = useStore(
     useShallow((state: any) => ({
       setUserOrders: state.setUserOrders,
     })),
   );
+
 
   const configurePerpOrder = (config: any): ORDER_TYPE[] => {
     const {
@@ -59,54 +65,49 @@ export const useSpotOrder = () => {
       strategy,
       chainId,
       isTrailingMode,
-      tpPrice,
-      slPrice,
       isTechnicalExit,
       tpPercentage,
       slPercentage,
       isReEntrance,
       reEntrancePercentage,
       slippage,
-      levrage,
-      levrageMultiplier,
+      leverage,
       isLong,
-      orderNetworkFee,
       protocol,
+      feeToken,
+      collateralPrice,
     } = config;
 
     const estOrders: ORDER_TYPE[] = [];
 
-    const parsedEntryPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
-    const baseAmount = safeParseUnits(
+    const parsedBaseEntryPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
+    const parsedBaseAmount = safeParseUnits(
       initialOrderSize,
       collateralToken.decimals,
     );
-    const baseLeverage = safeParseUnits(levrage, 4);
     const slBps = BigInt(Math.floor(slPercentage * 100));
     const tpBps = BigInt(Math.floor(tpPercentage * 100));
     if (gridNumber > 1) {
       for (let i = 0; i < gridNumber; i++) {
         const orderIndex = i + 1;
-        const rawSize = getGridMultiplierNthValue({
-          initialValue: baseAmount,
+        const parsedRawSize = getGridMultiplierNthValue({
+          initialValue: parsedBaseAmount,
           multiplier: orderSizeMultiplier,
           n: orderIndex,
         });
-        const leverageSize = getGridMultiplierNthValue({
-          initialValue: baseLeverage,
-          multiplier: levrageMultiplier,
-          n: orderIndex,
-        });
-        const targetedPrice = getGridNthPrice({
-          entryPrice: parsedEntryPrice,
+        const parsedTragetPrice = getGridNthPrice({
+          entryPrice: parsedBaseEntryPrice,
           gridDistance,
           gridMultiplier,
           n: orderIndex,
           decrement: isLong,
         });
+
+        const feeTokenAmount = (parsedRawSize * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
         estOrders.push({
           // ... (order object unchanged) ...
           protocol,
+          indexTokenAddress: orderToken.address || orderToken.symbol,
           user: {},
           wallet: {},
           chainId,
@@ -120,22 +121,31 @@ export const useSpotOrder = () => {
             priceLogic: {
               type: "Price",
               id: "price",
-              operator: "LESS_THAN",
-              threshold: targetedPrice.toString(),
+              operator: isLong ? "LESS_THAN" : "GREATER_THAN",
+              threshold: parsedTragetPrice.toString(),
             },
           },
-          orderAsset: {
-            orderToken,
-            collateralToken,
-            outputToken,
-            pairAddress: orderToken.pairAddress,
-            ...(orderToken.marketTokenAddress && {
-              marketTokenAddress: orderToken.marketTokenAddress,
-            }),
+          perp: {
+            quantity: '0',
+            isLong,
+            leverage: Number(leverage),
+            positionMode: "ONE_WAY",
+            iswalletBasedContract: false,
+            protocol,
+            orderAsset: {
+              collateralToken,
+              outputToken,
+              persedSymbolInfo: orderToken,
+              symbol: orderToken.symbol,
+            },
+            amount: {
+              orderSize: parsedRawSize.toString(),
+              marginSizeUsd: (convertToUsd(parsedRawSize, collateralToken.decimals, safeParseUnits(collateralPrice, PRECISION_DECIMALS)) || 0).toString(),
+            }
           },
-          amount: {
-            orderSize: rawSize.toString(),
-            tokenAmount: "0",
+          feeToken: {
+            ...feeToken,
+            amount: feeTokenAmount.toString()
           },
           slippage,
           sl: i + 1,
@@ -162,28 +172,16 @@ export const useSpotOrder = () => {
             isReEntrance,
             reEntranceLimit: Math.floor(reEntrancePercentage * 100),
           },
-          executionFee: {
-            payInUsd: "0",
-            feeInUsd: "0",
-            feeUsed: "0",
-            ...(orderNetworkFee != "0" && {
-              networkTradeFeeLocked: (
-                BigInt(orderNetworkFee) * BigInt(2)
-              ).toString(),
-            }),
-          },
-          perpetual: {
-            isLong,
-            leverage: Number(leverageSize),
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
       }
     } else {
+      const feeTokenAmount = (parsedBaseAmount * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
       estOrders.push({
         // ... (order object unchanged) ...
         protocol,
+        indexTokenAddress: orderToken.address || orderToken.symbol,
         user: {},
         wallet: {},
         chainId,
@@ -193,29 +191,38 @@ export const useSpotOrder = () => {
         orderType: "BUY",
         orderStatus: "PENDING",
         entry: {
-          isTechnicalEntry: strategy == "algo" ? true : false,
+          isTechnicalEntry: strategy == 'algo' ? true : false,
           ...(strategy == "algo" && { technicalLogic: entryLogic }),
           ...(strategy != "algo" && {
             priceLogic: {
               type: "Price",
               id: "price",
               operator: isLong ? "LESS_THAN" : "GREATER_THAN",
-              threshold: parsedEntryPrice.toString(),
+              threshold: parsedBaseEntryPrice.toString(),
             },
-          }),
+          })
         },
-        orderAsset: {
-          orderToken,
-          collateralToken,
-          outputToken,
-          pairAddress: orderToken.pairAddress,
-          ...(orderToken.marketTokenAddress && {
-            marketTokenAddress: orderToken.marketTokenAddress,
-          }),
+        perp: {
+          quantity: '0',
+          isLong,
+          leverage: Number(leverage),
+          positionMode: "ONE_WAY",
+          iswalletBasedContract: false,
+          protocol,
+          orderAsset: {
+            collateralToken,
+            outputToken,
+            persedSymbolInfo: orderToken,
+            symbol: orderToken.symbol,
+          },
+          amount: {
+            orderSize: parsedBaseAmount.toString(),
+            marginSizeUsd: (convertToUsd(parsedBaseAmount, collateralToken.decimals, safeParseUnits(collateralPrice, PRECISION_DECIMALS)) || 0).toString(),
+          }
         },
-        amount: {
-          orderSize: baseAmount.toString(),
-          tokenAmount: "0",
+        feeToken: {
+          ...feeToken,
+          amount: feeTokenAmount.toString()
         },
         slippage,
         sl: 1,
@@ -223,16 +230,13 @@ export const useSpotOrder = () => {
         exit: {
           takeProfit: {
             profit: "0",
-            takeProfitPercentage: isTechnicalExit ? 0 : Number(tpBps),
-            takeProfitPrice:
-              !isTechnicalExit && tpPrice
-                ? safeParseUnits(tpPrice, PRECISION_DECIMALS).toString()
-                : "0",
+            takeProfitPercentage: Number(tpBps),
+            takeProfitPrice: "0",
           },
           stopLoss: {
-            isActive: activeStopLoss && !isTechnicalExit,
+            isActive: activeStopLoss,
             save: "0",
-            stopLossPercentage: isTechnicalExit ? 0 : Number(slBps),
+            stopLossPercentage: Number(slBps),
             stopLossPrice: "0",
           },
           isTechnicalExit: isTechnicalExit,
@@ -245,20 +249,6 @@ export const useSpotOrder = () => {
         reEntrance: {
           isReEntrance,
           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-        },
-        executionFee: {
-          payInUsd: "0",
-          feeInUsd: "0",
-          feeUsed: "0",
-          ...(orderNetworkFee != "0" && {
-            networkTradeFeeLocked: (
-              BigInt(orderNetworkFee) * BigInt(2)
-            ).toString(),
-          }),
-        },
-        perpetual: {
-          isLong: true,
-          leverage: Number(baseLeverage),
         },
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -296,30 +286,35 @@ export const useSpotOrder = () => {
       isReEntrance,
       reEntrancePercentage,
       slippage,
-      orderNetworkFee,
+      feeToken,
+      feeTokenPrice,
+      collateralPrice,
+      orderTokenPrice,
+      feeTokenRequired,
     } = config;
 
     const estOrders: ORDER_TYPE[] = [];
-    let isSellStrategy = strategy == "sellToken";
-    let parseTargetPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
-    let baseAmount = safeParseUnits(initialOrderSize, collateralToken.decimals);
+    const isSellStrategy = strategy == "sellToken";
+    let parsedBaseTragetPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
+    let parsedBaseAmount = safeParseUnits(initialOrderSize, collateralToken.decimals);
 
     if (isSellStrategy) {
-      parseTargetPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
-      baseAmount = safeParseUnits(initialOrderSize, orderToken.decimals);
+      parsedBaseTragetPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
+      parsedBaseAmount = safeParseUnits(initialOrderSize, orderToken.decimals);
     }
+
     const slBps = BigInt(Math.floor(slPercentage * 100));
     const tpBps = BigInt(Math.floor(tpPercentage * 100));
     if (gridNumber > 1) {
       for (let i = 0; i < gridNumber; i++) {
         const orderIndex = i + 1;
-        const rawSize = getGridMultiplierNthValue({
-          initialValue: baseAmount,
+        const parsedRawSize = getGridMultiplierNthValue({
+          initialValue: parsedBaseAmount,
           multiplier: orderSizeMultiplier,
           n: orderIndex,
         });
-        const targetedPrice = getGridNthPrice({
-          entryPrice: parseTargetPrice,
+        const parsedTargetedPrice = getGridNthPrice({
+          entryPrice: parsedBaseTragetPrice,
           gridDistance,
           gridMultiplier,
           n: orderIndex,
@@ -329,35 +324,38 @@ export const useSpotOrder = () => {
           // ... (order object unchanged) ...
           user: {},
           wallet: {},
+          indexTokenAddress: orderToken.address,
           chainId,
           name: orderName,
           strategy,
           category: "spot",
-          orderType: "BUY",
+          orderType: isSellStrategy ? "SELL" : "BUY",
           orderStatus: "PENDING",
           entry: {
             isTechnicalEntry: false,
-            ...(!isSellStrategy && {
-              priceLogic: {
-                type: "Price",
-                id: "price",
-                operator: "LESS_THAN",
-                threshold: targetedPrice.toString(),
-              },
-            }),
+            priceLogic: {
+              type: "Price",
+              id: "price",
+              operator: "LESS_THAN",
+              threshold: parsedTargetedPrice.toString(),
+            },
           },
-          orderAsset: {
-            orderToken,
-            collateralToken,
-            outputToken,
-            ...(orderToken.pairAddress && {
-              pairAddress: orderToken.pairAddress,
-            }),
+          spot: {
+            orderAsset: {
+              orderToken,
+              collateralToken,
+              outputToken,
+              ...(orderToken.pairAddress && {
+                pairAddress: orderToken.pairAddress,
+              }),
+            },
+            amount: {
+              orderSize: isSellStrategy ? "0" : parsedRawSize.toString(),
+              tokenAmount: isSellStrategy ? parsedRawSize.toString() : "0",
+              orderSizeUsd: convertToUsd(parsedRawSize, collateralToken.decimals, safeParseUnits(collateralPrice, PRECISION_DECIMALS))?.toString() || '0',
+            },
           },
-          amount: {
-            orderSize: isSellStrategy ? "0" : rawSize.toString(),
-            tokenAmount: isSellStrategy ? rawSize.toString() : "0",
-          },
+          feeToken,
           slippage,
           sl: i + 1,
           isTrailingMode,
@@ -365,7 +363,7 @@ export const useSpotOrder = () => {
             takeProfit: {
               profit: "0",
               takeProfitPercentage: Number(tpBps),
-              takeProfitPrice: isSellStrategy ? targetedPrice.toString() : "0",
+              takeProfitPrice: isSellStrategy ? parsedTargetedPrice.toString() : "0",
             },
             stopLoss: {
               isActive: activeStopLoss,
@@ -383,16 +381,6 @@ export const useSpotOrder = () => {
             isReEntrance,
             reEntranceLimit: Math.floor(reEntrancePercentage * 100),
           },
-          executionFee: {
-            payInUsd: "0",
-            feeInUsd: "0",
-            feeUsed: "0",
-            ...(orderNetworkFee != "0" && {
-              networkTradeFeeLocked: (
-                BigInt(orderNetworkFee) * BigInt(isSellStrategy ? 1 : 2)
-              ).toString(),
-            }),
-          },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -402,11 +390,12 @@ export const useSpotOrder = () => {
         // ... (order object unchanged) ...
         user: {},
         wallet: {},
+        indexTokenAddress: orderToken.address,
         chainId,
         name: orderName,
         strategy,
         category: "spot",
-        orderType: "BUY",
+        orderType: isSellStrategy ? "SELL" : "BUY",
         orderStatus: "PENDING",
         entry: {
           isTechnicalEntry:
@@ -415,24 +404,30 @@ export const useSpotOrder = () => {
             strategy == "algo" && { technicalLogic: entryLogic }),
           ...(strategy != "algo" &&
             !isSellStrategy && {
-              priceLogic: {
-                type: "Price",
-                id: "price",
-                operator: "LESS_THAN",
-                threshold: parseTargetPrice.toString(),
-              },
+            priceLogic: {
+              type: "Price",
+              id: "price",
+              operator: "LESS_THAN",
+              threshold: parsedBaseTragetPrice.toString(),
+            },
+          }),
+        },
+        spot: {
+          orderAsset: {
+            orderToken,
+            collateralToken,
+            outputToken,
+            ...(orderToken.pairAddress && {
+              pairAddress: orderToken.pairAddress,
             }),
+          },
+          amount: {
+            orderSize: isSellStrategy ? "0" : parsedBaseAmount.toString(),
+            tokenAmount: isSellStrategy ? parsedBaseAmount.toString() : "0",
+            orderSizeUsd: convertToUsd(parsedBaseAmount, collateralToken.decimals, safeParseUnits(collateralPrice, PRECISION_DECIMALS))?.toString() || '0',
+          },
         },
-        orderAsset: {
-          orderToken,
-          collateralToken,
-          outputToken,
-          pairAddress: orderToken.pairAddress,
-        },
-        amount: {
-          orderSize: isSellStrategy ? "0" : baseAmount.toString(),
-          tokenAmount: isSellStrategy ? "0" : baseAmount.toString(),
-        },
+        feeToken,
         slippage,
         sl: 1,
         isTrailingMode,
@@ -441,8 +436,8 @@ export const useSpotOrder = () => {
             profit: "0",
             takeProfitPercentage: isTechnicalExit ? 0 : Number(tpBps),
             takeProfitPrice:
-              !isTechnicalExit && tpPrice
-                ? safeParseUnits(tpPrice, PRECISION_DECIMALS).toString()
+              !isTechnicalExit && isSellStrategy
+                ? parsedBaseTragetPrice.toString()
                 : "0",
           },
           stopLoss: {
@@ -462,17 +457,6 @@ export const useSpotOrder = () => {
           isReEntrance,
           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
         },
-        executionFee: {
-          payInUsd: "0",
-          feeInUsd: "0",
-          feeUsed: "0",
-          ...(orderNetworkFee != "0" && {
-            networkTradeFeeLocked: (
-              BigInt(orderNetworkFee) * BigInt(isSellStrategy ? 1 : 2)
-            ).toString(),
-          }),
-        },
-
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -481,88 +465,105 @@ export const useSpotOrder = () => {
     return estOrders;
   };
 
-  const addSpotOrder = async ({
+  /**
+   * createOrder — unified order submission for both spot and perpetual.
+   * Sends { orderParams, gridsByWallet } to POST /create-order.
+   * The backend rebuilds orders server-side from orderParams.
+   */
+  const submitOrder = async ({
+    orderParams,
+    gridsByWallet,
     estOrders,
     areWalletsReady,
-    gridsByWallet,
-    name,
-    chainId,
-    strategy,
-    indexToken,
     category,
-    isLong,
-    protocol,
     user,
-  }: AddOrderProps) => {
+  }: {
+    orderParams: any;
+    gridsByWallet: Record<number, WalletConfig>;
+    estOrders: ORDER_TYPE[];
+    areWalletsReady: boolean;
+    category: "spot" | "perpetual";
+    user: any;
+  }) => {
     let orderAddResult = { added: false, error: null as string | null };
     try {
-      // Validate inputs
-      if (estOrders.length == 0 || !areWalletsReady) {
-        let key = "INVALID_EST_ORDERS";
-        notify("error", key);
-        orderAddResult.error = key;
+      // ── Client-side pre-validation ──
+      if (estOrders.length === 0 || !areWalletsReady) {
+        notify("error", "INVALID_EST_ORDERS");
+        orderAddResult.error = "INVALID_EST_ORDERS";
         return orderAddResult;
       }
 
-      if (!chainId) {
-        let key = "INVALID_NETWORK";
-        notify("error", key);
-        orderAddResult.error = key;
+      const { chainId, strategy, orderName, indexTokenAddress } = orderParams;
+
+      if (!chainId || !Object.values(chains).includes(chainId)) {
+        notify("error", "UNSUPPORTED_NETWORK");
+        orderAddResult.error = "UNSUPPORTED_NETWORK";
         return orderAddResult;
-      } else {
-        if (!Object.values(chains).includes(chainId)) {
-          let key = "UNSUPPORTED_NETWORK";
-          notify("error", key);
-          orderAddResult.error = key;
-          return orderAddResult;
-        }
       }
 
-      if (!name) {
-        let key = "INVALID_ORDER_NAME";
-        notify("error", key);
-        orderAddResult.error = key;
+      if (!orderName) {
+        notify("error", "INVALID_ORDER_NAME");
+        orderAddResult.error = "INVALID_ORDER_NAME";
         return orderAddResult;
       }
 
       if (!strategy) {
-        let key = "INVALID ORDER_STRATEGY";
-        notify("error", key);
-        orderAddResult.error = key;
+        notify("error", "INVALID_ORDER_STRATEGY");
+        orderAddResult.error = "INVALID_ORDER_STRATEGY";
         return orderAddResult;
       }
 
-      if (category != "perpetual") {
-        let userAddedAssetes = user.assetes || [];
-        let userTokens = [...userAddedAssetes, ...userDeafultTokens]
-          .filter((t) => t.split(":")[1] == chainId)
-          .map((t) => t.toLowerCase());
-        if (!userTokens.includes(`${indexToken}:${chainId}`.toLowerCase())) {
-          let key = "TOKEN_NOT_ADDED";
-          notify("error", key);
-          orderAddResult.error = key;
+      // Spot-only: verify user has the token added
+      if (category === "spot" && indexTokenAddress) {
+        const userAddedAssetes = user.assetes || [];
+        const userTokens = [...userAddedAssetes, ...userDeafultTokens]
+          .filter((t: string) => t.split(":")[1] == chainId)
+          .map((t: string) => t.toLowerCase());
+        if (!userTokens.includes(`${indexTokenAddress}:${chainId}`.toLowerCase())) {
+          notify("error", "TOKEN_NOT_ADDED");
+          orderAddResult.error = "TOKEN_NOT_ADDED";
           return orderAddResult;
         }
       }
 
-      if (user.status != "admin") {
+      // Strategy support check
+      if (user.status !== "admin") {
         const state = USER_LEVEL[user.status.toUpperCase()];
         if (!state) {
-          let key = "USER_NOT_ELIGIBLE";
-          notify("error", key);
-          orderAddResult.error = key;
+          notify("error", "USER_NOT_ELIGIBLE");
+          orderAddResult.error = "USER_NOT_ELIGIBLE";
           return orderAddResult;
         }
-
         if (!state.benefits.supportStrategy.includes(strategy)) {
-          let key = "UNSUPPORTED_STRATEGY";
-          notify("error", key);
-          orderAddResult.error = key;
+          notify("error", "UNSUPPORTED_STRATEGY");
+          orderAddResult.error = "UNSUPPORTED_STRATEGY";
           return orderAddResult;
         }
       }
 
-      // Process grids
+      if (!isTradeFeeExemptStatus(user?.status)) {
+        if (
+          !orderParams.feeToken?.address ||
+          orderParams.feeToken?.decimals == null
+        ) {
+          notify("error", "INVALID_FEE_TOKEN");
+          orderAddResult.error = "INVALID_FEE_TOKEN";
+          return orderAddResult;
+        }
+      }
+
+      // ── Collateral token must always be a stable token ──
+      // The fee token is unrestricted (stable or volatile), but collateral
+      // must be stable so that margin / sizing math is predictable and the
+      // protocol can safely liquidate / settle positions.
+      if (orderParams.collateralToken && !validateCollateralIsStable(orderParams.collateralToken)) {
+        notify("error", "COLLATERAL_MUST_BE_STABLE_TOKEN");
+        orderAddResult.error = "COLLATERAL_MUST_BE_STABLE_TOKEN";
+        return orderAddResult;
+      }
+
+      // ── Convert gridsByWallet: WalletConfig objects → wallet ID strings ──
       const _gridsByWallet: Record<number, string> = {};
       for (const key in gridsByWallet) {
         if (gridsByWallet[key]?._id) {
@@ -570,29 +571,30 @@ export const useSpotOrder = () => {
         }
       }
 
-      // Submit order
-      const apiResponse: any = await OrderService.addOrder({
-        orders: estOrders,
-        chainId,
-        strategy,
+      // ── Build payload matching backend: { orderParams, gridsByWallet } ──
+      // Backend validateParams checks for "name", creation functions use "orderName"
+      // So we send both to satisfy both
+      const { orderNetworkFee: _omitNetworkFee, ...orderParamsRest } = orderParams;
+      const payload = {
+        orderParams: {
+          ...orderParamsRest,
+          category,
+          name: orderParams.orderName, // validateParams checks "name"
+        },
         gridsByWallet: _gridsByWallet,
-        indexToken,
-        category,
-        name,
-        isLong,
-        protocol,
-      });
+      };
+
+      const apiResponse: any = await OrderService.createOrder(payload);
 
       if (!apiResponse.success) {
-        let key = apiResponse.success || "SERVER_ERROR";
-        notify("error", key);
+        const key = notifyFromApiError(apiResponse.message);
         orderAddResult.error = key;
         return orderAddResult;
       }
 
       notify("success", "ORDER_CREATION_SUCCESS");
 
-      if (apiResponse.data.orders) {
+      if (apiResponse.data?.orders) {
         setUserOrders(apiResponse.data.orders);
       } else {
         notifyWithResponseError("error", "Network congested. Refresh the page");
@@ -600,7 +602,7 @@ export const useSpotOrder = () => {
       orderAddResult.added = true;
       return orderAddResult;
     } catch (error: any) {
-      let key = handleServerErrorToast({ err: error });
+      const key = handleServerErrorToast({ err: error });
       orderAddResult.error = key;
       return orderAddResult;
     }
@@ -619,8 +621,7 @@ export const useSpotOrder = () => {
         orderId: order._id,
       });
       if (!apiResponse.deleted) {
-        let key = apiResponse.message || "SERVER_ERROR";
-        notify("error", key);
+        let key = notifyFromApiError(apiResponse.message);
         deleteResult.error = key;
         return deleteResult;
       }
@@ -653,8 +654,7 @@ export const useSpotOrder = () => {
         orderId: order._id,
       });
       if (!apiResponse.closed) {
-        let key = apiResponse.message || "SERVER_ERROR";
-        notify("error", key);
+        let key = notifyFromApiError(apiResponse.message);
         closedResult.error = key;
         return closedResult;
       }
@@ -682,7 +682,7 @@ export const useSpotOrder = () => {
     strategyName: string;
     category: string;
     strategy: string;
-  }) => {};
+  }) => { };
   const deleteStrategy = async ({
     strategyName,
     category,
@@ -691,14 +691,13 @@ export const useSpotOrder = () => {
     strategyName: string;
     category: string;
     strategy: string;
-  }) => {};
+  }) => { };
 
   const getOrders = async () => {
     try {
       let apiResponse: any = await OrderService.getOrder({});
       if (!apiResponse.success) {
-        let key = apiResponse.message || "SERVER_ERROR";
-        notify("error", key);
+        notifyFromApiError(apiResponse.message);
         return false;
       }
       notify("success", "ORDER_FETCH_SUCCESS");
@@ -713,7 +712,7 @@ export const useSpotOrder = () => {
   return {
     configurePerpOrder,
     configureSpotOrder,
-    addSpotOrder,
+    submitOrder,
     closeOrder,
     deleteOrder,
     getOrders,
@@ -721,618 +720,3 @@ export const useSpotOrder = () => {
     closeStrategy,
   };
 };
-
-// const configureOrder = (config: any): ORDER_TYPE[] => {
-//   const {
-//     gridNumber,
-//     targetPrice,
-//     activeStopLoss,
-//     entryLogic,
-//     exitLogic,
-//     orderSizeMultiplier,
-//     initialOrderSize,
-//     gridMultiplier,
-//     gridDistance,
-//     collateralToken,
-//     outputToken,
-//     orderToken,
-//     priority,
-//     executionSpeed,
-//     orderName,
-//     strategy,
-//     chainId,
-//     isTrailingMode,
-//     tpPrice,
-//     slPrice,
-//     isTechnicalExit,
-//     tpPercentage,
-//     slPercentage,
-//     isReEntrance,
-//     reEntrancePercentage,
-//     slippage,
-//   } = config;
-
-//   const estOrders: ORDER_TYPE[] = [];
-
-//   if (
-//     gridNumber > 1 &&
-//     strategy == "sellToken" &&
-//     tpPrice &&
-//     Number(tpPrice) > 0
-//   ) {
-//     const parsedEntryPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
-//     let lastPriceDistanceRate = 0;
-//     const CollateralParseOrderSize = safeParseUnits(
-//       initialOrderSize,
-//       orderToken.decimals,
-//     );
-//     for (let i = 0; i < gridNumber; i++) {
-//       const sizeMultiplier = Math.pow(orderSizeMultiplier, i);
-//       const rawSize = CollateralParseOrderSize * BigInt(sizeMultiplier);
-//       let targetedPrice = BigInt(0);
-//       if (i === 0) {
-//         targetedPrice = parsedEntryPrice;
-//       } else {
-//         const distMultiplier = Math.pow(gridMultiplier, i - 1);
-//         const currentStepDistance = gridDistance * distMultiplier;
-//         lastPriceDistanceRate += currentStepDistance;
-//         const bpsChange = BigInt(Math.floor(lastPriceDistanceRate * 100));
-//         targetedPrice =
-//           parsedEntryPrice +
-//           (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
-//       }
-//       estOrders.push({
-//         user: {},
-//         wallet: {},
-//         chainId,
-//         name: orderName,
-//         strategy,
-//         category: "spot",
-//         orderType: "SELL",
-//         orderStatus: "PENDING",
-//         entry: {
-//           isTechnicalEntry: false,
-//         },
-//         orderAsset: {
-//           orderToken: orderToken,
-//           collateralToken: collateralToken,
-//           outputToken: outputToken,
-//           pairAddress: orderToken.pairAddress,
-//         },
-//         amount: {
-//           orderSize: "0",
-//           tokenAmount: rawSize.toString(),
-//         },
-//         slippage,
-//         sl: slPercentage,
-//         isTrailingMode,
-//         exit: {
-//           takeProfit: {
-//             profit: "0",
-//             takeProfitPercentage: tpPercentage,
-//             takeProfitPrice: "0",
-//           },
-//           stopLoss: {
-//             isActive: activeStopLoss,
-//             save: "0",
-//             stopLossPercentage: slPercentage,
-//             stopLossPrice: slPrice,
-//           },
-//           isTechnicalExit: false,
-//         },
-//         isActive: true,
-//         isBusy: false,
-//         priority: Number(priority),
-//         executionSpeed,
-//         reEntrance: {
-//           isReEntrance,
-//           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-//         },
-//         executionFee: {
-//           payInUsd: "0",
-//           feeInUsd: "0",
-//         },
-//         createdAt: new Date(),
-//         updatedAt: new Date(),
-//       });
-//     }
-//   } else if (
-//     gridNumber > 1 &&
-//     ["grid", "multiScalp", "dca"].includes(strategy) &&
-//     targetPrice &&
-//     Number(targetPrice) > 0
-//   ) {
-//     const parsedEntryPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
-//     let lastPriceDistanceRate = 0;
-//     const CollateralParseOrderSize = safeParseUnits(
-//       initialOrderSize,
-//       collateralToken.decimals,
-//     );
-//     const slBps = BigInt(Math.floor(slPercentage * 100));
-//     const tpBps = BigInt(Math.floor(tpPercentage * 100));
-//     for (let i = 0; i < gridNumber; i++) {
-//       const sizeMultiplier = Math.pow(orderSizeMultiplier, i);
-//       const rawSize = CollateralParseOrderSize * BigInt(sizeMultiplier);
-//       let targetedPrice = BigInt(0);
-//       if (i === 0) {
-//         targetedPrice = parsedEntryPrice;
-//       } else {
-//         const distMultiplier = Math.pow(gridMultiplier, i - 1);
-//         const currentStepDistance = gridDistance * distMultiplier;
-//         lastPriceDistanceRate += currentStepDistance;
-//         const bpsChange = BigInt(Math.floor(lastPriceDistanceRate * 100));
-//         targetedPrice =
-//           parsedEntryPrice -
-//           (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
-//       }
-//       estOrders.push({
-//         user: {},
-//         wallet: {},
-//         chainId,
-//         name: orderName,
-//         strategy,
-//         category: "spot",
-//         orderType: "BUY",
-//         orderStatus: "PENDING",
-//         entry: {
-//           isTechnicalEntry: false,
-//           priceLogic: {
-//             type: "Price",
-//             id: "price",
-//             operator: "LESS_THAN",
-//             threshold: targetedPrice.toString(),
-//           },
-//         },
-//         orderAsset: {
-//           orderToken: orderToken,
-//           collateralToken: collateralToken,
-//           outputToken: outputToken,
-//           pairAddress: orderToken.pairAddress,
-//         },
-//         amount: {
-//           orderSize: rawSize.toString(),
-//           tokenAmount: "0",
-//         },
-//         slippage,
-//         sl: i + 1,
-//         isTrailingMode,
-//         exit: {
-//           takeProfit: {
-//             profit: "0",
-//             takeProfitPercentage: Number(tpBps),
-//             takeProfitPrice: "0",
-//           },
-//           stopLoss: {
-//             isActive: activeStopLoss,
-//             save: "0",
-//             stopLossPercentage: Number(slBps),
-//             stopLossPrice: "0",
-//           },
-//           isTechnicalExit: false,
-//         },
-//         isActive: true,
-//         isBusy: false,
-//         priority: Number(priority),
-//         executionSpeed,
-//         reEntrance: {
-//           isReEntrance,
-//           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-//         },
-//         executionFee: {
-//           payInUsd: "0",
-//           feeInUsd: "0",
-//         },
-//         createdAt: new Date(),
-//         updatedAt: new Date(),
-//       });
-//     }
-//   } else {
-//     let isSellStrategy = strategy == "sellToken";
-
-//     const slBps = BigInt(Math.floor(slPercentage * 100));
-//     const tpBps = BigInt(Math.floor(tpPercentage * 100));
-//     estOrders.push({
-//       user: {},
-//       wallet: {},
-//       chainId,
-//       name: orderName,
-//       strategy,
-//       category: "spot",
-//       orderType: isSellStrategy ? "SELL" : "BUY",
-//       orderStatus: "PENDING",
-//       entry: {
-//         isTechnicalEntry:
-//           !isSellStrategy && strategy == "algo" ? true : false,
-//         ...(strategy == "algo" && { technicalLogic: entryLogic }),
-//         ...(!isSellStrategy &&
-//           strategy != "algo" && {
-//             priceLogic: {
-//               type: "Price",
-//               id: "price",
-//               operator: "LESS_THAN",
-//               threshold: safeParseUnits(
-//                 targetPrice,
-//                 PRECISION_DECIMALS,
-//               ).toString(),
-//             },
-//           }),
-//       },
-//       orderAsset: {
-//         orderToken: orderToken,
-//         collateralToken: collateralToken,
-//         outputToken: outputToken,
-//         pairAddress: orderToken.pairAddress,
-//       },
-//       amount: {
-//         orderSize: isSellStrategy
-//           ? "0"
-//           : safeParseUnits(
-//               initialOrderSize,
-//               collateralToken.decimals,
-//             ).toString(),
-//         tokenAmount: isSellStrategy
-//           ? safeParseUnits(initialOrderSize, orderToken.decimals).toString()
-//           : "0",
-//       },
-//       slippage,
-//       sl: 1,
-//       isTrailingMode,
-//       exit: {
-//         takeProfit: {
-//           profit: "0",
-//           takeProfitPercentage: isTechnicalExit ? 0 : Number(tpBps),
-//           takeProfitPrice:
-//             isSellStrategy && !isTechnicalExit && tpPrice
-//               ? safeParseUnits(tpPrice, PRECISION_DECIMALS).toString()
-//               : "0",
-//         },
-//         stopLoss: {
-//           isActive: !isSellStrategy && activeStopLoss && !isTechnicalExit,
-//           save: "0",
-//           stopLossPercentage: isTechnicalExit ? 0 : Number(slBps),
-//           stopLossPrice: "0",
-//         },
-//         isTechnicalExit: isTechnicalExit,
-//         ...(isTechnicalExit && { technicalLogic: exitLogic }),
-//       },
-//       isActive: true,
-//       isBusy: false,
-//       priority: Number(priority),
-//       executionSpeed,
-//       reEntrance: {
-//         isReEntrance,
-//         reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-//       },
-//       executionFee: {
-//         payInUsd: "0",
-//         feeInUsd: "0",
-//       },
-//       createdAt: new Date(),
-//       updatedAt: new Date(),
-//     });
-//   }
-//   return estOrders;
-// };
-
-// const configureSpotOrder = (config: any): ORDER_TYPE[] => {
-//   const {
-//     gridNumber,
-//     targetPrice,
-//     activeStopLoss,
-//     entryLogic,
-//     exitLogic,
-//     orderSizeMultiplier,
-//     initialOrderSize,
-//     gridMultiplier,
-//     gridDistance,
-//     collateralToken,
-//     outputToken,
-//     orderToken,
-//     priority,
-//     executionSpeed,
-//     orderName,
-//     strategy,
-//     chainId,
-//     isTrailingMode,
-//     tpPrice,
-//     slPrice,
-//     isTechnicalExit,
-//     tpPercentage,
-//     slPercentage,
-//     isReEntrance,
-//     reEntrancePercentage,
-//     slippage,
-//     orderNetworkFee,
-//   } = config;
-
-//   const estOrders: ORDER_TYPE[] = [];
-
-//   // ────────────────── SELL (grid) branch ──────────────────
-//   if (
-//     gridNumber > 1 &&
-//     strategy == "sellToken" &&
-//     tpPrice &&
-//     Number(tpPrice) > 0
-//   ) {
-//     const parsedEntryPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
-//     let lastPriceDistanceRate = 0;
-//     const baseAmount = safeParseUnits(initialOrderSize, orderToken.decimals);
-//     let currentMultiplier = 1; // multiplier for the first grid
-
-//     for (let i = 0; i < gridNumber; i++) {
-//       const rawSize = applyMultiplier(baseAmount, currentMultiplier);
-//       let targetedPrice = BigInt(0);
-
-//       if (i === 0) {
-//         targetedPrice = parsedEntryPrice;
-//       } else {
-//         const distMultiplier = Math.pow(gridMultiplier, i - 1);
-//         const currentStepDistance = gridDistance * distMultiplier;
-//         lastPriceDistanceRate += currentStepDistance;
-//         const bpsChange = BigInt(Math.floor(lastPriceDistanceRate * 100));
-//         targetedPrice =
-//           parsedEntryPrice +
-//           (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
-//       }
-
-//       estOrders.push({
-//         // ... (order object unchanged) ...
-//         user: {},
-//         wallet: {},
-//         chainId,
-//         name: orderName,
-//         strategy,
-//         category: "spot",
-//         orderType: "SELL",
-//         orderStatus: "PENDING",
-//         entry: { isTechnicalEntry: false },
-//         orderAsset: {
-//           orderToken,
-//           collateralToken,
-//           outputToken,
-//           pairAddress: orderToken.pairAddress,
-//         },
-//         amount: {
-//           orderSize: "0",
-//           tokenAmount: rawSize.toString(),
-//         },
-//         slippage,
-//         sl: i + 1,
-//         isTrailingMode,
-//         exit: {
-//           takeProfit: {
-//             profit: "0",
-//             takeProfitPercentage: tpPercentage,
-//             takeProfitPrice: "0",
-//           },
-//           stopLoss: {
-//             isActive: activeStopLoss,
-//             save: "0",
-//             stopLossPercentage: slPercentage,
-//             stopLossPrice: slPrice,
-//           },
-//           isTechnicalExit: false,
-//         },
-//         isActive: true,
-//         isBusy: false,
-//         priority: Number(priority),
-//         executionSpeed,
-//         reEntrance: {
-//           isReEntrance,
-//           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-//         },
-//         executionFee: {
-//           payInUsd: "0",
-//           feeInUsd: "0",
-//           feeUsed: "0",
-//           ...(orderNetworkFee != "0" && {
-//             networkTradeFeeLocked: orderNetworkFee,
-//           }),
-//         },
-//         createdAt: new Date(),
-//         updatedAt: new Date(),
-//       });
-
-//       currentMultiplier *= orderSizeMultiplier; // prepare for next grid
-//     }
-//   }
-//   // ────────────────── BUY (grid/multiScalp/dca) branch ──────────────────
-//   else if (
-//     gridNumber > 1 &&
-//     ["grid", "multiScalp", "dca"].includes(strategy) &&
-//     targetPrice &&
-//     Number(targetPrice) > 0
-//   ) {
-//     const parsedEntryPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
-//     let lastPriceDistanceRate = 0;
-//     const baseAmount = safeParseUnits(
-//       initialOrderSize,
-//       collateralToken.decimals,
-//     );
-//     const slBps = BigInt(Math.floor(slPercentage * 100));
-//     const tpBps = BigInt(Math.floor(tpPercentage * 100));
-//     let currentMultiplier = 1;
-
-//     for (let i = 0; i < gridNumber; i++) {
-//       const rawSize = applyMultiplier(baseAmount, currentMultiplier);
-//       let targetedPrice = BigInt(0);
-
-//       if (i === 0) {
-//         targetedPrice = parsedEntryPrice;
-//       } else {
-//         const distMultiplier = Math.pow(gridMultiplier, i - 1);
-//         const currentStepDistance = gridDistance * distMultiplier;
-//         lastPriceDistanceRate += currentStepDistance;
-//         const bpsChange = BigInt(Math.floor(lastPriceDistanceRate * 100));
-//         targetedPrice =
-//           parsedEntryPrice -
-//           (parsedEntryPrice * bpsChange) / BASIS_POINT_DIVISOR_BIGINT;
-//       }
-
-//       estOrders.push({
-//         // ... (order object unchanged) ...
-//         user: {},
-//         wallet: {},
-//         chainId,
-//         name: orderName,
-//         strategy,
-//         category: "spot",
-//         orderType: "BUY",
-//         orderStatus: "PENDING",
-//         entry: {
-//           isTechnicalEntry: false,
-//           priceLogic: {
-//             type: "Price",
-//             id: "price",
-//             operator: "LESS_THAN",
-//             threshold: targetedPrice.toString(),
-//           },
-//         },
-//         orderAsset: {
-//           orderToken,
-//           collateralToken,
-//           outputToken,
-//           pairAddress: orderToken.pairAddress,
-//         },
-//         amount: {
-//           orderSize: rawSize.toString(),
-//           tokenAmount: "0",
-//         },
-//         slippage,
-//         sl: i + 1,
-//         isTrailingMode,
-//         exit: {
-//           takeProfit: {
-//             profit: "0",
-//             takeProfitPercentage: Number(tpBps),
-//             takeProfitPrice: "0",
-//           },
-//           stopLoss: {
-//             isActive: activeStopLoss,
-//             save: "0",
-//             stopLossPercentage: Number(slBps),
-//             stopLossPrice: "0",
-//           },
-//           isTechnicalExit: false,
-//         },
-//         isActive: true,
-//         isBusy: false,
-//         priority: Number(priority),
-//         executionSpeed,
-//         reEntrance: {
-//           isReEntrance,
-//           reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-//         },
-//         executionFee: {
-//           payInUsd: "0",
-//           feeInUsd: "0",
-//           feeUsed: "0",
-//           ...(orderNetworkFee != "0" && {
-//             networkTradeFeeLocked: (
-//               BigInt(orderNetworkFee) * BigInt(2)
-//             ).toString(),
-//           }),
-//         },
-//         createdAt: new Date(),
-//         updatedAt: new Date(),
-//       });
-
-//       currentMultiplier *= orderSizeMultiplier;
-//     }
-//   }
-//   // ────────────────── Single order branch ──────────────────
-//   else {
-//     const isSellStrategy = strategy == "sellToken";
-//     const slBps = BigInt(Math.floor(slPercentage * 100));
-//     const tpBps = BigInt(Math.floor(tpPercentage * 100));
-
-//     estOrders.push({
-//       // ... (single order object unchanged) ...
-//       user: {},
-//       wallet: {},
-//       chainId,
-//       name: orderName,
-//       strategy,
-//       category: "spot",
-//       orderType: isSellStrategy ? "SELL" : "BUY",
-//       orderStatus: "PENDING",
-//       entry: {
-//         isTechnicalEntry:
-//           !isSellStrategy && strategy == "algo" ? true : false,
-//         ...(strategy == "algo" && { technicalLogic: entryLogic }),
-//         ...(!isSellStrategy &&
-//           strategy != "algo" && {
-//             priceLogic: {
-//               type: "Price",
-//               id: "price",
-//               operator: "LESS_THAN",
-//               threshold: safeParseUnits(
-//                 targetPrice,
-//                 PRECISION_DECIMALS,
-//               ).toString(),
-//             },
-//           }),
-//       },
-//       orderAsset: {
-//         orderToken,
-//         collateralToken,
-//         outputToken,
-//         pairAddress: orderToken.pairAddress,
-//       },
-//       amount: {
-//         orderSize: isSellStrategy
-//           ? "0"
-//           : safeParseUnits(
-//               initialOrderSize,
-//               collateralToken.decimals,
-//             ).toString(),
-//         tokenAmount: isSellStrategy
-//           ? safeParseUnits(initialOrderSize, orderToken.decimals).toString()
-//           : "0",
-//       },
-//       slippage,
-//       sl: 1,
-//       isTrailingMode,
-//       exit: {
-//         takeProfit: {
-//           profit: "0",
-//           takeProfitPercentage: isTechnicalExit ? 0 : Number(tpBps),
-//           takeProfitPrice:
-//             isSellStrategy && !isTechnicalExit && tpPrice
-//               ? safeParseUnits(tpPrice, PRECISION_DECIMALS).toString()
-//               : "0",
-//         },
-//         stopLoss: {
-//           isActive: !isSellStrategy && activeStopLoss && !isTechnicalExit,
-//           save: "0",
-//           stopLossPercentage: isTechnicalExit ? 0 : Number(slBps),
-//           stopLossPrice: "0",
-//         },
-//         isTechnicalExit: isTechnicalExit,
-//         ...(isTechnicalExit && { technicalLogic: exitLogic }),
-//       },
-//       isActive: true,
-//       isBusy: false,
-//       priority: Number(priority),
-//       executionSpeed,
-//       reEntrance: {
-//         isReEntrance,
-//         reEntranceLimit: Math.floor(reEntrancePercentage * 100),
-//       },
-//       executionFee: {
-//         payInUsd: "0",
-//         feeInUsd: "0",
-//         feeUsed: "0",
-//         ...(orderNetworkFee != "0" && {
-//           networkTradeFeeLocked: (
-//             BigInt(orderNetworkFee) * BigInt(isSellStrategy ? 1 : 2)
-//           ).toString(),
-//         }),
-//       },
-//       createdAt: new Date(),
-//       updatedAt: new Date(),
-//     });
-//   }
-
-//   return estOrders;
-// };

@@ -434,7 +434,7 @@ export const useAsterSymbols = (
     };
   }, [enabled]);
 
-  console.log(symbols);
+  // console.log(symbols);
 
   const filteredSymbols = useMemo(() => {
     let filtered = symbols;

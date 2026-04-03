@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { ORDER_TYPE } from "@/type/order";
+import { useDebounce } from "use-debounce";
+import { ORDER_TYPE, OrderTokenType } from "@/type/order";
 
 import { MIN_ORDER_SIZE, MAX_GRID_NUMBER } from "@/constants/common/order";
-import { CollateralTokens } from "@/constants/common/tokens";
+import { PerpCollateral } from "@/constants/common/tokens";
 import { PerpetualStrategies } from "@/constants/common/frontend";
-import { FiChevronDown, FiInfo } from "react-icons/fi";
+import { FiChevronDown, FiAlertTriangle } from "react-icons/fi";
 import { ZeroAddress } from "ethers";
 
 //components
-import { toast } from "react-hot-toast";
 import TechnicalEntry from "./TradeBoxCommon/TechnicalEntry";
 import InfoTooltip from "./TradeBoxCommon/BoxTooltip";
 import DropDown from "./TradeBoxCommon/BoxDropdown";
@@ -21,15 +21,27 @@ import EntryPriceRendering from "./TradeBoxCommon/EntryPriceRendering";
 import OrderNameValidationInput from "./TradeBoxCommon/orderNameValidation";
 import GridInput from "./TradeBoxCommon/GridInput";
 import NumberInput from "./TradeBoxCommon/NumberInput";
-import EstSpotOrders from "@/components/order/estimate/estSpotOrder";
-import SelectWallet from "@/components/walletManager/selection/selectWalletToCreateOrder";
+import EstSpotOrders from "@/components/order/estimate/estPerpOrder";
+import PerpAccountSelect from "@/components/walletManager/selection/perpAccountSelect";
 import ConfirmationModal from "../common/Confirmation/ConfirmationBox";
 
 // hook
-import { useSpotOrder } from "@/hooks/useOrder";
+import { useOrder } from "@/hooks/useOrder";
 
 //library
 import { fetchCodexTokenPrice } from "@/lib/oracle/codex";
+import LeverageInput from "./TradeBoxCommon/LeverageInput";
+import {
+  getOrderIndexTokenAddress,
+  getOrderPerpetual,
+  getOrderProtocol,
+  isActiveClientOrder,
+  getDefaultFeeToken,
+  shouldRenderFeeTokenSelector,
+  calculateEstLiquidationPrice,
+} from "@/utility/orderUtility";
+import { displayNumber } from "@/utility/displayPrice";
+import { BASIS_POINT_DIVISOR } from "@/constants/common/utils";
 
 // Constants
 const GRID_MULTIPLIER_OPTIONS = [
@@ -40,9 +52,25 @@ const GRID_MULTIPLIER_OPTIONS = [
   { label: "3x", value: 3 },
 ];
 
+const EST_PERP_MAINTENANCE_BPS = 50;
+
 interface GridsByWallet {
   [walletIndex: number]: any;
 }
+
+const renderTokenOption = (token: any) => ({
+  label: (
+    <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
+      <img
+        src={token.imageUrl}
+        className="w-4 h-4 rounded-full"
+        alt={token.symbol}
+      />
+      <span>{token.symbol}</span>
+    </div>
+  ),
+  value: token,
+});
 
 const RenderingTechnicalExit = ({
   isTechnicalExit,
@@ -87,26 +115,26 @@ const RenderingTechnicalExit = ({
   );
 };
 
-interface spotTradeBoxProps {
+interface perpTradeBoxProps {
   tokenInfo: any;
   chainId: number;
-  protocol?: string;
   isConnected: boolean;
   user?: any;
   userWallets?: any[];
   userPrevOrders?: any[];
+  protocol: string;
 }
 
-export default function spotTradeBox({
+export default function PerpTradeBox({
   tokenInfo,
   chainId,
-  protocol,
   isConnected,
   user,
   userWallets = [],
   userPrevOrders = [],
-}: spotTradeBoxProps) {
-  const { configurePerpOrder, addSpotOrder } = useSpotOrder();
+  protocol,
+}: perpTradeBoxProps) {
+  const { configurePerpOrder, submitOrder } = useOrder();
 
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -120,10 +148,10 @@ export default function spotTradeBox({
     PerpetualStrategies[0],
   );
   const [collateralToken, setCollateralToken] = useState<any>(
-    CollateralTokens[chainId][ZeroAddress],
+    Object.values(PerpCollateral[42161])[0],
   );
   const [outputToken, setOutputToken] = useState<any>(
-    CollateralTokens[chainId][ZeroAddress],
+    Object.values(PerpCollateral[42161])[0],
   );
   const [collateralPrice, setCollateralPrice] = useState<number>(0);
 
@@ -154,16 +182,29 @@ export default function spotTradeBox({
   // Advanced Settings State
   const [priority, setPriority] = useState<number>(2);
   const [executionSpeed, setExecutionSpeed] = useState<string>("standard");
-  const [orderNetworkFee, setOrderNetworkFee] = useState("0");
 
   // Wallet & Order State
   const [gridsByWallet, setGridsByWallet] = useState<GridsByWallet>({});
   const [areWalletsReady, setWalletsReady] = useState<boolean>(false);
+  const [perpAccountGateOk, setPerpAccountGateOk] = useState(false);
   const [estOrders, setEstOrders] = useState<ORDER_TYPE[]>([]);
+  const feeTokenOptions = useMemo(
+    () => Object.values(PerpCollateral[chainId] || {}) as OrderTokenType[],
+    [chainId],
+  );
+  const [feeToken, setFeeToken] = useState<OrderTokenType | null>(
+    getDefaultFeeToken(feeTokenOptions),
+  );
+  const [feeTokenPrice, setFeeTokenPrice] = useState<number>(0);
+  const showFeeTokenSelector = shouldRenderFeeTokenSelector(user?.status);
 
   const [leverage, setLeverage] = useState(1);
-  const [leverageMultiplier, setLevrageMultiplier] = useState(1);
-  const [isLong, setIsLong] = useState(true);
+  //const [leverageMultiplier, setLevrageMultiplier] = useState(1);
+  const [isLong, setIsLong] = useState(false);
+
+  const [debouncedInitialOrderSize] = useDebounce(initialOrderSize, 300);
+  const [debouncedEntryPrice] = useDebounce(entryPrice, 300);
+  const [debouncedTpPrice] = useDebounce(tpPrice, 300);
 
   //order submission error
   const [submitText, setSubmitText] = useState("Create Order");
@@ -179,10 +220,10 @@ export default function spotTradeBox({
       let secounCal = fristCal / (gridMultiplier - 1);
       let lastPercentage = gridDistance * secounCal;
       if (lastPercentage >= 100) {
-        return false;
+        return true;
       }
     }
-    return true;
+    return false;
   };
 
   // ========================================================================
@@ -215,7 +256,7 @@ export default function spotTradeBox({
 
         // Handle Native Token (convert to Wrapped for API query)
         if (collateralToken.address === ZeroAddress) {
-          const wrappedNative = Object.values(CollateralTokens[chainId]).find(
+          const wrappedNative = Object.values(PerpCollateral[chainId]).find(
             (t: any) => t.isWrappedNative,
           ) as any;
           if (wrappedNative) {
@@ -241,6 +282,84 @@ export default function spotTradeBox({
 
     fetchCollateralPrice();
   }, [collateralToken, tokenInfo, chainId]);
+
+  useEffect(() => {
+    const nextPrice = tokenInfo?.priceUsd ? String(tokenInfo.priceUsd) : "";
+    setEntryPrice(nextPrice);
+    setTpPrice(nextPrice);
+  }, [tokenInfo?.address]);
+
+  useEffect(() => {
+    const defaultFeeToken = getDefaultFeeToken(feeTokenOptions);
+    setFeeToken((prev) => {
+      if (!defaultFeeToken) return null;
+
+      const matchedToken = feeTokenOptions.find(
+        (token) =>
+          token.address.toLowerCase() === prev?.address?.toLowerCase(),
+      );
+
+      return matchedToken || defaultFeeToken;
+    });
+  }, [feeTokenOptions]);
+
+  useEffect(() => {
+    const fetchFeeTokenPrice = async () => {
+      if (!feeToken) {
+        setFeeTokenPrice(0);
+        return;
+      }
+
+      if (feeToken.isStable) {
+        setFeeTokenPrice(1);
+        return;
+      }
+
+      if (
+        tokenInfo?.address &&
+        feeToken.address.toLowerCase() === tokenInfo.address.toLowerCase() &&
+        tokenInfo?.priceUsd
+      ) {
+        setFeeTokenPrice(Number(tokenInfo.priceUsd));
+        return;
+      }
+
+      if (
+        collateralToken?.address &&
+        feeToken.address.toLowerCase() ===
+        collateralToken.address.toLowerCase() &&
+        collateralPrice > 0
+      ) {
+        setFeeTokenPrice(collateralPrice);
+        return;
+      }
+
+      try {
+        let queryAddress = feeToken.address;
+
+        if (queryAddress === ZeroAddress) {
+          const wrappedNative = Object.values(PerpCollateral[chainId]).find(
+            (token: any) => token.isWrappedNative,
+          ) as any;
+
+          if (wrappedNative) {
+            queryAddress = wrappedNative.address;
+          }
+        }
+
+        const price = await fetchCodexTokenPrice({
+          tokenAddress: queryAddress,
+          chainId,
+        });
+
+        setFeeTokenPrice(price ? Number(price) : 0);
+      } catch {
+        setFeeTokenPrice(0);
+      }
+    };
+
+    fetchFeeTokenPrice();
+  }, [feeToken, tokenInfo?.address, tokenInfo?.priceUsd, collateralPrice, collateralToken, chainId]);
 
   // ========================================================================
   // Event Handlers
@@ -278,7 +397,7 @@ export default function spotTradeBox({
 
     // Set collateral token based on strategy
     if (strategy.id === "sellToken") {
-      const tokenFromConstants = Object.values(CollateralTokens[chainId]).find(
+      const tokenFromConstants = Object.values(PerpCollateral[chainId]).find(
         (t: any) =>
           t.address.toLowerCase() === tokenInfo.address?.toLowerCase(),
       ) as any;
@@ -297,7 +416,7 @@ export default function spotTradeBox({
       }
     } else {
       // Reset to default collateral token
-      setCollateralToken(CollateralTokens[chainId][ZeroAddress]);
+      setCollateralToken(Object.values(PerpCollateral[chainId])[0]);
     }
   };
 
@@ -311,32 +430,159 @@ export default function spotTradeBox({
     return Number(initialOrderSize) * collateralPrice;
   }, [initialOrderSize, collateralPrice]);
 
+  const entryForLiquidationUsd = useMemo(() => {
+    if (selectedStrategy.id === "sellToken" && !isTechnicalExit) {
+      return Number(debouncedTpPrice) || 0;
+    }
+    if (selectedStrategy.id === "algo") {
+      return (
+        Number(debouncedEntryPrice) || Number(tokenInfo?.priceUsd) || 0
+      );
+    }
+    return Number(debouncedEntryPrice) || 0;
+  }, [
+    selectedStrategy.id,
+    isTechnicalExit,
+    debouncedTpPrice,
+    debouncedEntryPrice,
+    tokenInfo?.priceUsd,
+  ]);
+
+  const estLiquidationPriceUsd = useMemo(() => {
+    return calculateEstLiquidationPrice(
+      entryForLiquidationUsd,
+      leverage,
+      isLong,
+      EST_PERP_MAINTENANCE_BPS,
+    );
+  }, [entryForLiquidationUsd, leverage, isLong]);
+
+  const selectedWalletCount = useMemo(() => {
+    const walletKeys = Object.values(gridsByWallet)
+      .map((wallet: any) => wallet?._id || wallet)
+      .filter(Boolean);
+
+    return new Set(walletKeys).size;
+  }, [gridsByWallet]);
+
+  const minimumWalletCount = useMemo(() => {
+    return estOrders.length > 0 ? 1 : 0;
+  }, [estOrders.length]);
+
+  const feeTokenReady = !showFeeTokenSelector || (!!feeToken?.address && feeTokenPrice > 0);
+
+  const strategyLabel = useMemo(() => {
+    return (
+      selectedStrategy?.name ||
+      selectedStrategy?.id ||
+      "Perp strategy"
+    );
+  }, [selectedStrategy]);
+
+
+
+  // Replace the old confirmationDescription with this detailed trade summary
+  const confirmationDescription = (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
+        Please review your perpetual order details before confirming.
+      </p>
+
+      {/* Trade Details Receipt Card */}
+      <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-5 border border-gray-200 dark:border-white/10 space-y-4 shadow-inner">
+
+        {/* Action Row */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Action</span>
+          <span className={`text-base font-bold flex items-center gap-1.5 ${isLong ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <div className={`w-2 h-2 rounded-full ${isLong ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+            {isLong ? 'Long' : 'Short'} {tokenInfo?.symbol}
+          </span>
+        </div>
+
+        {/* Size & Leverage Row */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Position Size</span>
+          <span className="text-base font-bold text-gray-900 dark:text-white">
+            {initialOrderSize || '0'} {tokenInfo?.symbol} <span className="text-gray-400 mx-1 font-normal">×</span> {leverage}x
+          </span>
+        </div>
+
+        {/* Strategy Row */}
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Strategy</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-white px-2.5 py-1 bg-gray-200/50 dark:bg-white/10 rounded-md">
+            {selectedStrategy?.name || 'Manual'}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Orders Count</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-white px-2.5 py-1 bg-gray-200/50 dark:bg-white/10 rounded-md">
+            {estOrders.length}
+          </span>
+        </div>
+
+        {/* TP / SL Row (Only renders if they are set > 0) */}
+        {(Number(tpPercentage) > 0 || Number(slPercentage) > 0) && (
+          <div className="pt-4 mt-2 border-t border-gray-200 dark:border-white/10 space-y-3">
+            {Number(tpPercentage) > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Take Profit</span>
+                <span className="text-sm font-bold text-emerald-500">+{tpPercentage}%</span>
+              </div>
+            )}
+            {Number(slPercentage) > 0 && isActiveStopLoss && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Stop Loss</span>
+                <span className="text-sm font-bold text-rose-500">-{slPercentage}%</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Risk Warning Box */}
+      <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 rounded-xl border border-amber-200 dark:border-amber-500/20 mt-6">
+        <FiAlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
+        <p className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed text-left">
+          Perpetual trading involves significant risk. Ensure you have sufficient margin to avoid liquidation.
+        </p>
+      </div>
+    </div>
+  );
+
   const isReadyToCreateOrder = (): boolean => {
+    const withStatus = (isValid: boolean, text: string) => {
+      setSubmitText(text);
+      return isValid;
+    };
+
     // Validate trailing mode
     let _submitText = "Create Order";
     if (selectedStrategy.id === "algo") {
       if (!technicalEntry) {
         _submitText = "Set entry logic";
-        return false;
+        return withStatus(false, _submitText);
       }
     } else {
       if (selectedStrategy.id == "sellToken" && !isTechnicalExit) {
         if (Number(tpPrice) <= 0 || tpPrice === "") {
           _submitText = "Set exit price";
-          return false;
+          return withStatus(false, _submitText);
         }
       } else {
         // Validate entry price for other strategies
         if (Number(entryPrice) <= 0 || entryPrice === "") {
           _submitText = "Set entry price";
-          return false;
+          return withStatus(false, _submitText);
         }
       }
     }
 
     if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
       _submitText = `Enter valid order size`;
-      return false;
+      return withStatus(false, _submitText);
     }
     if (
       isTrailingMode &&
@@ -345,7 +591,7 @@ export default function spotTradeBox({
         slPercentage == 100)
     ) {
       _submitText = "Slippage required in trailing mode";
-      return false;
+      return withStatus(false, _submitText);
     }
     // Validate re-entrance
     if (
@@ -353,53 +599,52 @@ export default function spotTradeBox({
       (reEntrancePercentage <= 0 || reEntrancePercentage.toString() === "")
     ) {
       _submitText = "Set re-entrance % in re-entrance mode";
-      return false;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     if (gridNumber < 1 || gridNumber > MAX_GRID_NUMBER) {
       _submitText = `Grid must be lower then ${MAX_GRID_NUMBER + 1} and not zero`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     if (selectedStrategy.id == "sellToken" && !isTechnicalExit) {
       if (Number(tpPrice) <= 0 || tpPrice === "") {
         _submitText = `Enter valid TP price`;
-        return false;
+        return withStatus(false, _submitText);
       }
     }
 
     if (isTechnicalExit) {
       if (!technicalExit) {
         _submitText = `Set exit logic`;
-        return false;
+        return withStatus(false, _submitText);
       }
     } else {
       if (tpPercentage <= 0) {
         _submitText = `Set TP percentage`;
-        return false;
+        return withStatus(false, _submitText);
       }
       if (isActiveStopLoss && slPercentage <= 0) {
         _submitText = `Set SL percentage`;
-        return false;
+        return withStatus(false, _submitText);
       }
     }
 
     // Validate basic order parameters
     if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
       _submitText = `Enter valid order size`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     if (slippage.toString() === "" || slippage <= 0.4) {
       _submitText = `Slippage should be greater then 0.4`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     // Validate Minimum USD Value
     if (estimatedUsdValue < MIN_ORDER_SIZE) {
       _submitText = `Minimum order size $${MIN_ORDER_SIZE} `;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     // Validate grid number for specific strategies
@@ -408,13 +653,13 @@ export default function spotTradeBox({
       gridNumber !== 1
     ) {
       _submitText = `Order configuration not metch refresh please`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     // Validate grid configuration
     if (gridNumber.toString() === "" || gridNumber === 0) {
       _submitText = `Order configuration not metch refresh please`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     if (Number(gridNumber) > 1) {
@@ -427,38 +672,128 @@ export default function spotTradeBox({
         orderSizeMultiplier.toString() === ""
       ) {
         _submitText = `Set valid grid configuration`;
-        return false;
+        return withStatus(false, _submitText);
       } else {
         if (
           selectedStrategy.id != "sellToken" &&
           negativeGridDecrementalPriceProtection()
         ) {
           _submitText = `Grid multiplier is too high set negative target`;
-          return false;
+          return withStatus(false, _submitText);
         }
       }
     }
 
     if (!isConnected) {
       _submitText = `Connect your wallet`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
     // Validate order name
     if (!isOrderNameValidate || orderName.trim() === "") {
       _submitText = `set Unique name`;
-      return false;
+      return withStatus(false, _submitText);
+    }
+
+    const hasAssignedWallets = Object.values(gridsByWallet).some(
+      (w: any) => w && (w._id || w.address),
+    );
+    if (hasAssignedWallets && !perpAccountGateOk) {
+      _submitText = "Approve Agent & Deposit First";
+      return withStatus(false, _submitText);
     }
 
     if (!areWalletsReady) {
       _submitText = `Select wallet`;
-      return false;
+      return withStatus(false, _submitText);
     }
 
-    setSubmitText(_submitText);
+    if (showFeeTokenSelector && !feeToken?.address) {
+      _submitText = `Select fee token`;
+      return withStatus(false, _submitText);
+    }
 
-    return true;
+    if (showFeeTokenSelector && feeTokenPrice <= 0) {
+      _submitText = `Fee token price unavailable`;
+      return withStatus(false, _submitText);
+    }
+
+    // Protocol specific position limits
+    const selectedWalletIds = Object.values(gridsByWallet).map((w: any) => w._id);
+    const uniqueWallets = Array.from(new Set(selectedWalletIds));
+    const currentProtocol = protocol?.toLowerCase();
+    const currentIndexToken = (
+      tokenInfo?.address ||
+      tokenInfo?.symbol ||
+      ""
+    ).toLowerCase();
+
+    for (const walletId of uniqueWallets) {
+      const walletOrders = userPrevOrders.filter(
+        (o: any) =>
+          isActiveClientOrder(o) &&
+          o.category?.toLowerCase() === "perpetual" &&
+          (o.wallet?._id === walletId || o.wallet === walletId) &&
+          getOrderIndexTokenAddress(o)?.toLowerCase() === currentIndexToken &&
+          getOrderProtocol(o)?.toLowerCase() === currentProtocol,
+      );
+
+      if (currentProtocol === "hyperliquid") {
+        if (walletOrders.length > 0) {
+          _submitText = `Hyperliquid: Only 1 position allowed per asset per wallet`;
+          return withStatus(false, _submitText);
+        }
+      } else if (currentProtocol === "asterdex") {
+        const sameDirectionCount = walletOrders.filter(
+          (o: any) => getOrderPerpetual(o)?.isLong === isLong,
+        ).length;
+        if (sameDirectionCount >= 1) {
+          _submitText = `Asterdex: Max 1 ${isLong ? "Long" : "Short"} position allowed per wallet`;
+          return withStatus(false, _submitText);
+        }
+      }
+    }
+
+    return withStatus(true, _submitText);
   };
+
+  useEffect(() => {
+    setReadyToSubmitOrder(isReadyToCreateOrder());
+  }, [
+    areWalletsReady,
+    perpAccountGateOk,
+    estimatedUsdValue,
+    selectedStrategy,
+    technicalEntry,
+    technicalExit,
+    tpPrice,
+    entryPrice,
+    initialOrderSize,
+    isTrailingMode,
+    slPercentage,
+    isReEntrance,
+    reEntrancePercentage,
+    gridNumber,
+    isTechnicalExit,
+    tpPercentage,
+    isActiveStopLoss,
+    slippage,
+    isConnected,
+    isOrderNameValidate,
+    orderName,
+    showFeeTokenSelector,
+    feeToken,
+    feeTokenPrice,
+    gridsByWallet,
+    userPrevOrders,
+    tokenInfo,
+    protocol,
+    isLong,
+    gridDistance,
+    gridMultiplier,
+    orderSizeMultiplier,
+    collateralPrice,
+  ]);
 
   // ========================================================================
   // Order Management Handlers
@@ -497,20 +832,54 @@ export default function spotTradeBox({
     setCreationPending(true);
 
     try {
-      const submitOrder = await addSpotOrder({
+      // Build the full orderParams that the backend expects
+      const orderParams = {
+        gridNumber,
+        targetPrice: entryPrice,
+        activeStopLoss: isActiveStopLoss,
+        entryLogic: technicalEntry,
+        exitLogic: technicalExit,
+        orderSizeMultiplier,
+        initialOrderSize,
+        gridMultiplier,
+        gridDistance,
+        collateralToken,
+        outputToken,
+        symbolInfo: {
+          symbol: tokenInfo.address || tokenInfo.symbol,
+          ...tokenInfo,
+        },
+        orderToken: tokenInfo,
+        priority,
+        executionSpeed,
+        orderName,
+        strategy: selectedStrategy.id,
+        chainId,
+        isTrailingMode,
+        tpPrice,
+        isTechnicalExit,
+        tpPercentage,
+        slPercentage,
+        isReEntrance,
+        reEntrancePercentage,
+        slippage,
+        leverage,
+        isLong,
+        protocol,
+        indexTokenAddress: tokenInfo.address || tokenInfo.symbol,
+        feeToken,
+      };
+
+      const result = await submitOrder({
+        orderParams,
+        gridsByWallet,
         estOrders,
         areWalletsReady,
-        gridsByWallet,
-        chainId,
-        name: orderName,
-        strategy: selectedStrategy.id,
-        indexToken: tokenInfo.address,
         category: "perpetual",
-        protocol,
         user,
       });
 
-      if (submitOrder.added == true) {
+      if (result.added === true) {
         // Reset form
         setGridNumber(1);
         setEstOrders([]);
@@ -545,42 +914,44 @@ export default function spotTradeBox({
         }
       } else {
         if (selectedStrategy.id == "sellToken" && !isTechnicalExit) {
-          if (Number(tpPrice) <= 0 || tpPrice === "") {
+          if (Number(debouncedTpPrice) <= 0 || debouncedTpPrice === "") {
             return false;
           }
         } else {
           // Validate entry price for other strategies
-          if (Number(entryPrice) <= 0 || entryPrice === "") {
+          if (Number(debouncedEntryPrice) <= 0 || debouncedEntryPrice === "") {
             return false;
           }
         }
       }
 
-      if (Number(initialOrderSize) <= 0 || initialOrderSize == "") {
+      if (
+        Number(debouncedInitialOrderSize) <= 0 ||
+        debouncedInitialOrderSize == ""
+      ) {
         return false;
       }
       return true;
     };
-    setReadyToSubmitOrder(isReadyToCreateOrder());
     if (shouldConfigureOrder()) {
+      const targetPx =
+        selectedStrategy.id === "sellToken" && !isTechnicalExit
+          ? debouncedTpPrice
+          : debouncedEntryPrice;
       const orderConfig: any = {
         gridNumber,
-        targetPrice: entryPrice,
+        targetPrice: targetPx,
         activeStopLoss: isActiveStopLoss,
         entryLogic: technicalEntry,
         exitLogic: technicalExit,
         orderSizeMultiplier,
-        initialOrderSize,
+        initialOrderSize: debouncedInitialOrderSize,
         gridMultiplier,
         gridDistance,
         collateralToken,
         outputToken,
         orderToken: {
-          address: tokenInfo.address,
-          pairAddress: tokenInfo.pairAddress,
-          marketTokenAddress: tokenInfo.marketTokenAddress,
-          decimals: tokenInfo.decimals,
-          symbol: tokenInfo.symbol,
+          ...tokenInfo
         },
         priority,
         executionSpeed,
@@ -588,15 +959,21 @@ export default function spotTradeBox({
         strategy: selectedStrategy.id,
         chainId,
         isTrailingMode,
-        tpPrice: entryPrice,
-        slPrice: entryPrice,
+        tpPrice: debouncedTpPrice,
+        slPrice: debouncedEntryPrice,
         isTechnicalExit,
         tpPercentage,
         slPercentage,
         isReEntrance,
         reEntrancePercentage,
         slippage,
-        orderNetworkFee,
+        leverage,
+        isLong,
+        protocol,
+        feeToken,
+        feeTokenPrice,
+        collateralPrice,
+        feeTokenRequired: showFeeTokenSelector,
       };
       const _estOrders = configurePerpOrder(orderConfig);
 
@@ -605,8 +982,9 @@ export default function spotTradeBox({
       setEstOrders([]);
     }
   }, [
-    initialOrderSize,
-    entryPrice,
+    debouncedInitialOrderSize,
+    debouncedEntryPrice,
+    debouncedTpPrice,
     technicalEntry,
     technicalExit,
     orderName,
@@ -621,20 +999,24 @@ export default function spotTradeBox({
     slPercentage,
     slippage,
     collateralToken,
+    feeToken,
+    feeTokenPrice,
     selectedStrategy,
     priority,
     isTechnicalExit,
     executionSpeed,
-    isOrderNameValidate,
-    orderNetworkFee,
-    estimatedUsdValue, // added dependency
-    areWalletsReady,
+    collateralPrice,
+    isLong,
+    leverage,
+    showFeeTokenSelector,
+    protocol,
   ]);
 
   const MemoizedWalletSelector = useMemo(
     () => (
-      <SelectWallet
-        category="perpetual"
+      <PerpAccountSelect
+        protocol={protocol}
+        category={'perpetual'}
         orders={userPrevOrders}
         availableWallets={userWallets}
         gridsByWallet={gridsByWallet}
@@ -645,24 +1027,28 @@ export default function spotTradeBox({
         collateralToken={collateralToken}
         selectedStrategy={selectedStrategy}
         estOrders={estOrders}
-        setOrderNetworkFee={setOrderNetworkFee}
         user={user}
+        feeToken={showFeeTokenSelector ? feeToken : undefined}
+        onPerpTradeGateChange={setPerpAccountGateOk}
       />
     ),
     [
       estOrders,
       userPrevOrders,
       userWallets,
+      protocol,
       gridNumber,
       selectedStrategy,
-      initialOrderSize,
-      orderSizeMultiplier,
       chainId,
       collateralToken,
+      feeToken,
       gridsByWallet,
       areWalletsReady,
+      showFeeTokenSelector,
     ],
   );
+
+
 
   // ========================================================================
   // Render
@@ -685,13 +1071,12 @@ export default function spotTradeBox({
                     {selectedStrategy.name}
                   </h3>
                   <div
-                    className={`px-2 py-0.5 text-xs rounded-full ${
-                      selectedStrategy.type === "Basic"
-                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                        : selectedStrategy.type === "Premium"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                          : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                    }`}
+                    className={`px-2 py-0.5 text-xs rounded-full ${selectedStrategy.type === "Basic"
+                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                      : selectedStrategy.type === "Premium"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                      }`}
                   >
                     {selectedStrategy.type}
                   </div>
@@ -702,9 +1087,8 @@ export default function spotTradeBox({
               </div>
             </div>
             <FiChevronDown
-              className={`w-5 h-5 text-gray-500 transition-transform ${
-                showStrategyDropdown ? "rotate-180" : ""
-              }`}
+              className={`w-5 h-5 text-gray-500 transition-transform ${showStrategyDropdown ? "rotate-180" : ""
+                }`}
             />
           </div>
         </div>
@@ -716,11 +1100,10 @@ export default function spotTradeBox({
               <div
                 key={strategy.id}
                 onClick={() => handleStrategyChange(strategy)}
-                className={`p-4 cursor-pointer transition-all ${
-                  selectedStrategy.id === strategy.id
-                    ? "bg-blue-50 dark:bg-gray-700"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
+                className={`p-4 cursor-pointer transition-all ${selectedStrategy.id === strategy.id
+                  ? "bg-blue-50 dark:bg-gray-700"
+                  : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   {strategy.icon}
@@ -730,13 +1113,12 @@ export default function spotTradeBox({
                         {strategy.name}
                       </h3>
                       <div
-                        className={`px-2 py-0.5 text-xs rounded-full ${
-                          strategy.type === "Basic"
-                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                            : strategy.type === "Premium"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                              : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        }`}
+                        className={`px-2 py-0.5 text-xs rounded-full ${strategy.type === "Basic"
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          : strategy.type === "Premium"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                            : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          }`}
                       >
                         {strategy.type}
                       </div>
@@ -771,10 +1153,6 @@ export default function spotTradeBox({
       {/* ============================================================ */}
 
       <div className="w-full grow overflow-y-auto space-y-2 scrollbar-track-transparent [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-gray-200 dark:[&::-webkit-scrollbar-track]:bg-gray-600 [&::-webkit-scrollbar-thumb]:bg-white dark:[&::-webkit-scrollbar-thumb]:bg-gray-800 [&::-webkit-scrollbar-thumb]:rounded-full">
-        {/* ======================================================== */}
-        {/* Initial Setup Section */}
-        {/* ======================================================== */}
-
         <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
           <div className="space-y-1 md:space-y-2">
             <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-lg">
@@ -789,22 +1167,20 @@ export default function spotTradeBox({
             <div className="bg-gray-50 dark:bg-gray-800 p-1 sm:p-1.5 rounded-xl flex gap-1 sm:gap-2 shadow-sm">
               <button
                 className={`flex-1 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base transition-all duration-200
-            ${
-              isLong
-                ? "bg-green-500 text-white shadow-lg scale-[1.02] hover:bg-green-600"
-                : "text-gray-600 hover:bg-gray-100/80"
-            }`}
+            ${isLong
+                    ? "bg-green-500 text-white shadow-lg scale-[1.02] hover:bg-green-600"
+                    : "text-gray-600 hover:bg-gray-100/80"
+                  }`}
                 onClick={() => setIsLong(true)}
               >
                 Long Position
               </button>
               <button
                 className={`flex-1 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base transition-all duration-200
-            ${
-              isLong === false
-                ? "bg-red-500 text-white shadow-lg scale-[1.02] hover:bg-red-600"
-                : "text-gray-600 hover:bg-gray-100/80"
-            }`}
+            ${isLong === false
+                    ? "bg-red-500 text-white shadow-lg scale-[1.02] hover:bg-red-600"
+                    : "text-gray-600 hover:bg-gray-100/80"
+                  }`}
                 onClick={() => setIsLong(false)}
               >
                 Short Position
@@ -812,13 +1188,20 @@ export default function spotTradeBox({
             </div>
           </div>
 
-          <div className="grid xl:grid-cols-2 gap-4">
+          <LeverageInput leverage={leverage} onLeverageChange={setLeverage} />
+
+          {/* <div className="grid 2xl:grid-cols-2 gap-4">
             <NumberInput
               inputLabel="Levrager"
               toolTipMessage="leverage"
               value={leverage}
               onChange={setLeverage}
-              notValid={Number(leverage) > 1 && (leverage === 0 || !leverage)}
+              notValid={
+                leverage <= 0 //||
+                // (typeof maxAllowedLeverage === "number" &&
+                //   leverage > maxAllowedLeverage)
+              }
+              //max={maxAllowedLeverage}
             />
             <NumberInput
               inputLabel="Levrager Multiplier"
@@ -830,7 +1213,12 @@ export default function spotTradeBox({
                 (leverageMultiplier === 0 || !leverageMultiplier)
               }
             />
-          </div>
+          </div> */}
+          {/* <div className="text-xs text-gray-500 dark:text-gray-400">
+            {typeof maxAllowedLeverage === "number"
+              ? `Max leverage ${maxAllowedLeverage}x. Current margin range: $${formatUsdLimit(minimumMarginUsd)} to $${formatUsdLimit(maximumMarginUsd)}.`
+              : `Current margin range: $${formatUsdLimit(minimumMarginUsd)} to $${formatUsdLimit(maximumMarginUsd)}.`}
+          </div> */}
           <div className="grid xl:grid-cols-2 gap-4">
             <div className="space-y-1 md:space-y-2">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -850,10 +1238,24 @@ export default function spotTradeBox({
                   content={"Order Margin type"}
                 />
               </label>
-              <div className="flex gap-2 font-bold text-md">HEDGE</div>
+              <div className="flex gap-2 font-bold text-md">ONE WAY</div>
             </div>
           </div>
+          {estLiquidationPriceUsd != null &&
+            estLiquidationPriceUsd > 0 &&
+            entryForLiquidationUsd > 0 && (
+              <div className="mt-3 p-3 rounded-lg border border-amber-200/80 dark:border-amber-700/50 bg-amber-50/80 dark:bg-amber-900/20">
+                <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                  Est. liquidation (isolated, maint. {EST_PERP_MAINTENANCE_BPS}{" "}
+                  bps): $
+                  {displayNumber(estLiquidationPriceUsd)}
+                </p>
+              </div>
+            )}
         </div>
+        {/* ======================================================== */}
+        {/* Initial Setup Section */}
+        {/* ======================================================== */}
 
         <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
           <div className="space-y-1 md:space-y-2">
@@ -899,13 +1301,12 @@ export default function spotTradeBox({
             </label>
             <div className="relative">
               <div
-                className={`relative flex focus-within:ring-2 focus-within:ring-blue-500 focus-within:rounded-lg bg-white dark:bg-gray-800 px-1 border ${
-                  user?.status !== "admin" &&
+                className={`relative flex focus-within:ring-2 focus-within:ring-blue-500 focus-within:rounded-lg bg-white dark:bg-gray-800 px-1 border ${user?.status !== "admin" &&
                   initialOrderSize &&
                   estimatedUsdValue < MIN_ORDER_SIZE
-                    ? "border-red-200 dark:border-red-700"
-                    : "border-gray-200 dark:border-gray-700"
-                } rounded-lg`}
+                  ? "border-red-200 dark:border-red-700"
+                  : "border-gray-200 dark:border-gray-700"
+                  } rounded-lg`}
               >
                 <input
                   type="number"
@@ -917,63 +1318,24 @@ export default function spotTradeBox({
                   placeholder="Enter Amount"
                 />
                 <div className="relative flex items-center pr-1">
-                  {selectedStrategy.id !== "sellToken" ? (
-                    tokenInfo?.token?.launchpad == null ||
-                    tokenInfo?.token?.launchpad?.graduationPercent === 100 ? (
-                      <DropDown
-                        options={Object.values(CollateralTokens[chainId])
-                          .filter(
-                            (t) =>
-                              t.address.toLowerCase() !=
-                              tokenInfo.address.toLowerCase(),
-                          )
-                          .map((token: any) => ({
-                            label: (
-                              <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
-                                <img
-                                  src={token.imageUrl}
-                                  className="w-4 h-4 rounded-full"
-                                  alt={token.symbol}
-                                />
-                                <span>{token.symbol}</span>
-                              </div>
-                            ),
-                            value: token,
-                          }))}
-                        onChange={setCollateralToken}
-                        value={collateralToken}
-                      />
-                    ) : (
-                      <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200 px-2">
-                        <img
-                          src={collateralToken.imageUrl}
-                          className="w-4 h-4 rounded-full"
-                          alt={collateralToken.symbol}
-                        />
-                        <span>{collateralToken.symbol}</span>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200 px-2">
-                      <img
-                        src={collateralToken.imageUrl}
-                        className="w-4 h-4 rounded-full"
-                        alt={collateralToken.symbol}
-                      />
-                      <span>{collateralToken.symbol}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200 px-2">
+                    <img
+                      src={collateralToken.imageUrl}
+                      className="w-4 h-4 rounded-full"
+                      alt={collateralToken.symbol}
+                    />
+                    <span>{collateralToken.symbol}</span>
+                  </div>
                 </div>
               </div>
 
               {/* USD Value Display */}
               {initialOrderSize && (
                 <div
-                  className={`mt-1 text-xs text-right px-1 ${
-                    estimatedUsdValue < MIN_ORDER_SIZE
-                      ? "text-red-500 font-medium"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
+                  className={`mt-1 text-xs text-right px-1 ${estimatedUsdValue < MIN_ORDER_SIZE
+                    ? "text-red-500 font-medium"
+                    : "text-gray-500 dark:text-gray-400"
+                    }`}
                 >
                   {estimatedUsdValue < MIN_ORDER_SIZE && (
                     <span className="mr-2">Min. order $5 USD</span>
@@ -986,6 +1348,23 @@ export default function spotTradeBox({
                 </div>
               )}
             </div>
+
+            {showFeeTokenSelector && feeToken && (
+              <div className="space-y-1 md:space-y-2 mt-2">
+                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Fee Token
+                  <InfoTooltip
+                    id="fee-token-tooltip"
+                    content="Pulse fee will be collected in this token."
+                  />
+                </label>
+                <DropDown
+                  options={feeTokenOptions.map(renderTokenOption)}
+                  onChange={setFeeToken}
+                  value={feeToken}
+                />
+              </div>
+            )}
           </div>
 
           {/* Order Name Validation */}
@@ -997,8 +1376,6 @@ export default function spotTradeBox({
             isConnected={isConnected}
           />
         </div>
-
-        
 
         {/* ======================================================== */}
         {/* Grid Configuration Section */}
@@ -1124,13 +1501,13 @@ export default function spotTradeBox({
 
           {(selectedStrategy.id == "algo" ||
             selectedStrategy.id == "sellToken") && (
-            <RenderingTechnicalExit
-              isTechnicalExit={isTechnicalExit}
-              setIsTechnicalExit={setIsTechnicalExit}
-              technicalExit={technicalExit}
-              setTechnicalExit={setTechnicalExit}
-            />
-          )}
+              <RenderingTechnicalExit
+                isTechnicalExit={isTechnicalExit}
+                setIsTechnicalExit={setIsTechnicalExit}
+                technicalExit={technicalExit}
+                setTechnicalExit={setTechnicalExit}
+              />
+            )}
 
           {/* Output Token Selection */}
           <div className="space-y-1 md:space-y-2">
@@ -1143,7 +1520,7 @@ export default function spotTradeBox({
             </label>
             <div className="relative">
               <DropDown
-                options={Object.values(CollateralTokens[chainId]).map(
+                options={Object.values(PerpCollateral[chainId]).map(
                   (token: any) => ({
                     label: (
                       <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
@@ -1169,7 +1546,7 @@ export default function spotTradeBox({
         {/* Advanced Settings Section */}
         {/* ======================================================== */}
 
-        <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
+        {/* <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
           <div className="space-y-1 md:space-y-2">
             <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-lg">
               Advanced Settings
@@ -1186,10 +1563,14 @@ export default function spotTradeBox({
             //setExecutionSpeed={setExecutionSpeed}
             user={user}
           />
+        </div> */}
+
+        <div className="bg-gray-50 dark:bg-gray-900 p-3 2xl:p-6 rounded-xl space-y-3 md:space-y-4 border border-gray-100 dark:border-gray-800">
+
+
+          {estOrders.length > 0 && user?.account && MemoizedWalletSelector}
         </div>
       </div>
-
-      {estOrders.length > 0 && user.account && MemoizedWalletSelector}
 
       {/* ============================================================ */}
       {/* Action Buttons */}
@@ -1206,9 +1587,8 @@ export default function spotTradeBox({
             </button>
           )}
           <button
-            className={`grow py-3 md:py-4 ${
-              estOrders.length > 0 ? "rounded-e-xl" : "rounded-xl"
-            } bg-gray-50 dark:bg-gray-900 font-bold text-black dark:text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
+            className={`grow py-3 md:py-4 ${estOrders.length > 0 ? "rounded-e-xl" : "rounded-xl"
+              } bg-gray-50 dark:bg-gray-900 font-bold text-black dark:text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
           >
             Connect Wallet
           </button>
@@ -1231,16 +1611,14 @@ export default function spotTradeBox({
               !readyToSubmitOrder
             }
             onClick={() => setIsConfirmationOpen(true)}
-            className={`grow py-3 md:py-4 ${
-              estOrders.length > 0 ? "rounded-e-xl" : "rounded-xl"
-            } ${
-              !areWalletsReady ||
-              estOrders.length === 0 ||
-              creationPending ||
-              !readyToSubmitOrder
+            className={`grow py-3 md:py-4 ${estOrders.length > 0 ? "rounded-e-xl" : "rounded-xl"
+              } ${!areWalletsReady ||
+                estOrders.length === 0 ||
+                creationPending ||
+                !readyToSubmitOrder
                 ? "bg-blue-200 dark:bg-blue-900/30 pointer-events-none opacity-50"
                 : "bg-blue-500 hover:bg-blue-600"
-            } font-bold text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
+              } font-bold text-white transition-all transform hover:scale-[1.02] cursor-pointer`}
           >
             {creationPending ? "Creating..." : submitText}
           </button>
@@ -1268,7 +1646,7 @@ export default function spotTradeBox({
           onClose={() => setIsConfirmationOpen(false)}
           onConfirm={handleOrderSubmit}
           title="Create order"
-          description="Are you sure to create order?"
+          description={confirmationDescription}
           confirmText="Confirm"
           cancelText="Cancel"
           variant="default"

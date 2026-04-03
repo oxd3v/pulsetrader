@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, memo } from 'react';
 import { OrderBookLevel, TradeItem, useRealTimeOrderBook } from '@/hooks/useAsterhooks/useRealTimeOrderBook';
 
 type ActiveTab = 'orderbook' | 'trades';
@@ -66,6 +66,223 @@ const getTradePriceClass = (trade: TradeItem | undefined): string => {
   return trade.isBuyerMaker ? 'text-orange-500 dark:text-orange-400' : 'text-emerald-600 dark:text-emerald-400';
 };
 
+// ✅ NEW: Memoized Table Header
+const TableHeader = memo(() => (
+  <div className="grid grid-cols-3 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+    <span>Price (USDT)</span>
+    <span className="text-right">Size (USDT)</span>
+    <span className="text-right">Total (USDT)</span>
+  </div>
+));
+TableHeader.displayName = "TableHeader";
+
+// ✅ NEW: Memoized Ask Rows
+const AskRows = memo(
+  ({
+    asksForDisplay,
+    rowSlots,
+    maxAskTotal,
+  }: {
+    asksForDisplay: OrderBookLevel[];
+    rowSlots: number[];
+    maxAskTotal: number;
+  }) => (
+    <div className="flex-1 min-h-0 overflow-hidden">
+      {rowSlots.map((index) => {
+        const level = asksForDisplay[index];
+        const hasLevel = Boolean(level && level.sizeUSDT > 0 && level.totalUSDT > 0);
+        const depthPercent = getDepthPercent(level, maxAskTotal);
+
+        return (
+          <div
+            key={`ask-${index}`}
+            className="relative grid grid-cols-3 items-center h-[22px] px-3"
+            style={{ opacity: hasLevel ? 1 : 0.55 }}
+          >
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 bg-red-500/10 dark:bg-red-400/20"
+              style={{ width: `${depthPercent.toFixed(2)}%` }}
+            />
+            <span className="relative z-10 text-orange-500 dark:text-orange-400">
+              {hasLevel ? formatPrice(level.price) : '-'}
+            </span>
+            <span className="relative z-10 text-right text-slate-600 dark:text-slate-300">
+              {hasLevel ? formatCompactUsdt(level.sizeUSDT) : '-'}
+            </span>
+            <span className="relative z-10 text-right text-slate-700 dark:text-slate-200">
+              {hasLevel ? formatCompactUsdt(level.totalUSDT) : '-'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  )
+);
+AskRows.displayName = "AskRows";
+
+// ✅ NEW: Memoized Mid Price Section
+const MidPriceSection = memo(
+  ({ midPrice, spreadText }: { midPrice: number; spreadText: string }) => (
+    <div className="h-10 px-3 border-y border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 flex items-center justify-between">
+      <span className="font-mono text-base font-semibold text-orange-500 dark:text-orange-400">
+        {midPrice > 0 ? formatPrice(midPrice) : '-'}
+      </span>
+      <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{spreadText}</span>
+    </div>
+  )
+);
+MidPriceSection.displayName = "MidPriceSection";
+
+// ✅ NEW: Memoized Bid Rows
+const BidRows = memo(
+  ({
+    bidsForDisplay,
+    rowSlots,
+    maxBidTotal,
+  }: {
+    bidsForDisplay: OrderBookLevel[];
+    rowSlots: number[];
+    maxBidTotal: number;
+  }) => (
+    <div className="flex-1 min-h-0 overflow-hidden">
+      {rowSlots.map((index) => {
+        const level = bidsForDisplay[index];
+        const hasLevel = Boolean(level && level.sizeUSDT > 0 && level.totalUSDT > 0);
+        const depthPercent = getDepthPercent(level, maxBidTotal);
+
+        return (
+          <div
+            key={`bid-${index}`}
+            className="relative grid grid-cols-3 items-center h-[22px] px-3"
+            style={{ opacity: hasLevel ? 1 : 0.55 }}
+          >
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 bg-emerald-500/10 dark:bg-emerald-400/20"
+              style={{ width: `${depthPercent.toFixed(2)}%` }}
+            />
+            <span className="relative z-10 text-emerald-600 dark:text-emerald-400">
+              {hasLevel ? formatPrice(level.price) : '-'}
+            </span>
+            <span className="relative z-10 text-right text-slate-600 dark:text-slate-300">
+              {hasLevel ? formatCompactUsdt(level.sizeUSDT) : '-'}
+            </span>
+            <span className="relative z-10 text-right text-slate-700 dark:text-slate-200">
+              {hasLevel ? formatCompactUsdt(level.totalUSDT) : '-'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  )
+);
+BidRows.displayName = "BidRows";
+
+// ✅ NEW: Memoized Trade Rows
+const TradeRows = memo(
+  ({
+    visibleTrades,
+    tradeSlots,
+  }: {
+    visibleTrades: TradeItem[];
+    tradeSlots: number[];
+  }) => (
+    <div className="flex-1 min-h-0 overflow-hidden font-mono text-xs">
+      {tradeSlots.map((index) => {
+        const trade = visibleTrades[index];
+        const hasTrade = Boolean(trade && trade.sizeUSDT > 0);
+
+        return (
+          <div
+            key={`trade-${index}`}
+            className="grid grid-cols-3 items-center h-[22px] px-3"
+            style={{ opacity: hasTrade ? 1 : 0.55 }}
+          >
+            <span className={getTradePriceClass(trade)}>
+              {hasTrade ? formatPrice(trade.price) : '-'}
+            </span>
+            <span className="text-right text-slate-600 dark:text-slate-300">
+              {hasTrade ? formatCompactUsdt(trade.sizeUSDT) : '-'}
+            </span>
+            <span className="text-right text-slate-500 dark:text-slate-400">
+              {hasTrade ? formatTradeTime(trade.time) : '--:--:--'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  )
+);
+TradeRows.displayName = "TradeRows";
+
+// ✅ NEW: Memoized Tab Header
+const TabHeader = memo(
+  ({
+    activeTab,
+    onTabChange,
+    connected,
+    loading,
+    marketSymbol,
+    error,
+    maxDepth,
+  }: {
+    activeTab: ActiveTab;
+    onTabChange: (tab: ActiveTab) => void;
+    connected: boolean;
+    loading: boolean;
+    marketSymbol: string;
+    error: string | null;
+    maxDepth: number;
+  }) => (
+    <div className="px-3 pt-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => onTabChange('orderbook')}
+            className={`text-sm leading-none pb-1 border-b transition-colors ${
+              activeTab === 'orderbook'
+                ? 'text-slate-900 border-slate-900 dark:text-slate-100 dark:border-slate-100'
+                : 'text-slate-500 border-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            Order book
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange('trades')}
+            className={`text-sm leading-none pb-1 border-b transition-colors ${
+              activeTab === 'trades'
+                ? 'text-slate-900 border-slate-900 dark:text-slate-100 dark:border-slate-100'
+                : 'text-slate-500 border-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            Trades
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+          <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+          <span>{connected ? 'Live' : loading ? 'Loading' : 'Disconnected'}</span>
+        </div>
+      </div>
+
+      <div className="mt-2 pb-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+        <span>{marketSymbol || '--'}</span>
+        {error ? <span className="text-red-500 dark:text-red-400">{error}</span> : <span>Depth {maxDepth}</span>}
+      </div>
+    </div>
+  )
+);
+TabHeader.displayName = "TabHeader";
+
+// ✅ NEW: Memoized Footer
+const Footer = memo(() => (
+  <div className="px-3 py-1.5 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+    Positive-only filter active for size and total values.
+  </div>
+));
+Footer.displayName = "Footer";
+
 const OrderBookPriceLevelsComponent: React.FC<OrderBookPriceLevelsProps> = ({
   symbol,
   maxDepth = 20,
@@ -80,12 +297,14 @@ const OrderBookPriceLevelsComponent: React.FC<OrderBookPriceLevelsProps> = ({
     tradesLimit: tradesDisplayCount,
   });
 
+  // ✅ OPTIMIZED: Memoized slot arrays
   const rowSlots = useMemo(() => Array.from({ length: displayCount }, (_, index) => index), [displayCount]);
   const tradeSlots = useMemo(
     () => Array.from({ length: tradesDisplayCount }, (_, index) => index),
     [tradesDisplayCount]
   );
 
+  // ✅ OPTIMIZED: Memoized sliced data
   const asksForDisplay = useMemo(
     () => snapshot.asks.slice(0, displayCount).reverse(),
     [snapshot.asks, displayCount]
@@ -99,6 +318,7 @@ const OrderBookPriceLevelsComponent: React.FC<OrderBookPriceLevelsProps> = ({
     [trades, tradesDisplayCount]
   );
 
+  // ✅ OPTIMIZED: Memoized max totals
   const maxAskTotal = useMemo(
     () => asksForDisplay.reduce((maxValue, level) => Math.max(maxValue, level.totalUSDT), 1),
     [asksForDisplay]
@@ -108,6 +328,7 @@ const OrderBookPriceLevelsComponent: React.FC<OrderBookPriceLevelsProps> = ({
     [bidsForDisplay]
   );
 
+  // ✅ OPTIMIZED: Memoized mid price
   const midPrice = useMemo(() => {
     if (snapshot.bestBidPrice > 0 && snapshot.bestAskPrice > 0) {
       return (snapshot.bestBidPrice + snapshot.bestAskPrice) / 2;
@@ -115,129 +336,40 @@ const OrderBookPriceLevelsComponent: React.FC<OrderBookPriceLevelsProps> = ({
     return snapshot.bestBidPrice || snapshot.bestAskPrice;
   }, [snapshot.bestAskPrice, snapshot.bestBidPrice]);
 
+  // ✅ OPTIMIZED: Memoized spread text
   const spreadText = useMemo(() => {
     if (snapshot.spread <= 0) return '-';
     return `${formatPrice(snapshot.spread)} (${snapshot.spreadPercent.toFixed(3)}%)`;
   }, [snapshot.spread, snapshot.spreadPercent]);
 
+  const handleTabChange = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+  }, []);
+
   return (
     <div className="h-full min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white/95 shadow-sm dark:border-slate-800 dark:bg-slate-950/90 flex flex-col">
-      <div className="px-3 pt-2 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setActiveTab('orderbook')}
-              className={`text-sm leading-none pb-1 border-b transition-colors ${
-                activeTab === 'orderbook'
-                  ? 'text-slate-900 border-slate-900 dark:text-slate-100 dark:border-slate-100'
-                  : 'text-slate-500 border-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-            >
-              Order book
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('trades')}
-              className={`text-sm leading-none pb-1 border-b transition-colors ${
-                activeTab === 'trades'
-                  ? 'text-slate-900 border-slate-900 dark:text-slate-100 dark:border-slate-100'
-                  : 'text-slate-500 border-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-            >
-              Trades
-            </button>
-          </div>
+      <TabHeader
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        connected={connected}
+        loading={loading}
+        marketSymbol={marketSymbol}
+        error={error}
+        maxDepth={maxDepth}
+      />
 
-          <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-            <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
-            <span>{connected ? 'Live' : loading ? 'Loading' : 'Disconnected'}</span>
-          </div>
-        </div>
-
-        <div className="mt-2 pb-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-          <span>{marketSymbol || '--'}</span>
-          {error ? <span className="text-red-500 dark:text-red-400">{error}</span> : <span>Depth {maxDepth}</span>}
-        </div>
-      </div>
-
+      {/* Order Book Tab */}
       <div className={`${activeTab === 'orderbook' ? 'flex' : 'hidden'} flex-1 min-h-0 flex-col`}>
-        <div className="grid grid-cols-3 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-          <span>Price (USDT)</span>
-          <span className="text-right">Size (USDT)</span>
-          <span className="text-right">Total (USDT)</span>
-        </div>
+        <TableHeader />
 
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col font-mono text-xs">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {rowSlots.map((index) => {
-              const level = asksForDisplay[index];
-              const hasLevel = Boolean(level && level.sizeUSDT > 0 && level.totalUSDT > 0);
-              const depthPercent = getDepthPercent(level, maxAskTotal);
-
-              return (
-                <div
-                  key={`ask-${index}`}
-                  className="relative grid grid-cols-3 items-center h-[22px] px-3"
-                  style={{ opacity: hasLevel ? 1 : 0.55 }}
-                >
-                  <div
-                    className="pointer-events-none absolute inset-y-0 right-0 bg-red-500/10 dark:bg-red-400/20"
-                    style={{ width: `${depthPercent.toFixed(2)}%` }}
-                  />
-                  <span className="relative z-10 text-orange-500 dark:text-orange-400">
-                    {hasLevel ? formatPrice(level.price) : '-'}
-                  </span>
-                  <span className="relative z-10 text-right text-slate-600 dark:text-slate-300">
-                    {hasLevel ? formatCompactUsdt(level.sizeUSDT) : '-'}
-                  </span>
-                  <span className="relative z-10 text-right text-slate-700 dark:text-slate-200">
-                    {hasLevel ? formatCompactUsdt(level.totalUSDT) : '-'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="h-10 px-3 border-y border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 flex items-center justify-between">
-            <span className="font-mono text-base font-semibold text-orange-500 dark:text-orange-400">
-              {midPrice > 0 ? formatPrice(midPrice) : '-'}
-            </span>
-            <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{spreadText}</span>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {rowSlots.map((index) => {
-              const level = bidsForDisplay[index];
-              const hasLevel = Boolean(level && level.sizeUSDT > 0 && level.totalUSDT > 0);
-              const depthPercent = getDepthPercent(level, maxBidTotal);
-
-              return (
-                <div
-                  key={`bid-${index}`}
-                  className="relative grid grid-cols-3 items-center h-[22px] px-3"
-                  style={{ opacity: hasLevel ? 1 : 0.55 }}
-                >
-                  <div
-                    className="pointer-events-none absolute inset-y-0 right-0 bg-emerald-500/10 dark:bg-emerald-400/20"
-                    style={{ width: `${depthPercent.toFixed(2)}%` }}
-                  />
-                  <span className="relative z-10 text-emerald-600 dark:text-emerald-400">
-                    {hasLevel ? formatPrice(level.price) : '-'}
-                  </span>
-                  <span className="relative z-10 text-right text-slate-600 dark:text-slate-300">
-                    {hasLevel ? formatCompactUsdt(level.sizeUSDT) : '-'}
-                  </span>
-                  <span className="relative z-10 text-right text-slate-700 dark:text-slate-200">
-                    {hasLevel ? formatCompactUsdt(level.totalUSDT) : '-'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <AskRows asksForDisplay={asksForDisplay} rowSlots={rowSlots} maxAskTotal={maxAskTotal} />
+          <MidPriceSection midPrice={midPrice} spreadText={spreadText} />
+          <BidRows bidsForDisplay={bidsForDisplay} rowSlots={rowSlots} maxBidTotal={maxBidTotal} />
         </div>
       </div>
 
+      {/* Trades Tab */}
       <div className={`${activeTab === 'trades' ? 'flex' : 'hidden'} flex-1 min-h-0 flex-col`}>
         <div className="grid grid-cols-3 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
           <span>Price (USDT)</span>
@@ -245,35 +377,10 @@ const OrderBookPriceLevelsComponent: React.FC<OrderBookPriceLevelsProps> = ({
           <span className="text-right">Time</span>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden font-mono text-xs">
-          {tradeSlots.map((index) => {
-            const trade = visibleTrades[index];
-            const hasTrade = Boolean(trade && trade.sizeUSDT > 0);
-
-            return (
-              <div
-                key={`trade-${index}`}
-                className="grid grid-cols-3 items-center h-[22px] px-3"
-                style={{ opacity: hasTrade ? 1 : 0.55 }}
-              >
-                <span className={getTradePriceClass(trade)}>
-                  {hasTrade ? formatPrice(trade.price) : '-'}
-                </span>
-                <span className="text-right text-slate-600 dark:text-slate-300">
-                  {hasTrade ? formatCompactUsdt(trade.sizeUSDT) : '-'}
-                </span>
-                <span className="text-right text-slate-500 dark:text-slate-400">
-                  {hasTrade ? formatTradeTime(trade.time) : '--:--:--'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        <TradeRows visibleTrades={visibleTrades} tradeSlots={tradeSlots} />
       </div>
 
-      <div className="px-3 py-1.5 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
-        Positive-only filter active for size and total values.
-      </div>
+      <Footer />
     </div>
   );
 };

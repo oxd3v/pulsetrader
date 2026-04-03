@@ -1,7 +1,10 @@
+import { MIN_ORDER_SIZE } from "@/constants/common/order";
+
 const GMX_API_BASE_URL = "https://arbitrum-api.gmxinfra.io";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ORACLE_PRICE_DECIMALS = 30;
 const USD_DECIMALS = 30;
+const GMX_MAX_LEVERAGE = 100;
 
 const RESOLUTION_TO_GMX_PERIOD: Record<string, string> = {
   "1": "1m",
@@ -86,7 +89,6 @@ export type GmxResolvedMarket = {
   availableLiquidityLongUsd: number;
   availableLiquidityShortUsd: number;
   availableLiquidityUsd: number;
-  lastUpdatedAt: number;
 };
 
 type GmxMarketSnapshotResult =
@@ -133,6 +135,23 @@ const getListingTimestamp = (value: string | undefined) => {
   if (!value) return 0;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const getGmxTradingLimits = ({
+  availableLiquidityUsd,
+}: {
+  availableLiquidityUsd: number;
+}) => {
+  const minPositionSizeUsd = Math.max(MIN_ORDER_SIZE, 0);
+  const maxPositionSizeUsd = Math.max(0, availableLiquidityUsd);
+
+  return {
+    maxLeverage: GMX_MAX_LEVERAGE,
+    minPositionSizeUsd,
+    maxPositionSizeUsd,
+    minMarginUsd: minPositionSizeUsd / GMX_MAX_LEVERAGE,
+    maxMarginUsd: maxPositionSizeUsd,
+  };
 };
 
 const fetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -241,11 +260,17 @@ export const buildGmxMarketRows = ({
         markPrice > 0
           ? ((Math.max(oracleMaxPrice - oracleMinPrice, 0) / markPrice) * 10000)
           : 0;
+    
 
       const openInterestLongUsd = getUsdValue(market.openInterestLong);
       const openInterestShortUsd = getUsdValue(market.openInterestShort);
       const availableLiquidityLongUsd = getUsdValue(market.availableLiquidityLong);
       const availableLiquidityShortUsd = getUsdValue(market.availableLiquidityShort);
+      const availableLiquidityUsd =
+        availableLiquidityLongUsd + availableLiquidityShortUsd;
+      const tradingLimits = getGmxTradingLimits({
+        availableLiquidityUsd,
+      });
 
       return {
         symbol: normalizeGmxSymbol(indexToken.symbol),
@@ -270,12 +295,8 @@ export const buildGmxMarketRows = ({
         openInterestUsd: openInterestLongUsd + openInterestShortUsd,
         availableLiquidityLongUsd,
         availableLiquidityShortUsd,
-        availableLiquidityUsd:
-          availableLiquidityLongUsd + availableLiquidityShortUsd,
-        lastUpdatedAt: Math.max(
-          toFiniteNumber(ticker?.updatedAt),
-          toFiniteNumber(ticker?.timestamp) * 1000,
-        ),
+        availableLiquidityUsd,
+        
       };
     })
     .filter((market): market is GmxResolvedMarket => Boolean(market));
@@ -318,6 +339,7 @@ export const getGmxMarketSnapshot = async (): Promise<GmxMarketSnapshotResult> =
       getGmxTickers(),
       getGmxMarketsInfo(),
     ]);
+
 
     const resolvedMarkets = buildGmxMarketRows({
       tokens,

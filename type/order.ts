@@ -40,9 +40,12 @@ export type OrderTokenType = {
   name?: string;
   imageUrl?: string;
   isCollateral?: boolean;
+  isStable?: boolean;
+  isNative?: boolean;
+  isWrappedNative?: boolean;
 };
 
-export type OrderStrategyType = 
+export type OrderStrategyType =
   | "limit"
   | "scalp"
   | "grid"
@@ -71,39 +74,64 @@ export type ORDER_TYPE = {
   category: OrderCategoryType;
   orderType: OrderExecutionType;
   orderStatus: OrderStatusType;
-  entry:{
+  indexTokenAddress: string;
+  feeToken?: OrderTokenType & {
+    amount: string
+  };
+  spot?: {
+    orderAsset: {
+      orderToken: OrderTokenType;
+      collateralToken: OrderTokenType;
+      outputToken: OrderTokenType;
+      pairAddress?: string;
+    },
+    amount: {
+      orderSize: string;
+      tokenAmount: string;
+      orderSizeUsd?: string;
+    },
+  }
+  perp?: {
+    quantity: string,
+    isLong: boolean,
+    leverage: number,
+    positionMode: string,
+    iswalletBasedContract: boolean,
+    protocol: string,
+    orderAsset: {
+      collateralToken: OrderTokenType;
+      outputToken: OrderTokenType;
+      marketTokenAddress?: string;
+      pairAddress?: string;
+      symbol: string;
+      persedSymbolInfo: any
+    },
+    amount: {
+      orderSize: string;
+      marginSizeUsd: string;
+    },
+  },
+  entry: {
     isTechnicalEntry: boolean;
     technicalLogic?: TECHNICAL_LOGICS_TYPE;
     priceLogic?: ConditionNode
   }
-  orderAsset: {
-    orderToken: OrderTokenType;
-    collateralToken: OrderTokenType;
-    outputToken: OrderTokenType;
-    marketTokenAddress?: string;
-    pairAddress?: string;
-  };
-  amount: {
-    orderSize: string; 
-    tokenAmount: string; 
-    orderSizeUsd?: string;
-  };
   sl: number;
   isTrailingMode: boolean;
   exit: {
-   takeProfit: {
-    profit: string;
-    takeProfitPercentage: number;
-    takeProfitPrice: string;
-  };
-  stopLoss: {
-    isActive: boolean;
-    save: string;
-    stopLossPrice: string;
-    stopLossPercentage: number;
-  };
-  isTechnicalExit: boolean;
-  technicalLogic?: TECHNICAL_LOGICS_TYPE
+    takeProfit: {
+      profit: string;
+      takeProfitPercentage: number;
+      takeProfitPrice: string;
+    };
+    stopLoss: {
+      isActive: boolean;
+      save: string;
+      stopLossPrice: string;
+      stopLossPercentage: number;
+    };
+    isTechnicalExit: boolean;
+    technicalLogic?: TECHNICAL_LOGICS_TYPE
   }
   message?: string | null;
   isActive: boolean;
@@ -115,17 +143,7 @@ export type ORDER_TYPE = {
     isReEntrance: boolean;
     reEntranceLimit: number;
   };
-  executionFee: {
-    payInUsd: string;
-    feeUsed?: string;
-    estFeeLocked?:string;
-    feeInUsd: string;
-  };
-  perpetual?:{
-    isLong: boolean,
-    leverage: number,
-    
-  },
+  // @note perpetual is now handled within perp natively
   additional?: {
     realizedPnl?: string;
     walletAddress?: string;

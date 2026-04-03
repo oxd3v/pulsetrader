@@ -1,6 +1,6 @@
-import { chains, chainConfig } from "./chain"
+import { chains, chainConfig } from "./chain";
 
-import { ZeroAddress } from "ethers"
+import { ZeroAddress } from "ethers";
 
 export const Tokens = {
   [chains.Avalanche]: {
@@ -9,14 +9,15 @@ export const Tokens = {
       name: "AVALANCHE",
       symbol: "AVAX",
       decimals: 18,
-      imageUrl: "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
       isNative: true,
       isSpot: true,
       isPerpetual: true,
       isCollateral: true,
     },
-    ['0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7']: {
-      address: '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7',
+    ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"]: {
+      address: "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
       name: "Wrapped AVAX",
       symbol: "WAVAX",
       decimals: 18,
@@ -25,7 +26,7 @@ export const Tokens = {
       isWrappedNative: true,
       isSpot: true,
       isPerpetual: true,
-      isCollateral: true, 
+      isCollateral: true,
     },
     ["0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e"]: {
       name: "USD Coin",
@@ -236,7 +237,7 @@ export const Tokens = {
     //   poolIndex: 0,
     //   poolType: "UNISWAPV2",
     //   dex: '0x60aE616a2155Ee3d9A68541Ba4544862310933d4',
-    //   dexName: 'JoeRouter02', 
+    //   dexName: 'JoeRouter02',
     // },
     // ["0xc301e6fe31062c557aee806cc6a841ae989a3ac6"]: {
     //   name: "Dogecoin",
@@ -337,34 +338,32 @@ export const Tokens = {
     //   coingeckoUrl: "https://www.coingecko.com/en/coins/world-liberty-financial",
     // },
   },
-  [chains.Ethereum]:{
+  [chains.Ethereum]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "ETHERIUM",
       symbol: "ETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
-      isNative:true,
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      isNative: true,
       isSpot: true,
       isPerpetual: true,
       isStable: false,
       isCollateral: true,
     },
-    ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"]:{
-      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"]: {
+      address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       name: "WRAPPED ETHERIUM",
       symbol: "WETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
       isWrappedNative: true,
       isSpot: true,
       isPerpetual: true,
       isCollateral: true,
-    }
+    },
   },
-  [chains.Solana]:{
+  [chains.Solana]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "SOLANA",
@@ -378,8 +377,8 @@ export const Tokens = {
       isPerpetual: true,
       isCollateral: true,
     },
-    ['so11111111111111111111111111111111111111112']: {
-      address: 'So11111111111111111111111111111111111111112',
+    ["so11111111111111111111111111111111111111112"]: {
+      address: "So11111111111111111111111111111111111111112",
       name: "WRAPPED SOLANA",
       symbol: "WSOL",
       decimals: 9,
@@ -391,8 +390,8 @@ export const Tokens = {
       isPerpetual: true,
       isCollateral: true,
     },
-    ['epjfWdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v']:{
-      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    ["epjfWdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v"]: {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       name: "USDc",
       symbol: "USDc",
       decimals: 6,
@@ -402,62 +401,58 @@ export const Tokens = {
       isPerpetual: true,
       isSpot: true,
       isCollateral: true,
-    }
+    },
   },
-  [chains.Arbitrum]:{
+  [chains.Arbitrum]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "ETHERIUM",
       symbol: "ETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
-      isNative:true,
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      isNative: true,
       isSpot: true,
       isStable: false,
       isPerpetual: true,
       isCollateral: true,
-      priceDecimals: 4
+      priceDecimals: 4,
     },
-    ['0x82af49447d8a07e3bd95bd0d56f35241523fbab1']:{
-      address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    ["0x82af49447d8a07e3bd95bd0d56f35241523fbab1"]: {
+      address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
       name: "WRAPPED ETHERIUM",
       symbol: "WETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
       isWrappedNative: true,
       isSpot: true,
       isPerpetual: true,
       isCollateral: true,
     },
-    ['0xaf88d065e77c8cC2239327C5EDb3a432268e5831']:{
-      address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
-    }
-  }
-}
+    ["0xaf88d065e77c8cC2239327C5EDb3a432268e5831"]: {
+      address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    },
+  },
+};
 
 export const CollateralTokens = {
-  [chains.Ethereum]:{
+  [chains.Ethereum]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "ETHERIUM",
       symbol: "ETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
-      isNative:true,
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      isNative: true,
     },
-    ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"]:{
-      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"]: {
+      address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       name: "WRAPPED ETHERIUM",
       symbol: "WETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
       isWrappedNative: true,
     },
-    ['0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48']:{
+    ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"]: {
       address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       name: "USDc",
       symbol: "USDc",
@@ -465,9 +460,9 @@ export const CollateralTokens = {
       isStable: true,
       imageUrl:
         "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
-    }
+    },
   },
-  [chains.Solana]:{
+  [chains.Solana]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "SOLANA",
@@ -477,8 +472,8 @@ export const CollateralTokens = {
         "https://solscan.io/_next/static/media/solana-sol-logo.ecf2bf3a.svg",
       isNative: true,
     },
-    ['so11111111111111111111111111111111111111112']: {
-      address: 'So11111111111111111111111111111111111111112',
+    ["so11111111111111111111111111111111111111112"]: {
+      address: "So11111111111111111111111111111111111111112",
       name: "WRAPPED SOLANA",
       symbol: "WSOL",
       decimals: 9,
@@ -486,64 +481,63 @@ export const CollateralTokens = {
         "https://solscan.io/_next/static/media/solana-sol-logo.ecf2bf3a.svg",
       isWrappedNative: true,
     },
-    ['epjfWdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v']:{
-      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    ["epjfWdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v"]: {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       name: "USDc",
       symbol: "USDc",
       decimals: 6,
       isStable: true,
       imageUrl:
         "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
-    }
+    },
   },
-  [chains.Arbitrum]:{
+  [chains.Arbitrum]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "ETHERIUM",
       symbol: "ETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
-      isNative:true,
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      isNative: true,
       isSpot: true,
       isStable: false,
       isPerpetual: true,
       isCollateral: true,
-      priceDecimals: 4
+      priceDecimals: 4,
     },
-    ['0x82af49447d8a07e3bd95bd0d56f35241523fbab1']:{
-      address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    ["0x82af49447d8a07e3bd95bd0d56f35241523fbab1"]: {
+      address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
       name: "WRAPPED ETHERIUM",
       symbol: "WETH",
       decimals: 18,
-      imageUrl:
-        "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
       isWrappedNative: true,
       isSpot: true,
       isPerpetual: true,
       isCollateral: true,
     },
-    ['0xaf88d065e77c8cc2239327C5edb3a432268e5831']:{
-      address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    ["0xaf88d065e77c8cc2239327C5edb3a432268e5831"]: {
+      address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
       name: "USDc",
       symbol: "USDc",
       decimals: 6,
       isStable: true,
       imageUrl:
         "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
-    }
+    },
   },
-  [chains.Avalanche]:{
+  [chains.Avalanche]: {
     [ZeroAddress]: {
       address: ZeroAddress,
       name: "AVALANCHE",
       symbol: "AVAX",
       decimals: 18,
-      imageUrl: "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
       isNative: true,
     },
-    ['0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7']: {
-      address: '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7',
+    ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"]: {
+      address: "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
       name: "Wrapped AVAX",
       symbol: "WAVAX",
       decimals: 18,
@@ -560,36 +554,140 @@ export const CollateralTokens = {
       imageUrl:
         "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
     },
-  }
-}
+  },
+};
+
+export const PerpCollateral = {
+  [chains.Ethereum]: {
+    [ZeroAddress]: {
+      address: ZeroAddress,
+      name: "ETHERIUM",
+      symbol: "ETH",
+      decimals: 18,
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      isNative: true,
+    },
+    ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"]: {
+      address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      name: "WRAPPED ETHERIUM",
+      symbol: "WETH",
+      decimals: 18,
+      imageUrl: "https://etherscan.io/images/svg/brands/ethereum-original.svg",
+      isWrappedNative: true,
+    },
+    ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"]: {
+      address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      name: "USDc",
+      symbol: "USDc",
+      decimals: 6,
+      isStable: true,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
+    },
+  },
+  [chains.Solana]: {
+    [ZeroAddress]: {
+      address: ZeroAddress,
+      name: "SOLANA",
+      symbol: "SOL",
+      decimals: 9,
+      imageUrl:
+        "https://solscan.io/_next/static/media/solana-sol-logo.ecf2bf3a.svg",
+      isNative: true,
+    },
+    ["so11111111111111111111111111111111111111112"]: {
+      address: "So11111111111111111111111111111111111111112",
+      name: "WRAPPED SOLANA",
+      symbol: "WSOL",
+      decimals: 9,
+      imageUrl:
+        "https://solscan.io/_next/static/media/solana-sol-logo.ecf2bf3a.svg",
+      isWrappedNative: true,
+    },
+    ["epjfWdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v"]: {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      name: "USDc",
+      symbol: "USDc",
+      decimals: 6,
+      isStable: true,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
+    },
+  },
+  [chains.Arbitrum]: {
+    ["0xaf88d065e77c8cc2239327C5edb3a432268e5831"]: {
+      address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      name: "USDc",
+      symbol: "USDc",
+      decimals: 6,
+      isStable: true,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
+    },
+    ["0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9"]: {
+      name: "Tether",
+      symbol: "USDT",
+      decimals: 6,
+      address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+      isStable: true,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/325/small/Tether-logo.png",
+    },
+  },
+  [chains.Avalanche]: {
+    [ZeroAddress]: {
+      address: ZeroAddress,
+      name: "AVALANCHE",
+      symbol: "AVAX",
+      decimals: 18,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
+      isNative: true,
+    },
+    ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"]: {
+      address: "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
+      name: "Wrapped AVAX",
+      symbol: "WAVAX",
+      decimals: 18,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/12559/small/coin-round-red.png?1604021818",
+      isWrappedNative: true,
+    },
+    ["0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e"]: {
+      name: "USD Coin",
+      symbol: "USDC",
+      address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+      decimals: 6,
+      isStable: true,
+      imageUrl:
+        "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png?1547042389",
+    },
+  },
+};
 
 export const DEFAULT_SPOT_TOKENS = {
-  [chains.Avalanche]: '0x152b9d0FdC40C096757F570A51E494bd4b943E50',
-  [chains.Ethereum]: '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf',
-  [chains.Arbitrum]: '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf',
-  [chains.Solana]:'So11111111111111111111111111111111111111112'
-}
+  [chains.Avalanche]: "0x152b9d0FdC40C096757F570A51E494bd4b943E50",
+  [chains.Ethereum]: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+  [chains.Arbitrum]: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+  [chains.Solana]: "So11111111111111111111111111111111111111112",
+};
 
 export const nativeToken = {
   [chains.Avalanche]: {
-    address: '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7'
-  }
-}
+    address: "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
+  },
+};
 
 export const USDCToken = {
   [chains.Avalanche]: {
-    address: '0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e'
-  }
-}
+    address: "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e",
+  },
+};
 
 export const userDeafultTokens = [
-  '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7:43114','0x152b9d0fdc40c096757f570a51e494bd4b943e50:43114', '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2:1', 'So11111111111111111111111111111111111111112:1399811149', '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1:42161'
-]
-
-
-
-
-
-
-
-
+  "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7:43114",
+  "0x152b9d0fdc40c096757f570a51e494bd4b943e50:43114",
+  "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2:1",
+  "So11111111111111111111111111111111111111112:1399811149",
+  "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1:42161",
+];

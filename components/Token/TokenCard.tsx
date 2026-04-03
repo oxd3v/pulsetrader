@@ -25,24 +25,24 @@ interface TokenInfo {
 }
 
 const TokenCard = memo(
-  ({ tokenInfo, walletAddress, chainId, user }: any) => {
-    
+  ({ tokenInfo, walletAddress, walletId, chainId, user }: any) => {
+
     const [tokenBalance, setTokenBalance] = useState<string>(tokenInfo.balance);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpenTokenFundModal, setIsOpenTokenFundModal] = useState(false);
 
     const fetchTokenBalance = async () => {
       try {
-        let balance = await getWalletTokenBalance({walletAddress, tokenAddress: tokenInfo.token.address, chainId})
+        let balance = await getWalletTokenBalance({ walletAddress, tokenAddress: tokenInfo.token.address, chainId })
         setTokenBalance(balance);
       } catch (e) {
         console.error("Error fetching token data", e);
       }
     };
 
-    const handleCloseFundingModel =  ()=>{
-        fetchTokenBalance();
-        setIsOpenTokenFundModal(false)
+    const handleCloseFundingModel = () => {
+      fetchTokenBalance();
+      setIsOpenTokenFundModal(false)
     }
 
     useEffect(() => {
@@ -131,7 +131,7 @@ const TokenCard = memo(
             </div>
             <span>Manage</span>
           </motion.button>
-          
+
           <button className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-500/5 rounded-xl transition-all" title="View Details">
             <FiExternalLink className="w-5 h-5" />
           </button>
@@ -144,7 +144,8 @@ const TokenCard = memo(
               isOpen={isOpenTokenFundModal}
               onClose={handleCloseFundingModel}
               wallet={walletAddress}
-              tokenInfo={({...tokenInfo.token, imageUrl: tokenInfo?.imageUrl})}
+              walletId={walletId}
+              tokenInfo={({ ...tokenInfo.token, imageUrl: tokenInfo?.imageUrl })}
               chainId={chainId}
               isNative={false}
               user={user}

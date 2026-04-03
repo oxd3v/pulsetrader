@@ -22,6 +22,7 @@ import {
   notifyWithResponseError,
   notify,
 } from "@/lib/utils";
+import { normalizeClientOrders } from "@/utility/orderUtility";
 
 // Notification Config (Optional: If you want to use it directly in hook for Toast defaults)
 import { NOTIFICATION_CONFIG } from "@/constants/config/notification";
@@ -67,7 +68,9 @@ export const useUserAuth = () => {
       // Safely map user data to store
       setUserState(user.userData);
 
-      setUserOrders(Array.isArray(user.orders) ? user.orders : []);
+      setUserOrders(
+        normalizeClientOrders(Array.isArray(user.orders) ? user.orders : []),
+      );
       //setUserHistories(Array.isArray(user.histories) ? user.histories : []);
       setUserWallets(Array.isArray(user.wallets) ? user.wallets : []);
 
@@ -97,11 +100,22 @@ export const useUserAuth = () => {
   const checkUser = useCallback(async () => {
     let checkResult = { connected: false, error: null as string | null };
     try {
-      const apiResponse: any = await Service.checkUser({});
+      const signer = await getSigner();
+      if (!signer) {
+        notify("error", "Please connect your wallet to join PulseTrader");
+        return checkResult;
+      }
+      const address = await signer.getAddress();
+
+      const apiResponse: any = await Service.checkUser({ address });
 
       if (!apiResponse?.connect || !apiResponse?.data?.userData?.account) {
-        const key = apiResponse.message || "SERVER_ERROR";
-        notify("error", key);
+        const key = apiResponse.message || "USER_NOT_FOUND";
+        if (apiResponse.message === "USER_NOT_FOUND") {
+          notify("error", "Wallet not registered. Please Join PulseTrader.");
+        } else {
+          notify("error", key);
+        }
         checkResult.error = key;
         return checkResult;
       }
@@ -118,24 +132,26 @@ export const useUserAuth = () => {
 
       const signature = localStorage.getItem(TOKEN_STORAGE_KEY);
       if (signature) {
-        const address = verifyMessage(SIGN_MESSAGE, signature);
-        if (
-          address.toLowerCase() ==
-          apiResponse.user?.userData?.account.toLowerCase()
-        ) {
-          setSignature(signature);
-        }
+        try {
+          const recoveredAddress = verifyMessage(SIGN_MESSAGE, signature);
+          if (
+            recoveredAddress.toLowerCase() ==
+            apiResponse.data?.userData?.account.toLowerCase()
+          ) {
+            setSignature(signature);
+          }
+        } catch (e) { }
       }
 
       updateGlobalUserState(apiResponse.data);
-      notify("success", "SUCCESSFULLY_CONNECTED");
+      checkResult.connected = true;
       return checkResult;
     } catch (fGlobalError: any) {
       const key = handleServerErrorToast({ err: fGlobalError });
       checkResult.error = key;
       return checkResult;
     }
-  }, [notify, updateGlobalUserState]);
+  }, [notify, updateGlobalUserState, getSigner, setSignature]);
 
   // --- 2. Connect (Login with Wallet) ---
   const connect = useCallback(async () => {
@@ -405,7 +421,7 @@ export const useUserAuth = () => {
           joinedResult.error = key;
           return joinedResult;
         }
-        
+
         localStorage.setItem(TOKEN_STORAGE_KEY, signature);
         localStorage.setItem(ACCOUNT_STORAGE_KEY, account);
         setSignature(signature);
@@ -645,7 +661,7 @@ export const useUserAuth = () => {
   }: {
     tokenAddress: string;
     chainId: number;
-    add:boolean
+    add: boolean
   }) => {
     let additionResult = { success: false, error: null as string | null };
     try {
@@ -703,8 +719,8 @@ export const useUserAuth = () => {
   }: {
     page: number;
     limit: number;
-    walletAddress:string,
-    walletId:string
+    walletAddress: string,
+    walletId: string
   }) => {
     let historiesResult = {
       success: false,

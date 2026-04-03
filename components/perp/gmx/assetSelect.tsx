@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AiFillStar,
@@ -56,6 +56,198 @@ const getSymbolBadge = (market: GmxResolvedMarket) => {
   return market.symbol.slice(0, 1).toUpperCase() || "?";
 };
 
+// Memoized table header
+const TableHeader = memo(() => (
+  <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+    <tr className="text-left text-gray-400 text-xs font-medium uppercase">
+      <th className="w-12 px-4 py-3"></th>
+      <th className="px-4 py-3 min-w-[150px]">Market</th>
+      <th className="px-4 py-3 text-right min-w-[120px]">
+        Oracle Price
+      </th>
+      <th className="px-4 py-3 text-right min-w-[110px]">
+        Spread
+      </th>
+      <th className="px-4 py-3 text-right min-w-[120px]">
+        Open Interest
+      </th>
+      <th className="px-4 py-3 text-right min-w-[120px]">
+        Liquidity
+      </th>
+    </tr>
+  </thead>
+));
+TableHeader.displayName = "TableHeader";
+
+// Memoized table row
+interface TableRowProps {
+  market: GmxResolvedMarket;
+  isFavorite: boolean;
+  isSelected: boolean;
+  onToggleFavorite: (symbol: string) => void;
+  onSelect: (symbol: string) => void;
+}
+
+const TableRow = memo(
+  ({
+    market,
+    isFavorite,
+    isSelected,
+    onToggleFavorite,
+    onSelect,
+  }: TableRowProps) => (
+    <motion.tr
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className={`border-b border-gray-800 hover:bg-gray-900 cursor-pointer transition-colors ${
+        isSelected ? "bg-gray-900" : ""
+      }`}
+      onClick={() => onSelect(market.symbol)}
+    >
+      <td
+        className="w-12 px-4 py-3"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleFavorite(market.symbol);
+        }}
+      >
+        <button className="p-1 hover:bg-gray-800 rounded transition-colors">
+          {isFavorite ? (
+            <AiFillStar className="w-4 h-4 text-yellow-500" />
+          ) : (
+            <AiOutlineStar className="w-4 h-4 text-gray-500 hover:text-gray-400" />
+          )}
+        </button>
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-sm font-bold text-gray-100">
+            {getSymbolBadge(market)}
+          </div>
+          <div>
+            <div className="font-semibold text-white">
+              {market.symbol}
+            </div>
+            <div className="text-xs text-gray-500">
+              {market.pairLabel}
+            </div>
+          </div>
+        </div>
+      </td>
+
+      <td className="px-4 py-3 text-right font-mono text-white">
+        {formatPrice(market.markPrice)}
+      </td>
+
+      <td className="px-4 py-3 text-right font-mono text-gray-300">
+        {formatSpread(market.spreadBps)}
+      </td>
+
+      <td className="px-4 py-3 text-right font-mono text-gray-300">
+        {formatCompactUsd(market.openInterestUsd)}
+      </td>
+
+      <td className="px-4 py-3 text-right font-mono text-gray-300">
+        {formatCompactUsd(market.availableLiquidityUsd)}
+      </td>
+    </motion.tr>
+  )
+);
+TableRow.displayName = "TableRow";
+
+// Memoized table body
+interface TableBodyProps {
+  markets: GmxResolvedMarket[];
+  favorites: Set<string>;
+  normalizedCurrentSymbol: string;
+  onToggleFavorite: (symbol: string) => void;
+  onSelect: (symbol: string) => void;
+}
+
+const TableBody = memo(
+  ({
+    markets,
+    favorites,
+    normalizedCurrentSymbol,
+    onToggleFavorite,
+    onSelect,
+  }: TableBodyProps) => (
+    <tbody>
+      {markets.map((market) => (
+        <TableRow
+          key={market.marketTokenAddress}
+          market={market}
+          isFavorite={favorites.has(market.symbol)}
+          isSelected={normalizedCurrentSymbol === market.symbol.toUpperCase()}
+          onToggleFavorite={onToggleFavorite}
+          onSelect={onSelect}
+        />
+      ))}
+    </tbody>
+  )
+);
+TableBody.displayName = "TableBody";
+
+// Memoized loading/error/empty state
+const TableContent = memo(
+  ({
+    loading,
+    error,
+    displaySymbols,
+    favorites,
+    normalizedCurrentSymbol,
+    onToggleFavorite,
+    onSelect,
+  }: {
+    loading: boolean;
+    error: string | null;
+    displaySymbols: GmxResolvedMarket[];
+    favorites: Set<string>;
+    normalizedCurrentSymbol: string;
+    onToggleFavorite: (symbol: string) => void;
+    onSelect: (symbol: string) => void;
+  }) => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64 text-gray-400">
+          Loading GMX markets...
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex items-center justify-center h-64 text-red-400">
+          {error}
+        </div>
+      );
+    }
+
+    if (displaySymbols.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-64 text-gray-400">
+          No GMX markets found
+        </div>
+      );
+    }
+
+    return (
+      <table className="w-full text-sm">
+        <TableHeader />
+        <TableBody
+          markets={displaySymbols}
+          favorites={favorites}
+          normalizedCurrentSymbol={normalizedCurrentSymbol}
+          onToggleFavorite={onToggleFavorite}
+          onSelect={onSelect}
+        />
+      </table>
+    );
+  }
+);
+TableContent.displayName = "TableContent";
+
 export default function AssetSelect({
   isOpen,
   onClose,
@@ -89,6 +281,7 @@ export default function AssetSelect({
   });
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
+  // Only sync to localStorage when favorites actually change
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(
@@ -109,11 +302,13 @@ export default function AssetSelect({
 
   const displaySymbols = useMemo(() => {
     if (!showFavoritesOnly) return filteredSymbols;
-
     return filteredSymbols.filter((market) => favorites.has(market.symbol));
   }, [favorites, filteredSymbols, showFavoritesOnly]);
 
-  const normalizedCurrentSymbol = currentSymbol.trim().toUpperCase();
+  const normalizedCurrentSymbol = useMemo(
+    () => currentSymbol.trim().toUpperCase(),
+    [currentSymbol]
+  );
 
   const toggleFavorite = useCallback((symbol: string) => {
     setFavorites((previous) => {
@@ -134,6 +329,10 @@ export default function AssetSelect({
     },
     [onClose, onSelectSymbol],
   );
+
+  const handleFavoritesToggle = useCallback(() => {
+    setShowFavoritesOnly((previous) => !previous);
+  }, []);
 
   return (
     <AnimatePresence>
@@ -179,7 +378,7 @@ export default function AssetSelect({
                 </div>
 
                 <button
-                  onClick={() => setShowFavoritesOnly((previous) => !previous)}
+                  onClick={handleFavoritesToggle}
                   className={`px-4 py-2 rounded-lg text-sm border transition-colors ${
                     showFavoritesOnly
                       ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/30"
@@ -192,107 +391,15 @@ export default function AssetSelect({
             </div>
 
             <div className="overflow-y-auto flex-1">
-              {loading ? (
-                <div className="flex items-center justify-center h-64 text-gray-400">
-                  Loading GMX markets...
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-center h-64 text-red-400">
-                  {error}
-                </div>
-              ) : displaySymbols.length === 0 ? (
-                <div className="flex items-center justify-center h-64 text-gray-400">
-                  No GMX markets found
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
-                    <tr className="text-left text-gray-400 text-xs font-medium uppercase">
-                      <th className="w-12 px-4 py-3"></th>
-                      <th className="px-4 py-3 min-w-[150px]">Market</th>
-                      <th className="px-4 py-3 text-right min-w-[120px]">
-                        Oracle Price
-                      </th>
-                      <th className="px-4 py-3 text-right min-w-[110px]">
-                        Spread
-                      </th>
-                      <th className="px-4 py-3 text-right min-w-[120px]">
-                        Open Interest
-                      </th>
-                      <th className="px-4 py-3 text-right min-w-[120px]">
-                        Liquidity
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displaySymbols.map((market) => {
-                      const isFavorite = favorites.has(market.symbol);
-                      const isSelected =
-                        normalizedCurrentSymbol === market.symbol.toUpperCase();
-
-                      return (
-                        <motion.tr
-                          key={market.marketTokenAddress}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className={`border-b border-gray-800 hover:bg-gray-900 cursor-pointer transition-colors ${
-                            isSelected ? "bg-gray-900" : ""
-                          }`}
-                          onClick={() => handleSelect(market.symbol)}
-                        >
-                          <td
-                            className="w-12 px-4 py-3"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleFavorite(market.symbol);
-                            }}
-                          >
-                            <button className="p-1 hover:bg-gray-800 rounded transition-colors">
-                              {isFavorite ? (
-                                <AiFillStar className="w-4 h-4 text-yellow-500" />
-                              ) : (
-                                <AiOutlineStar className="w-4 h-4 text-gray-500 hover:text-gray-400" />
-                              )}
-                            </button>
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-sm font-bold text-gray-100">
-                                {getSymbolBadge(market)}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-white">
-                                  {market.symbol}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {market.pairLabel}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3 text-right font-mono text-white">
-                            {formatPrice(market.markPrice)}
-                          </td>
-
-                          <td className="px-4 py-3 text-right font-mono text-gray-300">
-                            {formatSpread(market.spreadBps)}
-                          </td>
-
-                          <td className="px-4 py-3 text-right font-mono text-gray-300">
-                            {formatCompactUsd(market.openInterestUsd)}
-                          </td>
-
-                          <td className="px-4 py-3 text-right font-mono text-gray-300">
-                            {formatCompactUsd(market.availableLiquidityUsd)}
-                          </td>
-                        </motion.tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+              <TableContent
+                loading={loading}
+                error={error}
+                displaySymbols={displaySymbols}
+                favorites={favorites}
+                normalizedCurrentSymbol={normalizedCurrentSymbol}
+                onToggleFavorite={toggleFavorite}
+                onSelect={handleSelect}
+              />
             </div>
           </motion.div>
         </div>

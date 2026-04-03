@@ -108,16 +108,16 @@ function getOrCreateWSConnection(
         // Connection healthy
       }
     } catch (err) {
-      console.error(`[WS] Parse error for ${streamName}:`, err);
+      //console.error(`[WS] Parse error for ${streamName}:`, err);
     }
   };
 
   ws.onerror = (error) => {
-    console.error(`[WS] Error for ${streamName}:`, error);
+    //console.error(`[WS] Error for ${streamName}:`, error);
   };
 
   ws.onclose = () => {
-    console.log(`[WS] Closed: ${streamName}`);
+   // console.log(`[WS] Closed: ${streamName}`);
     
     if (connection.pingInterval) {
       clearInterval(connection.pingInterval);
@@ -245,7 +245,7 @@ class AsterDexDataFeed {
         has_weekly_and_monthly: true,
         data_status: "streaming",
         default_bar_type: "candle",
-        visible_plots_set: "ohlc",
+        visible_plots_set: "ohlcv",
         has_seconds: false,
         intraday_multipliers: ["1", "5", "15", "60", "240"],
         supported_resolutions: GMX_SUPPORTED_RESOLUTIONS,

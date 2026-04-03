@@ -1,4 +1,4 @@
-import DefinedPerpMain from "@/components/perp/aster/mainbox";
+import DefinedPerpMain from "@/components/perp/aster/asterMain";
 
 export default async function PerpMain({
   params,
@@ -7,8 +7,8 @@ export default async function PerpMain({
 }) {
   const { symbol } = await params;
   const normalizedSymbol = decodeURIComponent(symbol ?? "").trim().toUpperCase();
-  
+
   return (
-    <DefinedPerpMain key={normalizedSymbol} tokenSymbol={normalizedSymbol}/>
+    <DefinedPerpMain key={normalizedSymbol} tokenSymbol={normalizedSymbol} />
   )
 }

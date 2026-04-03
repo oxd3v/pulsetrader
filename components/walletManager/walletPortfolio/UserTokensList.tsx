@@ -4,12 +4,14 @@ import RenderTokenList from "@/components/Token/RenderTokenList";
 
 interface UserTokensProps {
   walletAddress: string;
+  walletId: string;
   chainId: number;
   user: any;
   holdingTokens: any[];
 }
 export default function UserTokens({
   walletAddress,
+  walletId,
   user,
   chainId,
   holdingTokens,
@@ -22,7 +24,7 @@ export default function UserTokens({
           token: td.token,
           balance: td.balance,
           priceUsd: td.tokenPriceUsd,
-          imageUrl: td.token.info.imageLargeUrl || td.token.info.imageSmallUrl || td.token.info.imageThumbUrl
+          imageUrl: td.token?.info?.imageLargeUrl || td.token?.info?.imageSmallUrl || td.token?.info?.imageThumbUrl || ""
         };
       });
       setTokens(_defaultTokens);
@@ -31,6 +33,7 @@ export default function UserTokens({
   return (
     <RenderTokenList
       tokenList={tokens}
+      walletId={walletId}
       chainId={chainId}
       walletAddress={walletAddress}
       user={user}

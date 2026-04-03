@@ -138,7 +138,7 @@ const OrderCreationModal = ({
   };
 
   // Generic Field Handler supporting deep nested updates
-  // path examples: "spot.amount.orderSize", "exit.takeProfit.takeProfitPercentage", "entry.priceLogic.threshold"
+  // path examples: "perp.amount.orderSize", "exit.takeProfit.takeProfitPercentage", "entry.priceLogic.threshold"
   const handleFieldChange = (orderId: string, path: string, value: any) => {
     setEditedOrders(prev => {
       const order = prev[orderId];
@@ -237,7 +237,7 @@ const OrderCreationModal = ({
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 shadow-sm">
                     <tr>
-                      {["Grid", "Entry Condition", "Order Size", "Exit / TP / SL", "Wallet", "Status", "Actions"].map((head) => (
+                      {["Grid", "Entry Condition", "Order Size", "Leverage", "Exit / TP / SL", "Wallet", "Status", "Actions"].map((head) => (
                         <th key={head} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {head}
                         </th>
@@ -301,18 +301,20 @@ const OrderCreationModal = ({
                                     <input 
                                         type="number"
                                         className="w-20 px-2 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600"
-                                        value={formateAmountWithFixedDecimals(currentOrder.spot?.amount?.orderSize ?? "0", collateralToken?.decimals, 3)}
-                                        onChange={(e) => handleFieldChange(orderId, "spot.amount.orderSize", e.target.value)} // Note: Requires converting back to base units in real logic
+                                        value={formateAmountWithFixedDecimals(currentOrder.perp?.amount?.orderSize ?? "0", collateralToken?.decimals, 3)}
+                                        onChange={(e) => handleFieldChange(orderId, "perp.amount.orderSize", e.target.value)} // Note: Requires converting back to base units in real logic
                                     />
                                     <span className="text-xs text-gray-500">{collateralToken?.symbol}</span>
                                 </div>
                              ) : (
                                 <div className="font-medium text-gray-800 dark:text-gray-200">
-                                    {formateAmountWithFixedDecimals(currentOrder.spot?.amount?.orderSize ?? "0", collateralToken?.decimals, 3)} 
+                                    {formateAmountWithFixedDecimals(currentOrder.perp?.amount?.orderSize ?? "0", collateralToken?.decimals, 3)} 
                                     <span className="text-xs text-gray-500 ml-1">{collateralToken?.symbol}</span>
                                 </div>
                              )}
                           </td>
+
+                          <td className={`px-4 py-3 text-sm text-[10px] font-bold ${currentOrder.perp?.leverage && currentOrder.perp?.leverage > 100000 ? "text-orange-500" : 'text-green-500'} uppercase flex items-center gap-1`}>{formatUnits(String(currentOrder.perp?.leverage || 0), 4)}X</td>
 
                           {/* 4. Exit / TP / SL */}
                           <td className="px-4 py-3 text-sm">

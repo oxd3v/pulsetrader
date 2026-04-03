@@ -15,17 +15,9 @@ import TradingViewAsterChart from "./tradingViewAster";
  * Example usage:
  * <DefinedChart symbol="BTC" />
  */
-const DefinedChart = ({ symbol }) => {
-  // Guard: symbol is required
-  if (!symbol) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-900 rounded-lg">
-        <span className="text-gray-500">Select a symbol to view chart</span>
-      </div>
-    );
-  }
 
-  return <TradingViewAsterChart symbol={symbol} />;
-};
+const AsterChart = ({symbol}) => {
+   return <TradingViewAsterChart symbol={symbol} />
+}
 
-export default DefinedChart;
+export default AsterChart

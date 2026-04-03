@@ -8,7 +8,7 @@ import {
   FiActivity,
   FiInfo,
   FiDollarSign,
-  FiCreditCard, 
+  FiCreditCard,
 } from "react-icons/fi";
 
 import { motion } from "framer-motion";
@@ -72,12 +72,17 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
     const isCollateral = !(
       order.orderType === "BUY" && order.category === "spot"
     );
+    const orderData = order.category === "spot" ? order.spot : order.perp;
+    const orderAsset = orderData?.orderAsset;
+    const amount = orderData?.amount;
+    if (!orderAsset || !amount) return "—";
+
     const token = isCollateral
-      ? order.orderAsset.collateralToken
-      : order.orderAsset.orderToken;
+      ? orderAsset.collateralToken
+      : (orderAsset as any).orderToken;
     const size = isCollateral
-      ? order.amount.orderSize
-      : order.amount.tokenAmount;
+      ? amount.orderSize
+      : (amount as any).tokenAmount;
     if (!size || !token) return "—";
     return (
       <>
@@ -96,18 +101,30 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
   }, []);
 
   const totalCost = useMemo(() => {
-    if (!order.executionFee) return "0";
-    return (
-      BigInt(order.executionFee.feeInUsd || "0") +
-      BigInt(order.executionFee.payInUsd || "0")
-    ).toString();
-  }, [order.executionFee]);
+    if (order.category === "spot" && order.spot?.amount?.orderSizeUsd) {
+      return order.spot.amount.orderSizeUsd;
+    }
+    if (order.category === "perpetual" && order.perp?.amount?.marginSizeUsd) {
+      return order.perp.amount.marginSizeUsd;
+    }
+    return "0";
+  }, [
+    order.category,
+    order.spot?.amount?.orderSizeUsd,
+    order.perp?.amount?.marginSizeUsd,
+  ]);
 
   const entryPrice = order.additional?.entryPrice;
   const exitPrice = order.additional?.exitPrice;
   const message = order.message;
 
   if (!order) return null;
+
+  const orderData = order.category === "spot" ? order.spot : order.perp;
+  const amountObj = orderData?.amount || { orderSize: "0", tokenAmount: "0" };
+  const orderAssetObj = orderData?.orderAsset || {
+    collateralToken: { decimals: 18, symbol: "UNK" }
+  };
 
   return (
     <motion.div
@@ -124,17 +141,16 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
             <div className="flex items-center gap-1">
               {STATUS_ICONS[order.orderStatus] || STATUS_ICONS.PENDING}
               <div
-                className={`flex gap-1 items-center font-semibold ${
-                  order.category.split(":")[0] === "perpetual"
+                className={`flex gap-1 items-center font-semibold ${order.category.split(":")[0] === "perpetual"
                     ? "text-blue-500"
                     : order.category.split(":")[0] === "spot"
                       ? "text-yellow-500"
                       : "text-gray-800 dark:text-gray-200"
-                }`}
+                  }`}
               >
                 <span>
-                  {order.orderAsset.orderToken
-                    ? `${order.orderAsset.orderToken.symbol} |`
+                  {order.category === "spot" && order.spot?.orderAsset?.orderToken
+                    ? `${order.spot.orderAsset.orderToken.symbol} |`
                     : ""}
                 </span>
                 <span>{order._id?.slice(-6)}</span>
@@ -204,13 +220,13 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
                   {displayNumber(
                     Number(
                       safeFormatNumber(
-                        order.amount.orderSize.toString(),
-                        order.orderAsset.collateralToken.decimals,
+                        amountObj.orderSize?.toString() || "0",
+                        orderAssetObj.collateralToken?.decimals || 18,
                         4,
                       ),
                     ),
                   )}
-                  <p>{order.orderAsset.collateralToken.symbol}</p>
+                  <p>{orderAssetObj.collateralToken?.symbol || "UNK"}</p>
                 </div>
               </div>
 
@@ -307,13 +323,13 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
                   {displayNumber(
                     Number(
                       safeFormatNumber(
-                        order.amount.tokenAmount.toString(),
-                        order.orderAsset.orderToken.decimals,
+                        (amountObj as any).tokenAmount?.toString() || "0",
+                        (orderAssetObj as any).orderToken?.decimals || orderAssetObj.collateralToken?.decimals || 18,
                         4,
                       ),
                     ),
                   )}
-                  <p>{order.orderAsset.collateralToken.symbol}</p>
+                  <p>{(orderAssetObj as any).orderToken?.symbol || orderAssetObj.collateralToken?.symbol || "UNK"}</p>
                 </div>
               </div>
 
@@ -328,20 +344,20 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
 
               {entryPrice && (
                 <div>
-                <span className="text-xs text-gray-500">Entry at</span>
-                <div className="text-sm font-medium flex items-center gap-1">
-                  {formatUSD(entryPrice)}
+                  <span className="text-xs text-gray-500">Entry at</span>
+                  <div className="text-sm font-medium flex items-center gap-1">
+                    {formatUSD(entryPrice)}
+                  </div>
                 </div>
-              </div>
               )}
 
               {exitPrice && (
                 <div>
-                <span className="text-xs text-gray-500">Exit at</span>
-                <div className="text-sm font-medium flex items-center gap-1">
-                  {formatUSD(exitPrice)}
+                  <span className="text-xs text-gray-500">Exit at</span>
+                  <div className="text-sm font-medium flex items-center gap-1">
+                    {formatUSD(exitPrice)}
+                  </div>
                 </div>
-              </div>
               )}
 
               {message && (

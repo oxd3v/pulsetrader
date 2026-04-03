@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, memo } from "react";
 import { FiChevronUp } from "react-icons/fi";
 import { LuChartCandlestick } from "react-icons/lu";
 import { RiArrowDropDownLine } from "react-icons/ri";
@@ -59,6 +59,23 @@ const formatCompactUsd = (value: number) => {
   return `$${value.toFixed(2)}`;
 };
 
+// Memoized metrics display component
+const MetricsDisplay = memo(({ items }: { items: MetricItem[] }) => (
+  <div className="flex w-full items-stretch justify-end gap-3 xl:w-auto xl:max-w-[820px]">
+    {items.map((item) => (
+      <div key={item.label}>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+          {item.label}
+        </p>
+        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+          {item.value}
+        </p>
+      </div>
+    ))}
+  </div>
+));
+MetricsDisplay.displayName = "MetricsDisplay";
+
 export default function ChartBox({
   tokenSymbol,
   stats,
@@ -70,28 +87,38 @@ export default function ChartBox({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAssetSelect, setShowAssetSelect] = useState(false);
 
-  const metrics: MetricItem[] = [
-    {
-      label: "Oracle Price",
-      value: formatPrice(stats.markPrice),
-    },
-    {
-      label: "Execution Spread",
-      value: formatSpread(stats.spreadBps),
-    },
-    {
-      label: "Open Interest",
-      value: formatCompactUsd(stats.openInterestUsd),
-    },
-    {
-      label: "Long Liquidity",
-      value: formatCompactUsd(stats.availableLiquidityLongUsd),
-    },
-    {
-      label: "Short Liquidity",
-      value: formatCompactUsd(stats.availableLiquidityShortUsd),
-    },
-  ];
+  // Memoize metrics array to prevent unnecessary child re-renders
+  const metrics: MetricItem[] = useMemo(
+    () => [
+      {
+        label: "Oracle Price",
+        value: formatPrice(stats.markPrice),
+      },
+      {
+        label: "Execution Spread",
+        value: formatSpread(stats.spreadBps),
+      },
+      {
+        label: "Open Interest",
+        value: formatCompactUsd(stats.openInterestUsd),
+      },
+      {
+        label: "Long Liquidity",
+        value: formatCompactUsd(stats.availableLiquidityLongUsd),
+      },
+      {
+        label: "Short Liquidity",
+        value: formatCompactUsd(stats.availableLiquidityShortUsd),
+      },
+    ],
+    [
+      stats.markPrice,
+      stats.spreadBps,
+      stats.openInterestUsd,
+      stats.availableLiquidityLongUsd,
+      stats.availableLiquidityShortUsd,
+    ]
+  );
 
   return (
     <>
@@ -134,18 +161,7 @@ export default function ChartBox({
               </div>
 
               <div className="flex justify-end gap-2">
-                <div className="flex w-full items-stretch justify-end gap-3 xl:w-auto xl:max-w-[820px]">
-                  {metrics.map((item) => (
-                    <div key={item.label}>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                        {item.label}
-                      </p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                        {item.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                <MetricsDisplay items={metrics} />
 
                 <button
                   onClick={(event) => {

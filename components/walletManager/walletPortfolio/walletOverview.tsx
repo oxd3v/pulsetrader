@@ -1,245 +1,243 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { WalletConfig } from "@/type/common";
-
-// UI Icons
-import { FiCopy, FiArrowDownLeft, FiArrowUpRight } from "react-icons/fi";
+import {
+  FiArrowDownLeft,
+  FiArrowUpRight,
+  FiCopy,
+  FiRefreshCw,
+  FiList,
+  FiClock,
+  FiPieChart,
+} from "react-icons/fi";
 import { IoWallet } from "react-icons/io5";
 import toast from "react-hot-toast";
 import { chainConfig } from "@/constants/common/chain";
 import { formateNumber, safeFormatNumber } from "@/utility/handy";
-
-// Libs & Mock
 import RenderWalletFundModal from "@/components/walletManager/modal/fundingModal";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
 import { ZeroAddress } from "ethers";
 import { getWalletBalance } from "@/lib/blockchain/balance";
+import type { BalanceData } from "./PortfolioMain";
 
 interface WalletOverviewProps {
   selectedWallet: WalletConfig;
   chainId: number;
-  balanceData: any;
+  balanceData: BalanceData;
   user: any;
 }
 
-export default function WalletOverview({
-  selectedWallet,
-  balanceData,
-  chainId,
-  user,
-}: WalletOverviewProps) {
-  // State
+export default function WalletOverview({ selectedWallet, balanceData, chainId, user }: WalletOverviewProps) {
   const [isFundingModalOpen, setIsFundingModalOpen] = useState(false);
-  const [fundingMode, setFundingMode] = useState<"deposit" | "withdraw">("deposit");
   const [nativeBalance, setNativeBalance] = useState(balanceData.nativeBalance);
-  const [isUpdatingNativeBalance, setIsUpdatingNativeBalance] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleBalance = useCallback(async () => {
-    if (!selectedWallet?.address) return;
-    
-    setIsUpdatingNativeBalance(true);
-    try {
-      const bal = await getWalletBalance({
-        walletAddress: selectedWallet.address,
-        chainId,
-      });
-      setNativeBalance(bal.toString());
-    } catch (err) {
-      console.error("Failed to fetch native balance:", err);
-    } finally {
-      setIsUpdatingNativeBalance(false);
-    }
-  }, [selectedWallet?.address, chainId]);
-
-  const handleCloseFundingModal = useCallback(() => {
-    setIsFundingModalOpen(false);
-    // Refresh native balance after modal closes
-    handleBalance();
-  }, [handleBalance]);
-
-  // Update native balance when props change
+  // Keep local native balance in sync when parent data changes
   useEffect(() => {
     setNativeBalance(balanceData.nativeBalance);
   }, [balanceData.nativeBalance]);
 
-  // Refresh balance when wallet or chain changes
+  // Lightweight native-balance-only refresh (avoids triggering a full parent re-fetch)
+  const handleRefreshNative = useCallback(async () => {
+    if (!selectedWallet?.address) return;
+    setIsRefreshing(true);
+    try {
+      const bal = await getWalletBalance({ walletAddress: selectedWallet.address, chainId });
+      setNativeBalance(bal.toString());
+    } catch { /* silent */ }
+    finally { setIsRefreshing(false); }
+  }, [selectedWallet?.address, chainId]);
+
+  // Refresh native balance whenever the selected wallet or chain changes
   useEffect(() => {
-    if (selectedWallet?.address) {
-      handleBalance();
-    }
-  }, [selectedWallet?.address, chainId, handleBalance]);
+    if (selectedWallet?.address) handleRefreshNative();
+  }, [selectedWallet?.address, chainId]);
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const isFunded = BigInt(nativeBalance || "0") > BigInt(0);
+  const isEVM = selectedWallet.network !== "SVM";
+
+  const totalPortfolioUsd = useMemo(
+    () => BigInt(balanceData.totalSpotUsd || "0") + BigInt(balanceData.totalPerpUsd || "0"),
+    [balanceData.totalSpotUsd, balanceData.totalPerpUsd]
+  );
+
+  // Formatted display values
+  const nativeFormatted = formateNumber(
+    Number(safeFormatNumber(nativeBalance || "0", chainConfig[chainId].nativeToken.decimals, 5)),
+    4
+  );
+  const portfolioFormatted = formateNumber(
+    Number(safeFormatNumber(totalPortfolioUsd.toString(), PRECISION_DECIMALS, 4)),
+    2
+  );
+  const spotFormatted = formateNumber(
+    Number(safeFormatNumber(BigInt(balanceData.totalSpotUsd || "0").toString(), PRECISION_DECIMALS, 4)),
+    2
+  );
+  const perpFormatted = formateNumber(
+    Number(safeFormatNumber(BigInt(balanceData.totalPerpUsd || "0").toString(), PRECISION_DECIMALS, 4)),
+    2
+  );
+
+  // Portfolio counts — sourced directly from balanceData (computed once in parent)
+  const tokensTracked = balanceData.holdingTokens?.length ?? 0;
+  const { active: activeOrdersCount, total: totalOrdersCount } = balanceData.orderSummary;
+
+  // Perp DEX breakdown — from balanceData.perpBalances (no extra fetch needed)
+  const formattedAsterdex = formateNumber(
+    Number(safeFormatNumber(balanceData.perpBalances.asterdex, PRECISION_DECIMALS, 4)),
+    2
+  );
+  const formattedHyperliquid = formateNumber(
+    Number(safeFormatNumber(balanceData.perpBalances.hyperliquid, PRECISION_DECIMALS, 4)),
+    2
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-sans">
-        {/* 1. Wallet Selection & Info Card */}
-        <div className="bg-white dark:bg-[#12141a] p-6 rounded-[24px] border border-white/5 relative group">
-          {/* Active Wallet Display */}
-          <div className="flex items-center gap-4 mb-8">
-            <div
-              className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg ${selectedWallet.network === "SVM" ? "bg-gradient-to-br from-purple-500 to-indigo-600" : "bg-gradient-to-br from-blue-500 to-cyan-600"}`}
-            >
-              <IoWallet className="text-white" />
+    <div className="space-y-4">
+      {/* ── Top Section ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        {/* Wallet info */}
+        <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-5 flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isEVM ? "bg-blue-500" : "bg-purple-500"}`}>
+              <IoWallet className="text-white" size={17} />
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold text-black dark:text-white truncate">
-                Main Account
-              </h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400 font-mono truncate">
-                  {selectedWallet.address.slice(0, 6)}...
-                  {selectedWallet.address.slice(-4)}
-                </span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedWallet.address);
-                    toast.success("Address copied");
-                  }}
-                  className="p-1.5 bg-white/5 hover:bg-white/10 rounded-md transition-colors"
-                >
-                  <FiCopy size={12} />
-                </button>
-              </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs 2xl:text-sm font-bold text-black dark:text-white">Main Account</p>
+              <button
+                onClick={() => { navigator.clipboard.writeText(selectedWallet.address); toast.success("Copied"); }}
+                className="flex items-center gap-1 text-[10px] 2xl:text-[11px] font-mono text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors group"
+              >
+                {selectedWallet.address.slice(0, 8)}…{selectedWallet.address.slice(-4)}
+                <FiCopy size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
             </div>
+            <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg ${isEVM ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" : "bg-purple-500/10 text-purple-600 dark:text-purple-400"}`}>
+              {isEVM ? "EVM" : "SOL"}
+            </span>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button
-              onClick={() => {
-                setFundingMode("deposit");
-                setIsFundingModalOpen(true);
-              }}
-              className="flex-1 flex items-center justify-center gap-2 bg-black dark:bg-white text-white dark:text-black dark:hover:bg-gray-200 hover:bg-gray-800 px-4 py-3 rounded-xl font-bold transition-all active:scale-95"
+              onClick={() => setIsFundingModalOpen(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-black dark:bg-white text-white dark:text-black hover:opacity-80 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95"
             >
-              <FiArrowDownLeft />{" "}
-              <span className=" lg:hidden xl:block">Deposit</span>
+              <FiArrowDownLeft size={13} /> Deposit
             </button>
             <button
-              onClick={() => {
-                setFundingMode("withdraw");
-                setIsFundingModalOpen(true);
-              }}
-              className="flex-1 flex items-center justify-center gap-2 bg-white/5 dark:hover:bg-white/10 hover:bg-dark/10 text-black dark:text-white border border-black/10 dark:border-white/10 px-4 py-3 rounded-xl font-bold transition-all active:scale-95"
+              onClick={() => setIsFundingModalOpen(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 border border-black/10 dark:border-white/10 text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95"
             >
-              <FiArrowUpRight />{" "}
-              <span className=" lg:hidden xl:block">Withdraw</span>
+              <FiArrowUpRight size={13} /> Withdraw
             </button>
           </div>
         </div>
 
-        {/* 2. Balance Breakdown Card */}
-        <div className="md:col-span-2 bg-white dark:bg-[#12141a] p-6 rounded-[24px] border border-white/5 flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div>
-              <h4 className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-1">
-                Native Balance
-              </h4>
-              <div className="flex gap-3 items-center">
-                <div className="text-4xl font-black text-black dark:text-white tracking-tight">
-                  {formateNumber(
-                    Number(
-                      safeFormatNumber(
-                        nativeBalance,
-                        chainConfig[chainId].nativeToken.decimals,
-                        5,
-                      ),
-                    ),
-                    4,
-                  )}
-                  {isUpdatingNativeBalance && (
-                    <span className="inline-block ml-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                  )}
-                </div>
-                <img
-                  src={chainConfig[chainId].imageUrl}
-                  className="w-6 h-6 rounded-full"
-                  alt={`${chainConfig[chainId].name} logo`}
-                />
-              </div>
-            </div>
-            <div
-              className={`px-3 py-1 rounded-full text-xs font-bold border ${selectedWallet.network === "SVM" ? "border-purple-500/30 text-purple-400 bg-purple-500/10" : "border-blue-500/30 text-blue-400 bg-blue-500/10"}`}
+        {/* Native balance */}
+        <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Native Balance</p>
+            <button
+              onClick={handleRefreshNative}
+              disabled={isRefreshing}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              title="Refresh"
             >
-              {selectedWallet.network === "SVM" ? "Solana" : "Ethereum"}
-            </div>
+              <FiRefreshCw size={12} className={`text-gray-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
           </div>
+          <div className="flex items-end gap-2">
+            <p className="text-3xl font-black text-black dark:text-white">{nativeFormatted}</p>
+            <img src={chainConfig[chainId].imageUrl} className="w-5 h-5 rounded-full mb-1" alt="chain logo" />
+          </div>
+          <div className={`mt-3 text-xs font-semibold ${isFunded ? "text-emerald-500" : "text-amber-500"}`}>
+            {isFunded ? "✓ Ready for gas" : "⚠ Needs funding"}
+          </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-1 lg:gap-4 mt-8">
-            {/* Stat 1 */}
-            <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
-              <div className="text-xs text-gray-900 dark:text-gray-500  mb-1">
-                Portfolio
-              </div>
-              <div className="text-md lg:text-lg font-bold text-black dark:text-white">
-                $
-                {formateNumber(
-                  Number(
-                    safeFormatNumber(
-                      (
-                        BigInt(balanceData.totalSpotUsd || "0") +
-                        BigInt(balanceData.totalPerpUsd || "0")
-                      ).toString(),
-                      PRECISION_DECIMALS,
-                      4,
-                    ),
-                  ),
-                  4,
-                )}
-              </div>
+        {/* Portfolio breakdown */}
+        <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Total Portfolio</p>
+          <p className="text-3xl font-black text-black dark:text-white mb-4">${portfolioFormatted}</p>
+          <div className="flex gap-2">
+            <div className="flex-1 flex flex-col gap-0.5 p-2.5 rounded-xl bg-black/5 dark:bg-white/5">
+              <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Spot Asset</span>
+              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">${spotFormatted}</span>
             </div>
-            {/* Stat 2 */}
-            <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
-              <div className="text-xs text-gray-500 mb-1">Spot Value</div>
-              <div className="text-md lg:text-lg font-bold text-emerald-400">
-                $
-                {formateNumber(
-                  Number(
-                    safeFormatNumber(
-                      BigInt(balanceData.totalSpotUsd || "0").toString(),
-                      PRECISION_DECIMALS,
-                      4,
-                    ),
-                  ),
-                  4,
-                )}
-              </div>
-            </div>
-            {/* Stat 3 */}
-            <div className="p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
-              <div className="text-xs text-gray-500 mb-1">Perps Value</div>
-              <div className="text-md lg:text-lg font-bold text-blue-400">
-                $
-                {formateNumber(
-                  Number(
-                    safeFormatNumber(
-                      BigInt(balanceData.totalPerpUsd || "0").toString(),
-                      PRECISION_DECIMALS,
-                      4,
-                    ),
-                  ),
-                  4,
-                )}
-              </div>
+            <div className="flex-1 flex flex-col gap-0.5 p-2.5 rounded-xl bg-black/5 dark:bg-white/5">
+              <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Perp Margin</span>
+              <span className="text-sm font-black text-blue-600 dark:text-blue-400">${perpFormatted}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Funding Modal Triggered from here if needed, or pass state up */}
+      {/* ── Bottom Section: Trading Stats ─────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+        {/* Tokens Tracked */}
+        <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <FiList size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Tokens Tracked</span>
+          </div>
+          <p className="text-2xl font-black text-black dark:text-white">{tokensTracked}</p>
+        </div>
+
+        {/* Orders */}
+        <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-4 flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <FiClock size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Orders</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex justify-between items-center p-2 rounded-xl bg-black/5 dark:bg-white/5">
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Total</span>
+              <span className="text-sm font-black text-black dark:text-white">{totalOrdersCount}</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded-xl bg-black/5 dark:bg-white/5">
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Active</span>
+              <span className="text-sm font-black text-blue-600 dark:text-blue-400">{activeOrdersCount}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Perp DEX Breakdown */}
+        <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-4 flex flex-col justify-center gap-3">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <FiPieChart size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Perp DEX</span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-gray-500">AsterDEX</span>
+              <span className="text-xs font-black text-black dark:text-white">${formattedAsterdex}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-gray-500">Hyperliquid</span>
+              <span className="text-xs font-black text-black dark:text-white">${formattedHyperliquid}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fund modal */}
       {isFundingModalOpen && (
         <RenderWalletFundModal
           isOpen={isFundingModalOpen}
-          onClose={handleCloseFundingModal}
+          onClose={() => { setIsFundingModalOpen(false); handleRefreshNative(); }}
           isNative={true}
           wallet={selectedWallet.address}
+          walletId={selectedWallet._id}
           chainId={chainId}
           user={user}
-          // Pass dummy token info, real app should derive from chainId
           tokenInfo={{
             address: ZeroAddress,
-            name: selectedWallet.network === "SVM" ? "Solana" : chainConfig[chainId].name,
-            symbol: selectedWallet.network === "SVM" ? "SOL" : chainConfig[chainId].symbol,
-            decimals: selectedWallet.network === "SVM" ? 9 : 18,
+            name: isEVM ? chainConfig[chainId].name : "Solana",
+            symbol: isEVM ? chainConfig[chainId].symbol : "SOL",
+            decimals: isEVM ? 18 : 9,
             imageUrl: chainConfig[chainId].imageUrl,
           }}
         />

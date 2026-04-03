@@ -9,7 +9,7 @@ import { RiRefreshLine } from "react-icons/ri";
 import { ORDER_TYPE } from "@/type/order";
 
 // Hooks & Store
-import { useSpotOrder } from "@/hooks/useOrder";
+import { useOrder } from "@/hooks/useOrder";
 
 // Components
 import StrategyGrouped from "./StrategyGrouped";
@@ -22,6 +22,7 @@ interface OrderListParams {
   walletAddress?: string | undefined;
   isConnected: boolean;
   tokenInfo?: any;
+  protocol?: string
 }
 
 // Helper to detect mobile screen on first render (SSR-safe)
@@ -37,8 +38,9 @@ export default function OrderList({
   walletAddress,
   isConnected,
   tokenInfo,
+  protocol
 }: OrderListParams) {
-  const { getOrders } = useSpotOrder();
+  const { getOrders } = useOrder();
 
   // State
   const [error, setError] = useState<string | null>(null);
@@ -90,13 +92,22 @@ export default function OrderList({
         }
       }
 
+      if (protocol) {
+        if (o.category === "perpetual" && o.perp?.protocol !== protocol) return false;
+      }
+
       // Token filter – case‑insensitive, skip if order has no token address
       if (tokenInfo?.address) {
-        const orderTokenAddr = o.orderAsset?.orderToken?.address;
+        const orderData = o.category === "spot" ? o.spot : o.perp;
+        const orderTokenAddr = o.category === "spot"
+          ? (orderData?.orderAsset as any)?.orderToken?.address
+          : orderData?.orderAsset?.collateralToken?.address;
         if (!orderTokenAddr || orderTokenAddr.toLowerCase() !== tokenInfo.address.toLowerCase()) {
           return false;
         }
       }
+
+      
 
       // Category filter
       if (categoryFilter !== "all" && o.category !== categoryFilter) return false;
@@ -245,22 +256,20 @@ export default function OrderList({
             <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-1">
               <button
                 onClick={() => setIsTableOrder(false)}
-                className={`p-1.5 rounded ${
-                  !isTableOrder
-                    ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
-                    : "text-gray-500"
-                }`}
+                className={`p-1.5 rounded ${!isTableOrder
+                  ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                  : "text-gray-500"
+                  }`}
                 title="Group View"
               >
                 <CiGrid2H className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setIsTableOrder(true)}
-                className={`p-1.5 rounded ${
-                  isTableOrder
-                    ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
-                    : "text-gray-500"
-                }`}
+                className={`p-1.5 rounded ${isTableOrder
+                  ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
+                  : "text-gray-500"
+                  }`}
                 title="Table View"
               >
                 <CiGrid41 className="w-5 h-5" />
@@ -271,10 +280,9 @@ export default function OrderList({
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors
-                ${
-                  showFilters || hasActiveFilters
-                    ? "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800"
-                    : "bg-white border-gray-200 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                ${showFilters || hasActiveFilters
+                  ? "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800"
+                  : "bg-white border-gray-200 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                 }`}
             >
               <FiFilter className="w-4 h-4" />

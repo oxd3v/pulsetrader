@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  getAsterSymbolTradingLimits,
+  type AsterExchangeSymbol,
+} from '@/lib/oracle/asterdexLimits';
 
 type RawTickerPayload = {
   e?: string;
@@ -41,6 +45,10 @@ type RawTickerRestPayload = {
   priceChangePercent?: number | string;
   quoteVolume?: number | string;
   time?: number | string;
+};
+
+type RawExchangeInfoPayload = {
+  symbols?: AsterExchangeSymbol[];
 };
 
 type TickerLikePayload = {
@@ -123,6 +131,7 @@ const createEmptyStats = (symbol: string): AsterMarketStats => ({
   quoteVolume: 0,
   openInterest: 0,
   openInterestUsd: 0,
+ 
   eventTime: 0,
 });
 
@@ -135,7 +144,8 @@ const toErrorMessage = (error: unknown, fallback: string): string => {
 
 const mergeStats = (
   previous: AsterMarketStats,
-  patch: Partial<AsterMarketStats>
+  patch: Partial<AsterMarketStats>,
+  exchangeSymbol: AsterExchangeSymbol | null
 ): AsterMarketStats => {
   const merged = {
     ...previous,
@@ -145,6 +155,8 @@ const mergeStats = (
   const markReference = merged.markPrice > 0 ? merged.markPrice : merged.lastPrice;
   merged.openInterestUsd =
     markReference > 0 && merged.openInterest > 0 ? merged.openInterest * markReference : 0;
+
+  const tradingLimits = getAsterSymbolTradingLimits(exchangeSymbol, markReference);
 
   return merged;
 };
@@ -167,6 +179,7 @@ export const useAsterMarketStats = (
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openInterestIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const exchangeSymbolRef = useRef<AsterExchangeSymbol | null>(null);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -205,6 +218,7 @@ export const useAsterMarketStats = (
     setError(null);
     setConnected(false);
     setStats(createEmptyStats(marketSymbol));
+    exchangeSymbolRef.current = null;
 
     const publishTicker = (tickerPayload: TickerLikePayload) => {
       const lastPrice = toFiniteNumber(tickerPayload.c ?? tickerPayload.lastPrice);
@@ -213,6 +227,7 @@ export const useAsterMarketStats = (
       );
       const quoteVolume = toFiniteNumber(tickerPayload.q ?? tickerPayload.quoteVolume);
       const eventTime = Math.trunc(toFiniteNumber(tickerPayload.E ?? tickerPayload.time));
+      
 
       setStats((previous) =>
         mergeStats(previous, {
@@ -223,7 +238,7 @@ export const useAsterMarketStats = (
             : previous.priceChangePercent,
           quoteVolume: quoteVolume > 0 ? quoteVolume : previous.quoteVolume,
           eventTime: eventTime > 0 ? eventTime : previous.eventTime,
-        })
+        }, exchangeSymbolRef.current)
       );
     };
 
@@ -242,7 +257,7 @@ export const useAsterMarketStats = (
           fundingRate: Number.isFinite(fundingRate) ? fundingRate : previous.fundingRate,
           nextFundingTime: nextFundingTime > 0 ? nextFundingTime : previous.nextFundingTime,
           eventTime: eventTime > 0 ? eventTime : previous.eventTime,
-        })
+        }, exchangeSymbolRef.current)
       );
     };
 
@@ -267,7 +282,7 @@ export const useAsterMarketStats = (
             symbol: marketSymbol,
             openInterest: openInterest > 0 ? openInterest : previous.openInterest,
             eventTime: eventTime > 0 ? eventTime : previous.eventTime,
-          })
+          }, exchangeSymbolRef.current)
         );
       } catch (fetchError) {
         if (disposed || abortController.signal.aborted) return;
@@ -277,29 +292,41 @@ export const useAsterMarketStats = (
 
     const fetchInitialData = async () => {
       try {
-        const [tickerResponse, premiumResponse] = await Promise.all([
+        const [tickerResponse, premiumResponse, exchangeResponse] = await Promise.all([
           fetch(`${REST_BASE_URL}/ticker/24hr?symbol=${marketSymbol}`, {
             signal: abortController.signal,
           }),
           fetch(`${REST_BASE_URL}/premiumIndex?symbol=${marketSymbol}`, {
             signal: abortController.signal,
           }),
+          fetch(`${REST_BASE_URL}/exchangeInfo`, {
+            signal: abortController.signal,
+          }),
         ]);
 
-        if (tickerResponse.ok) {
-          const tickerPayload = (await tickerResponse.json()) as RawTickerRestPayload;
-          if (!disposed) {
-            publishTicker(tickerPayload);
-          }
-        } else {
+        if (!tickerResponse.ok) {
           throw new Error(`Ticker request failed (${tickerResponse.status})`);
         }
 
-        if (premiumResponse.ok) {
-          const premiumPayload = (await premiumResponse.json()) as RawPremiumIndexPayload;
-          if (!disposed) {
-            publishMarkPrice(premiumPayload);
-          }
+        if (!premiumResponse.ok) {
+          throw new Error(`Premium index request failed (${premiumResponse.status})`);
+        }
+
+        if (!exchangeResponse.ok) {
+          throw new Error(`Exchange info request failed (${exchangeResponse.status})`);
+        }
+
+        const exchangePayload = (await exchangeResponse.json()) as RawExchangeInfoPayload;
+        exchangeSymbolRef.current =
+          exchangePayload.symbols?.find((item) => item.symbol === marketSymbol) ?? null;
+
+        const tickerPayload = (await tickerResponse.json()) as RawTickerRestPayload;
+        const premiumPayload = (await premiumResponse.json()) as RawPremiumIndexPayload;
+
+        if (!disposed) {
+          publishTicker(tickerPayload);
+          publishMarkPrice(premiumPayload);
+          setStats((previous) => mergeStats(previous, {}, exchangeSymbolRef.current));
         }
       } catch (fetchError) {
         if (!disposed && !abortController.signal.aborted) {

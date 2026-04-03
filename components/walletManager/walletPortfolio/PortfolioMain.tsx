@@ -2,400 +2,452 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FiBarChart,
+  FiBarChart2,
   FiPieChart,
   FiShield,
   FiList,
   FiActivity,
-  FiCreditCard,
   FiPlus,
   FiGlobe,
   FiCopy,
+  FiRefreshCw,
+  FiChevronDown,
+  FiCheck,
+  FiLayers,
+  FiTrendingUp,
 } from "react-icons/fi";
-import { RiArrowDropDownLine, RiRefreshLine } from "react-icons/ri";
 import { IoWallet } from "react-icons/io5";
 
 import { chains } from "@/constants/common/chain";
 import toast from "react-hot-toast";
 
-// Types
 import { ORDER_TYPE } from "@/type/order";
 import { ACTIVITY_TYPE, WalletConfig } from "@/type/common";
 
 import { getWalletBalance } from "@/lib/blockchain/balance";
 import { fetchCodexWalletBalances } from "@/lib/oracle/codex";
 
-// Components
 import WalletOverview from "./walletOverview";
 import MyTokenPortfolio from "./UserTokensList";
 import OrderList from "@/components/order/dashboard/OrderList";
-import ActivityModel from '@/components/activity/activityTable';
-import Analytics from '@/components/walletManager/walletPortfolio/walletAnalytics';
-import WalletSettings from '@/components/walletManager/walletPortfolio/walletSettings';
+import ActivityModel from "@/components/activity/activityTable";
+import Analytics from "@/components/walletManager/walletPortfolio/walletAnalytics";
+import WalletSettings from "@/components/walletManager/walletPortfolio/walletSettings";
+import PerpTab from "./PerpTab";
 import CreationModel from "@/components/walletManager/modal/createWalletModel";
-import { safeParseUnits } from "@/utility/handy";
+import { safeParseUnits, formateNumber, safeFormatNumber } from "@/utility/handy";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
+import Service from "@/service/api-service";
 
-// Props
 interface PortfolioMainProps {
-  user: any;
+  user: unknown;
   chainId: number;
   userOrders: ORDER_TYPE[];
   userWallets: WalletConfig[];
   userHistories: ACTIVITY_TYPE[];
-  userConnectedWallet: any;
+  userConnectedWallet: unknown;
 }
 
-export default function PortfolioMain({
-  user,
-  chainId,
-  userOrders,
-  userWallets,
-  userHistories,
-  userConnectedWallet,
-}: PortfolioMainProps) {
-  // --- State ---
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "holdings" |"orders" | "activity" | "analytics" | "settings"
-  >("overview");
+// Centralised shape — every consumer reads from this
+export interface BalanceData {
+  nativeBalance: string;
+  holdingTokens: Array<Record<string, unknown>>;
+  totalSpotUsd: string;
+  totalPerpUsd: string;
+  /** Raw perp balances keyed by DEX so child tabs never have to re-fetch */
+  perpBalances: {
+    asterdex: string;
+    hyperliquid: string;
+  };
+  /** Order counts derived from userOrders for the selected wallet */
+  orderSummary: {
+    total: number;
+    active: number;
+    pending: number;
+    opened: number;
+  };
+}
+
+const EMPTY_BALANCE_DATA: BalanceData = {
+  nativeBalance: "0",
+  holdingTokens: [],
+  totalSpotUsd: "0",
+  totalPerpUsd: "0",
+  perpBalances: { asterdex: "0", hyperliquid: "0" },
+  orderSummary: { total: 0, active: 0, pending: 0, opened: 0 },
+};
+
+const TABS = [
+  { id: "overview", label: "Overview", icon: FiPieChart, description: "Wallet snapshot, balances, and health checks." },
+  { id: "holdings", label: "Holdings", icon: FiLayers, description: "Token balances for this wallet." },
+  { id: "perp", label: "Perp", icon: FiTrendingUp, description: "Fund perp accounts and approve agents." },
+  { id: "orders", label: "Orders", icon: FiList, description: "Live and pending automation orders." },
+  { id: "activity", label: "Activity", icon: FiActivity, description: "Recent transfers and fills." },
+  { id: "analytics", label: "Analytics", icon: FiBarChart2, description: "Historical balance and transfer patterns." },
+  { id: "settings", label: "Settings", icon: FiShield, description: "Security and wallet preferences." },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
+
+export default function PortfolioMain(props: PortfolioMainProps) {
+  const { user, chainId, userOrders, userWallets } = props;
+
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [isWalletDropdownOpen, setIsWalletDropdownOpen] = useState(false);
   const [isCreationModelOpen, setIsCreationModelOpen] = useState(false);
-  const [balanceData, setBalanceData] = useState<{
-    nativeBalance: string;
-    holdingTokens: any[];
-    totalSpotUsd: string;
-    totalPerpUsd: string;
-  }>({
-    nativeBalance: "0",
-    holdingTokens: [],
-    totalSpotUsd: "0",
-    totalPerpUsd: "0",
-  });
-
-  // Wallet State
-  const [selectedWallet, setSelectedWallet] = useState<WalletConfig | null>(
-    null,
-  );
+  const [selectedWallet, setSelectedWallet] = useState<WalletConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Refs for Optimization
+  const [balanceData, setBalanceData] = useState<BalanceData>(EMPTY_BALANCE_DATA);
+
   const isInitialMount = useRef(true);
-  const prevSelectedWalletRef = useRef<string | null>(null);
-  const prevChainIdRef = useRef<number | null>(null);
-  const fetchIdRef = useRef(0); // Tracks the latest fetch request ID
+  const prevWalletRef = useRef<string | null>(null);
+  const prevChainRef = useRef<number | null>(null);
+  const fetchIdRef = useRef(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // --- Memoized Values ---
+  // ── Derived lists ──────────────────────────────────────────────────────────
+  const filteredWallets = useMemo(
+    () =>
+      userWallets
+        .filter((w) => (chainId === chains.Solana ? w.network === "SVM" : w.network === "EVM"))
+        .filter((w) => !w.isAgentWallet),
+    [userWallets, chainId]
+  );
 
-  // 1. Filter Wallets based on Active Network Type
-  const filteredWallets = useMemo(() => {
-    return userWallets.filter((w) =>
-      chainId === chains.Solana ? w.network === "SVM" : w.network === "EVM",
+  // ── Order summary for the selected wallet ─────────────────────────────────
+  const walletOrderSummary = useMemo(() => {
+    const orders = (userOrders || []).filter((o) => {
+      const wId = typeof o.wallet === "object" ? o.wallet?._id : o.wallet;
+      return wId?.toString() === selectedWallet?._id?.toString();
+    });
+    return orders.reduce(
+      (acc, o) => {
+        const s = String(o.orderStatus || "").toUpperCase();
+        if (["PENDING", "OPENED", "PROCESSING"].includes(s) && o.isActive !== false) acc.active++;
+        if (s === "PENDING") acc.pending++;
+        if (s === "OPENED") acc.opened++;
+        acc.total++;
+        return acc;
+      },
+      { total: 0, active: 0, pending: 0, opened: 0 }
     );
-  }, [userWallets, chainId]);
+  }, [selectedWallet?._id, userOrders]);
 
-  // --- Handlers ---
+  // Keep balanceData.orderSummary in sync whenever orders or wallet changes
+  // without triggering a full balance re-fetch
+  useEffect(() => {
+    setBalanceData((prev) => ({ ...prev, orderSummary: walletOrderSummary }));
+  }, [walletOrderSummary]);
 
+  // ── Main fetch ─────────────────────────────────────────────────────────────
   const handleSelectedWallet = useCallback(
-    async (walletAddress: string) => {
+    async (walletAddress: string, walletId: string) => {
       if (!walletAddress) return;
-
-      const currentFetchId = ++fetchIdRef.current; // Increment fetch ID
+      const currentFetchId = ++fetchIdRef.current;
       setIsLoading(true);
-      
       try {
-        // 1. Fetch data in parallel
-        const [walletInfo, nativeBalanceRaw] = await Promise.all([
+        const [walletInfo, nativeBalanceRaw, asterdexRes, hyperRes] = await Promise.all([
           fetchCodexWalletBalances({ walletAddress, chainId, limit: 100 }),
           getWalletBalance({ walletAddress, chainId }),
+          Service.getPerpBalance({ mainWalletId: walletId, dex: "asterdex" }) as Promise<any>,
+          Service.getPerpBalance({ mainWalletId: walletId, dex: "hyperliquid" }) as Promise<any>,
         ]);
 
-        // Optimization: Check if this is still the latest request
+
+
         if (currentFetchId !== fetchIdRef.current) return;
 
+        // Extract numeric perp balances from either flat or nested response shapes
+        const extractPerpBal = (res: any): string => {
+          const raw = res?.data?.balance ?? res?.balance ?? res ?? 0;
+          return String(safeParseUnits(String(Number(raw)), PRECISION_DECIMALS));
+        };
+        const asterdexBal = extractPerpBal(asterdexRes);
+        const hyperliquidBal = extractPerpBal(hyperRes);
+
+        let totalSpotUsd = BigInt(0);
+        let holdingTokens: Array<Record<string, unknown>> = [];
+
         if (walletInfo && Array.isArray(walletInfo)) {
-          // 2. High-precision summation using BigInt
-          const totalSpotUsdBigInt = walletInfo.reduce(
-            (acc: bigint, item: any) => {
-              const balance = BigInt(item.balance || 0);
-              const priceUsdScaled = safeParseUnits(
-                item.tokenPriceUsd || "0",
-                PRECISION_DECIMALS,
-              );
-              const decimals = item.token?.decimals || 18;
-
-              // Math: (Balance * PriceScaled) / 10^Decimals
-              const usdValueScaled =
-                (balance * priceUsdScaled) / BigInt(10 ** decimals);
-
-              return acc + usdValueScaled;
-            },
-            BigInt(0),
-          );
-
-          setBalanceData({
-            nativeBalance: nativeBalanceRaw.toString(),
-            holdingTokens:
-              walletInfo.filter((w) => w.tokenId !== `native:${chainId}`) || [],
-            totalSpotUsd: totalSpotUsdBigInt.toString(),
-            totalPerpUsd: "0",
-          });
+          totalSpotUsd = walletInfo.reduce((acc: bigint, item: any) => {
+            const balance = BigInt(item.balance || 0);
+            const priceScaled = safeParseUnits(item.tokenPriceUsd || "0", PRECISION_DECIMALS);
+            const decimals = item.token?.decimals || 18;
+            return acc + (balance * priceScaled) / BigInt(10 ** decimals);
+          }, BigInt(0));
+          holdingTokens = walletInfo.filter((w: any) => w.tokenId !== `native:${chainId}`);
         }
-      } catch (error) {
-        // Only log error if this is still the active request
-        if (currentFetchId === fetchIdRef.current) {
-            console.error("Portfolio sync error:", error);
-            toast.error("Failed to fetch wallet data");
-        }
+
+        const totalPerpUsd = String(BigInt(asterdexBal) + BigInt(hyperliquidBal));
+
+        setBalanceData({
+          nativeBalance: nativeBalanceRaw.toString(),
+          holdingTokens,
+          totalSpotUsd: totalSpotUsd.toString(),
+          totalPerpUsd,
+          perpBalances: {
+            asterdex: asterdexBal,
+            hyperliquid: hyperliquidBal,
+          },
+          orderSummary: walletOrderSummary,
+        });
+      } catch {
+        if (currentFetchId === fetchIdRef.current) toast.error("Failed to fetch wallet data");
       } finally {
-        if (currentFetchId === fetchIdRef.current) {
-            setIsLoading(false);
-        }
+        if (currentFetchId === fetchIdRef.current) setIsLoading(false);
       }
     },
-    [chainId],
+    // walletOrderSummary intentionally omitted — synced separately via the effect above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chainId]
   );
 
+  // ── Wallet selection helpers ───────────────────────────────────────────────
   const handleWalletChange = useCallback((wallet: WalletConfig) => {
     setSelectedWallet(wallet);
     setIsWalletDropdownOpen(false);
-    // Reset balance data immediately
-    setBalanceData({
-      nativeBalance: "0",
-      holdingTokens: [],
-      totalSpotUsd: "0",
-      totalPerpUsd: "0",
-    });
+    setBalanceData(EMPTY_BALANCE_DATA);
   }, []);
 
-  // Copy Handler
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Address copied!");
-  };
-
-  // --- Effects ---
-
-  // Auto-select wallet when network changes or wallets load
+  // Auto-select first wallet when the filtered list changes
   useEffect(() => {
     if (filteredWallets.length > 0) {
-      // Check if selected wallet still exists in filtered wallets
-      const walletStillValid =
-        selectedWallet &&
-        filteredWallets.some((w) => w._id === selectedWallet._id);
-
-      if (walletStillValid) {
-        return;
-      } else {
-        setSelectedWallet(filteredWallets[0]);
-      }
+      const stillValid = selectedWallet?._id && filteredWallets.some((w) => w._id === selectedWallet._id);
+      if (!stillValid) setSelectedWallet(filteredWallets[0]);
     } else {
       setSelectedWallet(null);
     }
-  }, [filteredWallets]); 
+  }, [filteredWallets]);
 
-  // Fetch wallet data when selected wallet or chainId changes
+  // Re-fetch whenever wallet address or chainId changes
   useEffect(() => {
-    // Skip initial mount check logic is handled, but we ensure clean state
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const walletChanged =
-      selectedWallet?.address !== prevSelectedWalletRef.current;
-    const chainChanged = chainId !== prevChainIdRef.current;
-
-    if (!walletChanged && !chainChanged) {
-      return;
-    }
-
-    // Update refs
-    prevSelectedWalletRef.current = selectedWallet?.address || null;
-    prevChainIdRef.current = chainId;
-
+    if (isInitialMount.current) { isInitialMount.current = false; return; }
+    const walletChanged = selectedWallet?.address !== prevWalletRef.current;
+    const chainChanged = chainId !== prevChainRef.current;
+    if (!walletChanged && !chainChanged) return;
+    prevWalletRef.current = selectedWallet?.address ?? null;
+    prevChainRef.current = chainId;
     if (selectedWallet?.address) {
-      // Reset data before fetching to show loading state cleanly or keep old data?
-      // Keeping old data is usually smoother, but user asked for "smooth fetch".
-      // We'll rely on isLoading state.
-      handleSelectedWallet(selectedWallet.address);
+      handleSelectedWallet(selectedWallet.address, selectedWallet._id);
     } else {
-        setBalanceData({
-            nativeBalance: "0",
-            holdingTokens: [],
-            totalSpotUsd: "0",
-            totalPerpUsd: "0",
-          });
+      setBalanceData(EMPTY_BALANCE_DATA);
     }
   }, [selectedWallet?.address, chainId, handleSelectedWallet]);
 
-  const tabs = [
-    { id: "overview", label: "Overview", icon: FiPieChart },
-    { id: "holdings", label: "Holdings", icon: FiCreditCard },
-    { id: "activity", label: "Activity", icon: FiActivity },
-    { id: "analytics", label: "Analytics", icon: FiBarChart },
-    { id: "orders", label: "Orders", icon: FiList },
-    { id: "settings", label: "Setting", icon: FiShield },
-  ] as const;
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsWalletDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
+  // ── Derived display values ─────────────────────────────────────────────────
+  const currentTab = TABS.find((t) => t.id === activeTab) || TABS[0];
+  const networkLabel = chainId === chains.Solana ? "Solana" : "EVM";
+  const isEVM = chainId !== chains.Solana;
+
+  const totalPortfolioUsd = useMemo(
+    () => Number(balanceData.totalSpotUsd || "0") + Number(balanceData.totalPerpUsd || "0"),
+    [balanceData.totalSpotUsd, balanceData.totalPerpUsd]
+  );
+
+  const portfolioDisplay = totalPortfolioUsd;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    // OPTIMIZATION: h-screen + flex-col + overflow-hidden to constrain viewport
-    <div className="h-screen bg-gray-100 dark:bg-[#08090a] text-white flex flex-col font-sans selection:bg-blue-500/30 overflow-hidden">
-      
-      {/* Header Section: flex-shrink-0 ensures it stays fixed size */}
-      <div className="w-full lg:w-2/3 mx-auto mb-4 lg:mb-6 2xl:mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-6 flex-shrink-0 pt-4 px-4 lg:px-0">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-              Live Portfolio
-            </span>
-          </div>
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-[#f5f5f7] dark:bg-[#0a0a0c] text-black dark:text-white font-sans">
 
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight bg-gradient-to-r dark:from-white from-black via-gray-200 to-gray-500 bg-clip-text text-transparent">
-            {selectedWallet
-              ? `Wallet ${selectedWallet._id.slice(0, 4)}`
-              : "No Wallet Selected"}
-          </h1>
-
-          {selectedWallet && (
-            <div
-              onClick={() => handleCopy(selectedWallet.address)}
-              className="group flex items-center gap-2 mt-2 w-fit cursor-pointer py-1 pr-3 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              <p className="text-gray-600 dark:text-gray-400 font-mono text-sm opacity-60 group-hover:opacity-100 transition-opacity">
-                {selectedWallet.address}
-              </p>
-              <FiCopy className="w-3.5 h-3.5 text-gray-500 group-hover:text-white transition-colors opacity-0 group-hover:opacity-100" />
-            </div>
-          )}
-
-          <div className="relative mb-6 z-20">
+      {/* ── TOP HEADER ───────────────────────────────────── */}
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0a0a0c]/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          {/* Wallet selector */}
+          <div className="relative flex-1 min-w-0 max-w-xs" ref={dropdownRef}>
             <button
               onClick={() => setIsWalletDropdownOpen(!isWalletDropdownOpen)}
-              className="flex gap-4 justify-between items-center text-gray-300 hover:text-white transition-colors"
+              className="flex items-center gap-2 w-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-3 py-2 rounded-xl transition-colors"
             >
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-500">
-                Selected Wallet
-              </span>
-              <div className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg">
-                <span className="text-xs font-mono">
-                  {filteredWallets.length} Available
-                </span>
-                <RiArrowDropDownLine
-                  size={20}
-                  className={`transform transition-transform ${isWalletDropdownOpen ? "rotate-180" : ""}`}
-                />
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm flex-shrink-0 ${isEVM ? "bg-blue-500" : "bg-purple-500"}`}>
+                <IoWallet size={14} />
               </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-xs font-bold text-black dark:text-white truncate">
+                  {selectedWallet ? `Wallet ${selectedWallet._id.slice(0, 6)}` : "No Wallet"}
+                </p>
+                {selectedWallet && (
+                  <p className="text-[10px] text-gray-500 font-mono truncate">
+                    {selectedWallet.address.slice(0, 8)}…{selectedWallet.address.slice(-4)}
+                  </p>
+                )}
+              </div>
+              <FiChevronDown size={14} className={`text-gray-400 flex-shrink-0 transition-transform ${isWalletDropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {/* Dropdown Menu */}
             <AnimatePresence>
               {isWalletDropdownOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-8 left-0 w-full bg-[#1a1d26] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto custom-scrollbar"
+                  initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full mt-1 left-0 w-64 bg-white dark:bg-[#18181c] border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
                 >
-                  {filteredWallets.map((wallet) => (
+                  <div className="p-1.5 overflow-y-auto max-h-[300px] scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                    {filteredWallets.length === 0 && (
+                      <p className="text-xs text-gray-500 text-center py-4">No wallets on this network</p>
+                    )}
+                    {filteredWallets.map((wallet) => {
+                      const isActive = selectedWallet?._id === wallet._id;
+                      return (
+                        <button
+                          key={wallet._id}
+                          onClick={() => handleWalletChange(wallet)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${isActive ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" : "hover:bg-black/5 dark:hover:bg-white/5"}`}
+                        >
+                          <IoWallet size={16} className={isActive ? "text-blue-500" : "text-gray-400"} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold">Wallet {wallet._id.slice(0, 6)}</p>
+                            <p className="text-[10px] font-mono text-gray-500 truncate">{wallet.address.slice(0, 14)}…</p>
+                          </div>
+                          {isActive && <FiCheck size={13} className="text-blue-500 flex-shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-black/5 dark:border-white/5 p-1.5">
                     <button
-                      key={wallet._id}
-                      onClick={() => handleWalletChange(wallet)}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-white/5 border-b border-white/5 last:border-0 flex items-center gap-3 ${selectedWallet?._id === wallet._id ? "bg-blue-500/10 text-blue-400" : "text-gray-300"}`}
+                      onClick={() => { setIsWalletDropdownOpen(false); setIsCreationModelOpen(true); }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
                     >
-                      <IoWallet />
-                      <div className="flex-1 truncate">
-                        <div className="font-bold">
-                          Wallet {wallet._id.slice(0, 4)}
-                        </div>
-                        <div className="text-[10px] font-mono opacity-60 truncate">
-                          {wallet.address}
-                        </div>
-                      </div>
+                      <FiPlus size={14} /> Add New Wallet
                     </button>
-                  ))}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => setIsCreationModelOpen(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
-          >
-            <FiPlus className="w-5 h-5" />
-            Add wallets
-          </button>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            disabled={!selectedWallet?.address || isLoading}
-            onClick={() =>
-              selectedWallet?.address &&
-              handleSelectedWallet(selectedWallet.address)
-            }
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 p-4 dark:bg-gray-700 bg-gray-300 text-white dark:text-black rounded-xl font-bold text-sm hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RiRefreshLine
-              className={`text-black dark:text-white ${isLoading ? "animate-spin" : ""}`}
-            />
-          </motion.button>
+          {/* Actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${isEVM ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" : "bg-purple-500/10 text-purple-600 dark:text-purple-400"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isEVM ? "bg-blue-500" : "bg-purple-500"}`} />
+              {networkLabel}
+            </span>
+            <button
+              onClick={() => selectedWallet?.address && handleSelectedWallet(selectedWallet.address, selectedWallet._id)}
+              disabled={!selectedWallet || isLoading}
+              className="p-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40"
+              title="Refresh"
+            >
+              <FiRefreshCw size={14} className={`text-gray-500 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              onClick={() => setIsCreationModelOpen(true)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors shadow-sm"
+            >
+              <FiPlus size={13} />
+              <span className="hidden sm:inline">Wallet</span>
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* OPTIMIZATION: flex-1 + overflow-hidden allows internal scrolling */}
-      <main className="w-full lg:w-2/3 flex-1 overflow-hidden min-h-0  lg:flex mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 px-4 lg:px-0 pb-4">
-        {/* Navigation Sidebar: overflow-y-auto allows independent scroll if needed */}
-        <nav className="w-full lg:w-1/4 h-full overflow-y-auto no-scrollbar">
-          <div className="dark:bg-[#12141a] bg-white border border-white/5 p-2 rounded-[24px] flex lg:flex-col gap-1 shadow-xl sticky top-0">
-            {tabs.map((tab) => {
+      {/* ── MAIN LAYOUT ──────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col lg:flex-row gap-4 lg:gap-6">
+
+        {/* ── SIDEBAR NAV ─────────────────────────────── */}
+        <aside className="w-full lg:w-52 xl:w-56 flex-shrink-0">
+          {/* Mobile: horizontal scroll tabs */}
+          <div className="lg:hidden bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-1.5 flex gap-1 overflow-x-auto no-scrollbar">
+            {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all flex-1 lg:flex-none overflow-hidden ${
-                    isActive
-                      ? "text-white"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                  }`}
+                  className={`flex-shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide transition-all ${isActive
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5"
+                    }`}
                 >
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-0 bg-blue-600 rounded-xl"
-                      transition={{
-                        type: "spring",
-                        bounce: 0.2,
-                        duration: 0.6,
-                      }}
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-3">
-                    <Icon
-                      className={`w-5 h-5 ${isActive ? "text-white" : "text-gray-500"}`}
-                    />
-                    <span className="hidden md:block">{tab.label}</span>
-                  </span>
+                  <Icon size={14} />
+                  {tab.label}
                 </button>
               );
             })}
           </div>
-        </nav>
 
-        {/* Content Area: overflow-y-auto enables the scrollable behavior you requested */}
-        <section className="w-full h-full  lg:grow  flex-1   custom-scrollbar relative">
+          {/* Desktop: vertical sidebar */}
+          <nav className="hidden lg:block bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl p-2 space-y-0.5 sticky top-20">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${isActive
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                    }`}
+                >
+                  <Icon size={15} className={isActive ? "text-white" : ""} />
+                  {tab.label}
+                </button>
+              );
+            })}
+
+            {/* Wallet copy shortcut */}
+            {selectedWallet && (
+              <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/5 px-2">
+                <button
+                  onClick={() => { navigator.clipboard.writeText(selectedWallet.address); toast.success("Copied!"); }}
+                  className="w-full flex items-center gap-2 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                >
+                  <FiCopy size={11} />
+                  <span className="font-mono truncate">{selectedWallet.address.slice(0, 12)}…</span>
+                </button>
+              </div>
+            )}
+          </nav>
+        </aside>
+
+        {/* ── CONTENT AREA ────────────────────────────── */}
+        <main className="flex-1 min-w-0 pb-12">
+          {/* Tab header strip */}
+          {selectedWallet && (
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-black text-black dark:text-white">{currentTab.label}</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{currentTab.description}</p>
+              </div>
+              {/* Mobile quick stats */}
+              <div className="sm:hidden flex gap-2">
+                <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-xl px-3 py-2 flex-1 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Portfolio</p>
+                  <p className="text-sm font-black">${portfolioDisplay}</p>
+                </div>
+                <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-xl px-3 py-2 flex-1 text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Tokens</p>
+                  <p className="text-sm font-black">{balanceData.holdingTokens.length}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Content */}
           <AnimatePresence mode="wait">
             {selectedWallet ? (
               <motion.div
                 key={`${activeTab}-${selectedWallet._id}`}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="pb-20 w-full h-full overflow-y-auto " // Add padding bottom so content isn't cut off
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
               >
                 {activeTab === "overview" && (
                   <WalletOverview
@@ -409,30 +461,56 @@ export default function PortfolioMain({
                   <MyTokenPortfolio
                     holdingTokens={balanceData.holdingTokens}
                     walletAddress={selectedWallet.address}
+                    walletId={selectedWallet._id}
                     chainId={chainId}
                     user={user}
                   />
                 )}
-                {activeTab === 'activity' && <ActivityModel user={user} walletAddress={selectedWallet.address} walletId={selectedWallet._id}/>}
-                {activeTab == 'orders' && <OrderList network={chainId} userOrders={userOrders} isConnected={true}/>}
-                {activeTab === 'analytics' && <Analytics address={selectedWallet.address} chainId={chainId}/>}
-                {activeTab === 'settings' && <WalletSettings wallet={selectedWallet}/>}
+                {activeTab === "perp" && (
+                  <PerpTab
+                    selectedWallet={selectedWallet}
+                    chainId={chainId}
+                    perpBalances={balanceData.perpBalances}
+                    onRefresh={() => handleSelectedWallet(selectedWallet.address, selectedWallet._id)}
+                  />
+                )}
+                {activeTab === "orders" && (
+                  <OrderList network={chainId} userOrders={userOrders} isConnected={true} />
+                )}
+                {activeTab === "activity" && (
+                  <ActivityModel user={user} walletAddress={selectedWallet.address} walletId={selectedWallet._id} />
+                )}
+                {activeTab === "analytics" && (
+                  <Analytics address={selectedWallet.address} chainId={chainId} />
+                )}
+                {activeTab === "settings" && (
+                  <WalletSettings wallet={selectedWallet} />
+                )}
               </motion.div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-96 text-gray-500 border border-dashed border-gray-800 rounded-3xl bg-white/5">
-                <FiGlobe className="w-12 h-12 mb-4 opacity-50" />
-                <p>No wallets found.</p>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-2xl px-6 py-12"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-4">
+                  <FiGlobe size={24} className="text-gray-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300">No wallets on {networkLabel}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mt-2 max-w-sm">
+                  Create a wallet to start managing balances, tokens, and automated orders.
+                </p>
                 <button
-                  className="mt-4 text-blue-500 hover:text-blue-400 text-sm font-bold"
                   onClick={() => setIsCreationModelOpen(true)}
+                  className="mt-5 flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors"
                 >
-                  Create one now
+                  <FiPlus size={15} /> Create Wallet
                 </button>
-              </div>
+              </motion.div>
             )}
           </AnimatePresence>
-        </section>
-      </main>
+        </main>
+      </div>
 
       {/* Modals */}
       {isCreationModelOpen && (

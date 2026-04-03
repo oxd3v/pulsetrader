@@ -47,6 +47,16 @@ export const NOTIFICATION_CONFIG: Record<
     title: "Session Error",
     message: "Account data missing. Please reconnect your wallet.",
   },
+  ["DEPOSIT_FIRST"]: {
+    title: "Deposit First",
+    message:
+      "Deposit first. If already deposited, wait for DEX account contract confirmation. Try again later.",
+  },
+  ["INSUFFICIENT_DEX_BALANCE_FOR_AGENT"]: {
+    title: "Deposit First",
+    message:
+      "Deposit first. If already deposited, wait for DEX account contract confirmation. Try again later.",
+  },
   ["USER_NOT_FOUND"]: {
     title: "Account Not Found",
     message: "This wallet is not joined. Please join the platform.",
@@ -250,6 +260,14 @@ export const NOTIFICATION_CONFIG: Record<
     title: "Exist order name",
     message: "Minimum collateral amount required",
   },
+  ["COLLATERAL_MUST_BE_STABLE_TOKEN"]: {
+    title: "Collateral error",
+    message: "Collateral must be a stable token for this order.",
+  },
+  ["INVALID_FEE_TOKEN"]: {
+    title: "Fee token",
+    message: "Select a valid fee token to continue.",
+  },
   ["EXIST_ORDER_NAME"]: {
     title: "Exist order name",
     message: "Order name already exist",
@@ -300,6 +318,10 @@ export const NOTIFICATION_CONFIG: Record<
   },
   ["INVALID ORDER_STRATEGY"]: {
     title: "Order in processing",
+    message: "Enter valid order strategy",
+  },
+  ["INVALID_ORDER_STRATEGY"]: {
+    title: "Invalid strategy",
     message: "Enter valid order strategy",
   },
   ["ORDER_CLOSE_FAILED"]: {

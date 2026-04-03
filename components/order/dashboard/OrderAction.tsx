@@ -15,7 +15,7 @@ import { RiHistoryFill } from "react-icons/ri";
 import { ORDER_TYPE } from "@/type/order";
 
 // Hooks
-import { useSpotOrder } from "@/hooks/useOrder";
+import { useOrder } from "@/hooks/useOrder";
 import ConfirmationModal from "@/components/common/Confirmation/ConfirmationBox";
 
 // Store
@@ -31,7 +31,7 @@ interface OrderActionProps {
 }
 
 const OrderActions = React.memo(({ order }: OrderActionProps) => {
-  const { deleteOrder, closeOrder } = useSpotOrder();
+  const { deleteOrder, closeOrder } = useOrder();
   const { ordersOnChart, setOrdersOnChart } = useChartDataStore(
     useShallow((state: any) => ({
       ordersOnChart: state.ordersOnChart,
