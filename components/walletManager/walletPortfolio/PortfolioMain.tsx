@@ -426,7 +426,7 @@ export default function PortfolioMain(props: PortfolioMainProps) {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{currentTab.description}</p>
               </div>
               {/* Mobile quick stats */}
-              <div className="sm:hidden flex gap-2">
+              {/* <div className="sm:hidden flex gap-2">
                 <div className="bg-white dark:bg-[#13131a] border border-black/5 dark:border-white/5 rounded-xl px-3 py-2 flex-1 text-center">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Portfolio</p>
                   <p className="text-sm font-black">${portfolioDisplay}</p>
@@ -435,7 +435,7 @@ export default function PortfolioMain(props: PortfolioMainProps) {
                   <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Tokens</p>
                   <p className="text-sm font-black">{balanceData.holdingTokens.length}</p>
                 </div>
-              </div>
+              </div> */}
             </div>
           )}
 

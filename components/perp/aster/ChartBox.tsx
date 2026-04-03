@@ -206,7 +206,7 @@ const ChartBox = memo(function ChartBox({
       <div className="bg-white dark:bg-gray-900 rounded-2xl font-mono shadow-sm p-1 lg:p-2 border border-gray-100 dark:border-gray-800">
         <div className="p-1 space-y-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-3">
+            <div className="xl:flex min-w-0 xl:flex-1 items-start gap-3">
               <div
                 className="min-w-0 flex-1 rounded-lg p-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 onClick={() => setShowAssetSelect(true)}
@@ -247,14 +247,14 @@ const ChartBox = memo(function ChartBox({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <div className="flex w-full  items-stretch justify-end gap-3 xl:w-auto xl:max-w-[760px]">
+              <div className="flex justify-end items-center gap-2">
+                <div className="flex w-full   items-stretch justify-end gap-3 xl:w-auto xl:max-w-[760px]">
                   {metrics.map((item) => (
                     <div key={item.label} className="">
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-[5px] xl:text-[11px] text-gray-500 dark:text-gray-400 truncate">
                         {item.label}
                       </p>
-                      <p className="flex gap-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                      <p className="flex gap-1 text-xs xl:text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                         {item.value}{" "}
                         {item.helper ?? null}
                       </p>
@@ -279,9 +279,9 @@ const ChartBox = memo(function ChartBox({
             </div>
           </div>
 
-          {error ? (
+          {/* {error ? (
             <p className="text-[11px] text-red-500">{error}</p>
-          ) : null}
+          ) : null} */}
         </div>
 
         <div

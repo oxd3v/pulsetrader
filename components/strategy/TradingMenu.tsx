@@ -22,13 +22,13 @@ const FUTURES_PROTOCOL = [
     assetIdentifier: 'BTC',
     imageUrl: "./hyperliquidWhite.svg",
   },
-  {
-    id: "gmx",
-    name: "GMX",
-    assetIdentifier: 'BTC',
-    imageUrl:
-      "https://raw.githubusercontent.com/gmx-io/gmx-assets/6ca89def873126e2d46bab65651cf940b2597923/GMX-Assets/SVG/GMX.svg",
-  },
+  // {
+  //   id: "gmx",
+  //   name: "GMX",
+  //   assetIdentifier: 'BTC',
+  //   imageUrl:
+  //     "https://raw.githubusercontent.com/gmx-io/gmx-assets/6ca89def873126e2d46bab65651cf940b2597923/GMX-Assets/SVG/GMX.svg",
+  // },
 ];
 
 export default function TradingStrategyMenu() {

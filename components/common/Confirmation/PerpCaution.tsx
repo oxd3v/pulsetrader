@@ -100,7 +100,7 @@ export default function PerpTradingCaution({
 
     return createPortal(
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 xl:p-4">
                 {/* Backdrop */}
                 <motion.div
                     initial={{ opacity: 0 }}
@@ -115,7 +115,7 @@ export default function PerpTradingCaution({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.96, y: 15 }}
                     transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                    className="relative w-full max-w-[540px] bg-[#11161A] border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                    className="relative max-w-[400px] 2xl:max-w-[600px] bg-[#11161A] border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[60vh] 2xl:max-h-[90vh]"
                 >
                     <div className="flex-1 overflow-y-auto px-8 py-8">
                         {/* Header */}
