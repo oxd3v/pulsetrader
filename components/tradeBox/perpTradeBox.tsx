@@ -1245,11 +1245,11 @@ export default function PerpTradeBox({
             estLiquidationPriceUsd > 0 &&
             entryForLiquidationUsd > 0 && (
               <div className="mt-3 p-3 rounded-lg border border-amber-200/80 dark:border-amber-700/50 bg-amber-50/80 dark:bg-amber-900/20">
-                <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                <div className="text-xs font-medium text-amber-900 dark:text-amber-200">
                   Est. liquidation (isolated, maint. {EST_PERP_MAINTENANCE_BPS}{" "}
                   bps): $
                   {displayNumber(estLiquidationPriceUsd)}
-                </p>
+                </div>
               </div>
             )}
         </div>

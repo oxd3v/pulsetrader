@@ -54,6 +54,11 @@ export default function ConnectionBox({
       const connectionRes = await connectUserByWallet();
       if (connectionRes.connection == true) {
         setTimeout(() => router.push("/"), 1000);
+      }else{
+        console.log(connectionRes.error)
+        if(connectionRes.error == 'USER_NOT_FOUND'){
+          setIsJoining(true)
+        }
       }
     } catch (e) {
       // console.error(e);
@@ -72,6 +77,8 @@ export default function ConnectionBox({
       const connectionRes: any = await connectUserByAuth(inputAuthToken);
       if (connectionRes.connection == true) {
         setTimeout(() => router.push("/"), 2000);
+      }else{
+        console.log(connectionRes)
       }
     } catch (e) {
       //toast.error("Connection failed");

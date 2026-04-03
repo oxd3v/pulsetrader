@@ -239,11 +239,11 @@ export const calculateWalletTokenAllocation = ({
       isActiveClientOrder(order)
     ) {
       if (order.category == 'spot') {
-        if (order.orderType == 'BUY' && order.orderStatus != 'PROCESSING' && order.spot?.orderAsset.collateralToken.address.toLowerCase() == tokenAddress.toLowerCase()) {
-          totalAllocation += BigInt(order.spot.amount.orderSize || 0);
+        if (order.orderType == 'BUY' && order.orderStatus != 'PROCESSING' && order.spot?.orderAsset?.collateralToken?.address?.toLowerCase() == tokenAddress.toLowerCase()) {
+          totalAllocation += BigInt(order.spot?.amount?.orderSize || 0);
         }
-        if (order.orderType == 'SELL' && order.orderStatus != 'PROCESSING' && order.spot?.orderAsset.orderToken.address.toLowerCase() == tokenAddress.toLowerCase()) {
-          totalAllocation += BigInt(order.spot.amount.tokenAmount || 0);
+        if (order.orderType == 'SELL' && order.orderStatus != 'PROCESSING' && order.spot?.orderAsset?.orderToken?.address?.toLowerCase() == tokenAddress.toLowerCase()) {
+          totalAllocation += BigInt(order.spot?.amount?.tokenAmount || 0);
         }
       }
 
@@ -257,7 +257,7 @@ export const calculateWalletTokenAllocation = ({
       // NOTE: for a spot BUY order where feeToken == collateralToken the
       // order-size amount is already counted above, and the fee amount is an
       // *additional* reservation from the same pool, so both must be summed.
-      if (!isTradeFeeExemptStatus(order.user.status)) {
+      if (!isTradeFeeExemptStatus(order.user?.status)) {
         if (order.feeToken?.address &&
           order.feeToken.address.toLowerCase() == tokenAddress.toLowerCase()) {
           totalAllocation += BigInt(order.feeToken?.amount || 0);

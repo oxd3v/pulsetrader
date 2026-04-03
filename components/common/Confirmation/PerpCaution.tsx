@@ -137,10 +137,10 @@ export default function PerpTradingCaution({
                                             }`}
                                     />
                                     <div>
-                                        <h3 className="text-[15px] font-medium text-gray-200 mb-1">
+                                        <h3 className="text-[12px] font-medium text-gray-200 mb-1">
                                             {item.title}
                                         </h3>
-                                        <p className="text-[14px] text-gray-500 leading-relaxed">
+                                        <p className="text-[10px] text-gray-500 leading-relaxed">
                                             {item.description}
                                         </p>
                                     </div>
@@ -149,12 +149,12 @@ export default function PerpTradingCaution({
 
                             {/* Arbitrum Emphasis styled cleanly */}
                             <div className="flex gap-4">
-                                <FiAlertTriangle className="w-[22px] h-[22px] flex-shrink-0 mt-0.5 text-blue-500" />
+                                <FiAlertTriangle className="w-[15px] h-[22px] flex-shrink-0 mt-0.5 text-blue-500" />
                                 <div>
                                     <h3 className="text-[15px] font-medium text-gray-200 mb-1">
                                         Arbitrum USDC Only
                                     </h3>
-                                    <p className="text-[14px] text-gray-500 leading-relaxed">
+                                    <p className="text-[10px] text-gray-500 leading-relaxed">
                                         Only Arbitrum network USDC is accepted for perp deposits. Other assets will be auto-swapped/bridged.
                                     </p>
                                 </div>

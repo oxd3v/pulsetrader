@@ -106,8 +106,34 @@ export const useUserAuth = () => {
         return checkResult;
       }
       const address = await signer.getAddress();
-
-      const apiResponse: any = await Service.checkUser({ address });
+      const signature = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (signature) {
+        try {
+          const recoveredAddress = verifyMessage(SIGN_MESSAGE, signature);
+          if (
+            recoveredAddress.toLowerCase() ==
+            address.toLowerCase()
+          ) {
+            setSignature(signature);
+          }
+        } catch (e) { }
+      }else{
+        notifyWithResponseError(
+          "error",
+          "Please connect your account.",
+        );
+        return checkResult;
+      }
+      let encryptedToken = await encryptAuthToken(signature as string).catch(
+        (err) => {
+          // let key = "SIGNATURE_AUTHENTICATION_FAILED";
+          // notify("error", key);
+          // connectionResult.error = key;
+          // return connectionResult;
+          return null;
+        },
+      );
+      const apiResponse: any = await Service.checkUser({ address, encryptedToken });
 
       if (!apiResponse?.connect || !apiResponse?.data?.userData?.account) {
         const key = apiResponse.message || "USER_NOT_FOUND";
@@ -130,18 +156,7 @@ export const useUserAuth = () => {
         return checkResult;
       }
 
-      const signature = localStorage.getItem(TOKEN_STORAGE_KEY);
-      if (signature) {
-        try {
-          const recoveredAddress = verifyMessage(SIGN_MESSAGE, signature);
-          if (
-            recoveredAddress.toLowerCase() ==
-            apiResponse.data?.userData?.account.toLowerCase()
-          ) {
-            setSignature(signature);
-          }
-        } catch (e) { }
-      }
+      
 
       updateGlobalUserState(apiResponse.data);
       checkResult.connected = true;

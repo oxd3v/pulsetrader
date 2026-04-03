@@ -325,7 +325,8 @@ const WalletCard = React.memo(
       };
     }, [walletData, estimates, feeToken]);
 
-    const handleSelectWallet = useCallback(async () => {
+    const handleSelectWallet = useCallback(async (e?: React.MouseEvent) => {
+      e?.stopPropagation();
       if (onSelect) await onSelect(wallet);
     }, [onSelect, wallet]);
 
@@ -393,6 +394,46 @@ const WalletCard = React.memo(
         </div>
       );
     }
+    // Unapproved wallet view (cannot be selected)
+    if (!isSelected && !isAgentApproved) {
+      return (
+        <div className="group relative rounded-xl border border-dashed border-amber-300/80 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-900/10 p-3 flex flex-col gap-2 transition-all">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded bg-amber-100 dark:bg-amber-900/50">
+                <HiWallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <span className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
+              </span>
+            </div>
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded">
+              NOT READY
+            </span>
+          </div>
+          <p className="text-xs text-amber-700 dark:text-amber-300/80 pl-9">
+            To enable this wallet for trading, deposit funds and approve the agent.
+          </p>
+          <div className="flex items-center gap-2 pl-9 mt-1">
+            <button
+              onClick={handleDeposit}
+              className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-emerald-100/80 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 transition-colors"
+            >
+              Deposit
+            </button>
+            {onApproveAgent && (
+              <button
+                onClick={handleApproveAgent}
+                className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-blue-100/80 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 transition-colors"
+              >
+                Approve Agent
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // Minimal view when data not yet loaded (available wallet list)
     if (!walletData) {
       return (
@@ -442,14 +483,6 @@ const WalletCard = React.memo(
               >
                 Deposit
               </button>
-              {!isAgentApproved && onApproveAgent && (
-                <button
-                  onClick={handleApproveAgent}
-                  className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
-                >
-                  Approve Agent
-                </button>
-              )}
               {!isSelected && (
                 <button
                   onClick={handleSelectWallet}
@@ -892,10 +925,13 @@ const WalletSelector = ({
 
   // Filter available wallets based on chain ID (non-agent wallets only)
   const filteredAvailableWallets = useMemo(() => {
+    const dexKey = normalizeProtocolKey(protocol);
     return availableWallets
-      ?.filter((wallet) => {
-        const walletAny = wallet as any;
-        const network = walletAny.network;
+      ?.filter((wallet: any) => {
+        const approved = wallet.isApproved?.[dexKey] === true;
+        if (!approved) return false;
+
+        const network = wallet.network;
         let chainMatch = false;
 
         if (chainId === chains.Solana) {
@@ -905,14 +941,14 @@ const WalletSelector = ({
         }
 
         // Must not be an agent wallet itself
-        const isNotAgent = !walletAny.isAgentWallet;
+        const isNotAgent = !wallet.isAgentWallet;
         return chainMatch && isNotAgent;
       })
       .map((w: any) => ({
         ...w,
         _id: w._id,
       }));
-  }, [availableWallets, chainId]);
+  }, [availableWallets, chainId, protocol]);
 
   // Fetch Gas Fee
   useEffect(() => {
@@ -1242,7 +1278,10 @@ const WalletSelector = ({
         return availableFeeToken >= feeAmount;
       });
 
+      const isApproved = (wallet as any).isApproved?.[normalizeProtocolKey(protocol)] === true;
+
       return (
+        isApproved &&
         availableNative >= estimate.estCost &&
         availableTokens >= estimate.estAmount &&
         hasFeeTokenLiquidity
@@ -1256,6 +1295,7 @@ const WalletSelector = ({
     estimatesByWallet,
     estOrders.length,
     setWalletsReady,
+    protocol,
   ]);
 
   useEffect(() => {
@@ -1427,7 +1467,11 @@ const WalletSelector = ({
           feeAmount,
       );
 
+      const dexKey = normalizeProtocolKey(protocol);
+      const isApproved = (wallet as any).isApproved?.[dexKey] === true;
+
       if (
+        !isApproved ||
         availableNative < estimate.estCost ||
         availableCollateral < estimate.estAmount ||
         feeBlocked
@@ -1437,7 +1481,7 @@ const WalletSelector = ({
 
       return count;
     }, 0);
-  }, [selectedWallets, walletDataMap, estimatesByWallet]);
+  }, [selectedWallets, walletDataMap, estimatesByWallet, protocol]);
 
 
 

@@ -232,7 +232,8 @@ const WalletCard = React.memo(
       };
     }, [walletData, estimates, feeToken]);
 
-    const handleSelectWallet = useCallback(async () => {
+    const handleSelectWallet = useCallback(async (e?: React.MouseEvent) => {
+      e?.stopPropagation();
       if (onSelect) await onSelect(wallet);
     }, [onSelect, wallet]);
 
