@@ -25,6 +25,7 @@ const STATUS_ICONS: Record<OrderStatusType, React.ReactNode> = {
   PROCESSING: <FiActivity className="w-4 h-4 text-blue-500" />,
   OPENED: <FiActivity className="w-4 h-4 text-blue-500" />,
   COMPLETED: <FiCheckCircle className="w-4 h-4 text-green-500" />,
+  CLOSED: <FiCheckCircle className="w-4 h-4 text-green-500" />,
   CANCELLED: <FiX className="w-4 h-4 text-red-500" />,
   REVERTED: <FiX className="w-4 h-4 text-red-500" />,
 };

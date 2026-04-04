@@ -18,6 +18,9 @@ import {
 import { getWalletBalance, getWalletTokenBalance } from "@/lib/blockchain/balance";
 import { ZeroAddress, formatUnits } from "ethers";
 import ApiService from "@/service/api-service";
+import { useStore } from "@/store/useStore";
+import { useShallow } from "zustand/shallow";
+import { calculateWalletTokenAllocation } from "@/utility/orderUtility";
 
 interface FundingModalProps {
   isOpen: boolean;
@@ -60,6 +63,12 @@ export default function FundingModal({
   const [quoteData, setQuoteData] = useState<any>(null);
   const [isQuoting, setIsQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState("");
+  
+  const { userOrders } = useStore(useShallow((state: any) => ({
+    userOrders: state.userOrders || []
+  })));
+  const [lockedBalance, setLockedBalance] = useState("0");
+
 
   const handleBalance = async () => {
     let bal = BigInt(0);
@@ -74,11 +83,27 @@ export default function FundingModal({
   }
 
   useEffect(() => {
-    console.log(wallet, tokenInfo, chainId)
     if (wallet && tokenInfo.address) {
       handleBalance();
     }
   }, [tokenInfo, wallet, chainId])
+
+  useEffect(() => {
+    if (walletId && tokenInfo.address) {
+       const locked = calculateWalletTokenAllocation({
+         orders: userOrders,
+         walletId: walletId,
+         tokenAddress: tokenInfo.address
+       });
+       setLockedBalance(locked.toString());
+    } else {
+       setLockedBalance("0");
+    }
+  }, [walletId, tokenInfo.address, userOrders]);
+
+  const availableBalance = (BigInt(balance) - BigInt(lockedBalance)) > BigInt(0) 
+    ? (BigInt(balance) - BigInt(lockedBalance)).toString() 
+    : "0";
 
   // Ensure Portal only runs on client-side to prevent hydration errors
   useEffect(() => {
@@ -125,8 +150,8 @@ export default function FundingModal({
       return;
     }
 
-    if (BigInt(balance) < BigInt(decimalsValue)) {
-      toast.error("Insufficient balance");
+    if (BigInt(availableBalance) < BigInt(decimalsValue)) {
+      toast.error("Insufficient available balance");
       return;
     }
 
@@ -194,12 +219,11 @@ export default function FundingModal({
   }, [amount, perpDex, mode]);
 
   const handlePerpDeposit = async () => {
-    console.log(walletId)
     if (!amount || parseFloat(amount) <= 0) return toast.error("Invalid amount");
     if (!walletId) return toast.error("Wallet ID not found");
 
-    if (BigInt(balance) < BigInt(decimalsValue)) {
-      return toast.error("Insufficient balance");
+    if (BigInt(availableBalance) < BigInt(decimalsValue)) {
+      return toast.error("Insufficient available balance");
     }
 
     setIsLoading(true);
@@ -306,15 +330,19 @@ export default function FundingModal({
                   </button>
                 ))}
               </div>
-              <div className="flex justify-end text-xs font-mono font-medium">
-                <span className="text-gray-400 mr-2">Available:</span>
-                <span className="text-white">
-                  {formateAmountWithFixedDecimals(
-                    balance,
-                    tokenInfo.decimals || 18,
-                    4,
-                  )}
-                </span>
+              <div className="flex justify-end gap-3 text-[11px] font-mono font-medium">
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-500">Locked:</span>
+                  <span className="text-red-400">
+                    {formateAmountWithFixedDecimals(lockedBalance, tokenInfo.decimals || 18, 4)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-500">Available:</span>
+                  <span className="text-emerald-400 font-bold">
+                    {formateAmountWithFixedDecimals(availableBalance, tokenInfo.decimals || 18, 4)}
+                  </span>
+                </div>
               </div>
 
               {mode === "perp deposit" ? (
@@ -359,7 +387,7 @@ export default function FundingModal({
                           <button
                             onClick={() =>
                               setAmount(
-                                formatUnits(BigInt(balance), tokenInfo.decimals || 18)
+                                formatUnits(BigInt(availableBalance), tokenInfo.decimals || 18)
                               )
                             }
                             className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest bg-blue-500/20 hover:bg-blue-500/35 text-blue-300 border border-blue-500/30 rounded-md transition-all"
@@ -445,7 +473,7 @@ export default function FundingModal({
                           <button
                             onClick={() =>
                               setAmount(
-                                formatUnits(BigInt(balance), tokenInfo.decimals || 18)
+                                formatUnits(BigInt(availableBalance), tokenInfo.decimals || 18)
                               )
                             }
                             className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-500/20 hover:bg-red-500/35 text-red-300 border border-red-500/30 rounded-md transition-all"

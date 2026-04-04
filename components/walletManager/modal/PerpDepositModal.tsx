@@ -7,6 +7,9 @@ import { formatUnits, parseUnits } from "ethers";
 import { WalletConfig } from "@/type/common";
 import { getWalletTokenBalance } from "@/lib/blockchain/balance";
 import Service from "@/service/api-service";
+import { useStore } from "@/store/useStore";
+import { useShallow } from "zustand/shallow";
+import { calculateWalletTokenAllocation } from "@/utility/orderUtility";
 
 interface TokenOption {
   symbol: string;
@@ -50,6 +53,11 @@ export default function PerpDepositModal({
 
   const [selectedToken, setSelectedToken] = useState<TokenOption>(TOKEN_OPTIONS[0]);
 
+  const { userOrders } = useStore(useShallow((state: any) => ({
+    userOrders: state.userOrders || []
+  })));
+  const [lockedBalance, setLockedBalance] = useState<bigint>(BigInt(0));
+
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
@@ -81,6 +89,23 @@ export default function PerpDepositModal({
     }
   }, [isOpen, fetchBalance]);
 
+  useEffect(() => {
+    if (wallet?._id && selectedToken?.address) {
+       const locked = calculateWalletTokenAllocation({
+         orders: userOrders,
+         walletId: wallet._id,
+         tokenAddress: selectedToken.address
+       });
+       setLockedBalance(locked);
+    } else {
+       setLockedBalance(BigInt(0));
+    }
+  }, [wallet?._id, selectedToken?.address, userOrders]);
+
+  const availableBalance = (walletBalance - lockedBalance) > BigInt(0) 
+    ? (walletBalance - lockedBalance) 
+    : BigInt(0);
+
   // Validate amount
   const parsedAmount = (() => {
     try {
@@ -92,7 +117,7 @@ export default function PerpDepositModal({
   })();
 
   const isBelowMinimum = false;//parsedAmount !== null && Number(amount) < MIN_DEPOSIT_USDC;
-  const isInsufficientBalance = parsedAmount !== null && parsedAmount > walletBalance;
+  const isInsufficientBalance = parsedAmount !== null && parsedAmount > availableBalance;
   const needsBridgeOrSwap = !selectedToken.isArbUsdc;
 
   // Quote deposit (for non-USDC tokens)
@@ -259,15 +284,21 @@ export default function PerpDepositModal({
 
             {/* Amount Input */}
             <div className="bg-[#161b22] border border-white/10 rounded-2xl p-4">
-              <div className="flex justify-between text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">
+              <div className="flex justify-between items-center text-[10px] text-gray-500 mb-2 font-bold uppercase tracking-widest">
                 <span>Amount to Deposit</span>
-                <button
-                  onClick={fetchBalance}
-                  className="flex items-center gap-1 hover:text-white transition-colors"
-                >
-                  <FiRefreshCw className="w-3 h-3" />
-                  {formatUnits(walletBalance, selectedToken.decimals)} {selectedToken.symbol.split(" ")[0]}
-                </button>
+                <div className="flex gap-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span>Locked:</span>
+                    <span className="text-red-400 normal-case">{formatUnits(lockedBalance, selectedToken.decimals)} {selectedToken.symbol.split(" ")[0]}</span>
+                  </div>
+                  <button
+                    onClick={fetchBalance}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors"
+                  >
+                    <FiRefreshCw className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400 normal-case">{formatUnits(availableBalance, selectedToken.decimals)} {selectedToken.symbol.split(" ")[0]}</span>
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -283,7 +314,7 @@ export default function PerpDepositModal({
                 />
                 <button
                   onClick={() => {
-                    setAmount(formatUnits(walletBalance, selectedToken.decimals));
+                    setAmount(formatUnits(availableBalance, selectedToken.decimals));
                     setQuoteInfo(null);
                   }}
                   className="text-xs bg-white/10 px-2.5 py-1.5 rounded-lg text-white font-bold tracking-widest uppercase hover:bg-white/20 transition-all"
