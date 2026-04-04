@@ -475,7 +475,7 @@ export default function PortfolioMain(props: PortfolioMainProps) {
                   />
                 )}
                 {activeTab === "orders" && (
-                  <OrderList network={chainId} userOrders={userOrders} isConnected={true} />
+                  <OrderList network={chainId} userOrders={userOrders} orderCategory={'all'} walletAddress={selectedWallet.address} walletId={selectedWallet._id} isConnected={true} />
                 )}
                 {activeTab === "activity" && (
                   <ActivityModel user={user} walletAddress={selectedWallet.address} walletId={selectedWallet._id} />

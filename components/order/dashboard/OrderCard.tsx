@@ -46,7 +46,7 @@ interface OrderCardProps {
   indexTokenInfo?: any;
 }
 
-const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
+const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Memoize combined order with GMX data to prevent unnecessary re-renders of OrderAction
@@ -97,7 +97,7 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
     const num = Number(
       safeFormatNumber(value.toString(), PRECISION_DECIMALS, 6),
     );
-    return <p className="flex gap-1">${displayNumber(num)}</p>;
+    return <div className="flex gap-1">${displayNumber(num)}</div>;
   }, []);
 
   const totalCost = useMemo(() => {
@@ -142,16 +142,23 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
               {STATUS_ICONS[order.orderStatus] || STATUS_ICONS.PENDING}
               <div
                 className={`flex gap-1 items-center font-semibold ${order.category.split(":")[0] === "perpetual"
-                    ? "text-blue-500"
-                    : order.category.split(":")[0] === "spot"
-                      ? "text-yellow-500"
-                      : "text-gray-800 dark:text-gray-200"
+                  ? "text-blue-500"
+                  : order.category.split(":")[0] === "spot"
+                    ? "text-yellow-500"
+                    : "text-gray-800 dark:text-gray-200"
                   }`}
               >
+                {order.category === "perpetual" && (
+                  <span className={`text-xs font-bold ${order.perp?.isLong == false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {order.perp?.isLong ? 'LONG' : 'SHORT'}
+                  </span>
+                )}
                 <span>
                   {order.category === "spot" && order.spot?.orderAsset?.orderToken
                     ? `${order.spot.orderAsset.orderToken.symbol} |`
-                    : ""}
+                    : order.category === "perpetual" && order.perp?.orderAsset?.symbol
+                      ? `${order.perp.orderAsset.symbol} |`
+                      : ""}
                 </span>
                 <span>{order._id?.slice(-6)}</span>
                 <button
@@ -360,8 +367,39 @@ const OrderCard = ({ order, orderGmxPositionData }: OrderCardProps) => {
                 </div>
               )}
 
+              {order.category === "perpetual" && order.perp?.leverage && (
+                <div>
+                  <span className="text-xs text-gray-500 flex items-center gap-1">Leverage & DEX</span>
+                  <div className="text-sm font-medium flex items-center gap-1.5 uppercase">
+                    <span className={`text-[11px] font-bold ${order.perp.leverage > 100000 ? "text-orange-500" : "text-blue-500"}`}>{order.perp.leverage}x</span>
+                    <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 rounded text-gray-500">{order.perp.protocol || 'DEX'}</span>
+                  </div>
+                </div>
+              )}
+
+              {(isGmxPosition || order.additional?.realizedPnl) && (
+                <div>
+                  <span className="text-xs text-gray-500 flex items-center gap-1">PnL</span>
+                  <div className="text-sm font-medium flex items-center gap-1">
+                    {order.orderStatus === "CLOSED" || order.orderStatus === "COMPLETED" ? (
+                      <span className={`font-mono ${Number(order.additional?.realizedPnl || 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
+                        ${displayNumber(Number(order.additional?.realizedPnl || 0))}
+                        {order.additional?.realizedPnl && <span className="text-[9px] text-gray-400 ml-1">(Net)</span>}
+                      </span>
+                    ) : orderWithPosition.gmxPnl !== undefined ? (
+                      <span className={`font-mono ${Number(orderWithPosition.gmxPnl) >= 0 ? "text-green-500" : "text-red-500"}`}>
+                        ${displayNumber(Number(orderWithPosition.gmxPnl))}
+                        <span className="text-[9px] text-gray-400 ml-1">(Live)</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {message && (
-                <div className="col-span-full flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-lg">
+                <div className="col-span-full flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-lg mt-2">
                   <FiInfo className="w-4 h-4 flex-shrink-0" />
                   <span>{message}</span>
                 </div>

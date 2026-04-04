@@ -222,9 +222,19 @@ export default function PerpTab({ selectedWallet, chainId, perpBalances, onRefre
             <h3 className="text-sm font-bold text-black dark:text-white">Agent Status</h3>
           </div>
 
-          {!hasFunds && !isApproved && (
+          {!isApproved || !walletState.agentWallet?.address ? (
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              Make sure you deposit in perp account. If you have already deposited, wait a moment for changes to reflect.
+              Make sure deposit first in perp account. If you have already sent transaction, wait a moment for changes to reflect.
+              <p className={`text-sm font-bold ${dex.color}`}>
+                {
+                  activeDex == 'hyperliquid' ? 'Deposit will be process by the Hyperliquid L1 validator network. This off-chain creation typically takes 1–2 minutes.' :
+                    'Processing between Arbitrum and the AsterDEX ledger typically takes 5-30 minutes. Please wait for the protocol to sync your balance before approving the Agent Wallet.'
+                }
+              </p>
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              This is your agent wallet address. Please dont use this wallet to send or receive any other asset and purpose.
             </p>
           )}
 

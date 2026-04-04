@@ -55,7 +55,7 @@ export type OrderStrategyType =
   | string;
 
 export type OrderCategoryType = "spot" | "perpetual" | "futures";
-export type OrderStatusType = "PENDING" | "OPENED" | "CANCELLED" | "REVERTED" | "COMPLETED" | "PROCESSING";
+export type OrderStatusType = "PENDING" | "OPENED" | "CANCELLED" | "REVERTED" | "COMPLETED" | "PROCESSING" | "CLOSED";
 export type OrderExecutionType = "BUY" | "SELL";
 
 export type LimitType = {

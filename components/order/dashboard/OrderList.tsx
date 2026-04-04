@@ -20,6 +20,7 @@ interface OrderListParams {
   userOrders: ORDER_TYPE[];
   orderCategory?: string; // 'all' | 'spot' | 'perpetual'
   walletAddress?: string | undefined;
+  walletId?: string | undefined;
   isConnected: boolean;
   tokenInfo?: any;
   protocol?: string
@@ -36,6 +37,7 @@ export default function OrderList({
   userOrders,
   orderCategory,
   walletAddress,
+  walletId,
   isConnected,
   tokenInfo,
   protocol
@@ -84,11 +86,19 @@ export default function OrderList({
       // Network filter – allow chainId 0
       if (network !== undefined && o.chainId !== network) return false;
 
-      // Wallet filter – case‑insensitive, skip if order has no wallet
-      if (walletAddress) {
-        const orderWalletAddr = o.wallet?.address;
-        if (!orderWalletAddr || orderWalletAddr.toLowerCase() !== walletAddress.toLowerCase()) {
+      // Wallet filter – handle both address and ID
+      if (walletId || walletAddress) {
+        const oWalletId = typeof o.wallet === "object" ? o.wallet?._id : o.wallet;
+        const orderWalletAddr = o.wallet?.address || o.additional?.walletAddress;
+
+        if (walletId && oWalletId?.toString() !== walletId.toString()) {
           return false;
+        }
+
+        if (walletAddress && !walletId) {
+          if (!orderWalletAddr || orderWalletAddr.toLowerCase() !== walletAddress.toLowerCase()) {
+            return false;
+          }
         }
       }
 
@@ -96,18 +106,26 @@ export default function OrderList({
         if (o.category === "perpetual" && o.perp?.protocol !== protocol) return false;
       }
 
-      // Token filter – case‑insensitive, skip if order has no token address
+      // Token filter – normalize asset filtering across Spot & Perpetual
       if (tokenInfo?.address) {
-        const orderData = o.category === "spot" ? o.spot : o.perp;
-        const orderTokenAddr = o.category === "spot"
-          ? (orderData?.orderAsset as any)?.orderToken?.address
-          : orderData?.orderAsset?.collateralToken?.address;
-        if (!orderTokenAddr || orderTokenAddr.toLowerCase() !== tokenInfo.address.toLowerCase()) {
+        const term = tokenInfo.address.toLowerCase();
+
+        let isMatch = false;
+        if (o.category === "spot") {
+          const spotOrderMatched = o.spot?.orderAsset?.orderToken?.address?.toLowerCase() === term;
+          const spotColMatched = o.spot?.orderAsset?.collateralToken?.address?.toLowerCase() === term;
+          isMatch = spotOrderMatched || spotColMatched;
+        } else {
+          const perpIndexMatched = o.indexTokenAddress?.toLowerCase() === term;
+          isMatch = perpIndexMatched;
+        }
+
+        if (!isMatch) {
           return false;
         }
       }
 
-      
+
 
       // Category filter
       if (categoryFilter !== "all" && o.category !== categoryFilter) return false;
@@ -122,6 +140,7 @@ export default function OrderList({
         const matchesId = o._id?.toLowerCase().includes(term) ?? false;
         if (!matchesName && !matchesId) return false;
       }
+
 
       return true;
     });

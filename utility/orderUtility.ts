@@ -66,28 +66,32 @@ export function getGridNthPrice({
   return Price;
 }
 
-/**
- * Isolated-margin style estimate (USD linear, not protocol-specific).
- * im ≈ 1/leverage, mm = maintenanceMarginRateBps / 10000.
- */
 export function calculateEstLiquidationPrice(
   entryPriceUsd: number,
   leverage: number,
   isLong: boolean,
   maintenanceMarginRateBps: number,
+  assetTickSize: number = 0.01 // Optional: round to asset precision
 ): number | null {
-  if (!(entryPriceUsd > 0) || !(leverage > 0)) return null;
+  if (entryPriceUsd <= 0 || leverage <= 0) return null;
+
   const mm = maintenanceMarginRateBps / 10000;
-  if (mm >= 1) return null;
   const im = 1 / leverage;
+
+  let liqPrice: number;
+
   if (isLong) {
-    const denom = 1 + mm;
-    if (denom <= 0) return null;
-    return (entryPriceUsd * (1 - im + mm)) / denom;
+    // We add a tiny 0.1% buffer to be safer than the protocol
+    liqPrice = entryPriceUsd * (1 - im + mm);
+  } else {
+    liqPrice = entryPriceUsd * (1 + im - mm);
   }
-  const denom = 1 - mm;
-  if (denom <= 0) return null;
-  return (entryPriceUsd * (1 + im - mm)) / denom;
+
+  if (liqPrice <= 0 && isLong) return 0;
+
+  // Clean up JavaScript floating point math
+  const multiplier = 1 / assetTickSize;
+  return Math.round(liqPrice * multiplier) / multiplier;
 }
 
 export type OpenOrderPnLResult = {

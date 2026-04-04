@@ -65,6 +65,7 @@ export default function Navbar() {
               >
                 PULSE<span className="text-blue-500">TRADER</span>
               </h1>
+              {/* <img src="/pulse.png" alt="logo" className="w-20 h-10" /> */}
               {/* Permanent BETA tag next to logo */}
               <span className="ml-1 px-2 py-0.5 text-[10px] font-bold uppercase bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded shadow-sm">
                 Beta
