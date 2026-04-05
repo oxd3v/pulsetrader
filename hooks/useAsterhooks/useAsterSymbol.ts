@@ -257,6 +257,7 @@ export const useAsterSymbols = (
           fetch(`${API_BASE_URL}/ticker/24hr`, { signal: controller.signal }),
           fetch(`${API_BASE_URL}/premiumIndex`, { signal: controller.signal }),
         ]);
+        
 
         if (!exchangeResponse.ok) {
           throw new Error(`Failed to fetch exchange info (${exchangeResponse.status})`);
@@ -273,6 +274,7 @@ export const useAsterSymbols = (
         const exchangeData = (await exchangeResponse.json()) as RawExchangeInfoPayload;
         const tickerData = toArray<RawTickerPayload>(await tickerResponse.json());
         const premiumData = toArray<RawMarkPricePayload>(await premiumResponse.json());
+       
 
         const tickerMap = new Map<string, RawTickerPayload>();
         tickerData.forEach((item) => {
@@ -293,6 +295,7 @@ export const useAsterSymbols = (
             return symbolItem.contractType === 'PERPETUAL' && symbolItem.status === 'TRADING';
           })
           .map((symbolItem) => {
+            const symbol_lot_size = (symbolItem as any).filters.find((f:any)=>f.filterType=="LOT_SIZE")
             const symbolCode = normalizeStringField(symbolItem.symbol, '').toUpperCase();
             const ticker = tickerMap.get(symbolCode);
             const premium = premiumMap.get(symbolCode);
@@ -302,7 +305,9 @@ export const useAsterSymbols = (
             );
 
             return {
-              symbol: symbolCode,
+              symbol: symbolCode, 
+              maxQty: symbol_lot_size.maxQty,
+              minQty: symbol_lot_size.minQty,
               baseAsset: normalizeStringField(symbolItem.baseAsset, symbolCode),
               quoteAsset: normalizeStringField(symbolItem.quoteAsset, 'USDT'),
               lastPrice: normalizeStringField(ticker?.c ?? ticker?.lastPrice, '0'),
@@ -434,7 +439,7 @@ export const useAsterSymbols = (
     };
   }, [enabled]);
 
-  // console.log(symbols);
+  
 
   const filteredSymbols = useMemo(() => {
     let filtered = symbols;

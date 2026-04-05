@@ -292,11 +292,10 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
               <div className="flex gap-4 mb-4 border-b border-gray-800 pb-4">
                 <button
                   onClick={() => setTab('Futures')}
-                  className={`font-medium transition-colors ${
-                    tab === 'Futures'
+                  className={`font-medium transition-colors ${tab === 'Futures'
                       ? 'text-white border-b-2 border-blue-500 -mb-4'
                       : 'text-gray-400 hover:text-gray-300'
-                  }`}
+                    }`}
                 >
                   Futures
                 </button>
@@ -317,11 +316,10 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
                   <button
                     key={cat}
                     onClick={() => setCategory(cat)}
-                    className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                      category === cat
+                    className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${category === cat
                         ? 'bg-gray-800 text-white'
                         : 'bg-gray-900 text-gray-400 hover:text-gray-300 border border-gray-800'
-                    }`}
+                      }`}
                   >
                     {cat}
                   </button>
@@ -357,6 +355,7 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
                   </thead>
                   <tbody>
                     {displaySymbols.map((symbolItem: SymbolData) => {
+
                       const change = toFiniteNumber(symbolItem.priceChangePercent);
                       const isFavorite = favorites.has(symbolItem.symbol);
                       const isSelected = normalizedCurrentSymbol === symbolItem.symbol.toUpperCase();
@@ -371,9 +370,8 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
                           key={symbolItem.symbol}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className={`border-b border-gray-800 hover:bg-gray-900 cursor-pointer transition-colors ${
-                            isSelected ? 'bg-gray-900' : ''
-                          }`}
+                          className={`border-b border-gray-800 hover:bg-gray-900 cursor-pointer transition-colors ${isSelected ? 'bg-gray-900' : ''
+                            }`}
                           onClick={() => handleSelectSymbol(symbolItem.symbol)}
                         >
                           <td
@@ -409,9 +407,8 @@ const AssetSelect: React.FC<AssetSelectProps> = ({
                           </td>
 
                           <td
-                            className={`px-4 py-3 text-right font-mono font-semibold ${
-                              change >= 0 ? 'text-green-500' : 'text-red-500'
-                            }`}
+                            className={`px-4 py-3 text-right font-mono font-semibold ${change >= 0 ? 'text-green-500' : 'text-red-500'
+                              }`}
                           >
                             {change >= 0 ? '+' : ''}
                             {change.toFixed(2)}%

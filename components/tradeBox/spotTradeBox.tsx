@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { ORDER_TYPE, OrderTokenType } from "@/type/order";
 
@@ -34,6 +34,7 @@ import {
   getDefaultFeeToken,
   shouldRenderFeeTokenSelector,
 } from "@/utility/orderUtility";
+import type { MarketSnapshotRef, StableMarketTokenInfo } from "@/type/market";
 
 // Constants
 const GRID_MULTIPLIER_OPTIONS = [
@@ -106,21 +107,40 @@ const RenderingTechnicalExit = ({
 };
 
 interface spotTradeBoxProps {
-  tokenInfo: any;
+  tokenInfo: StableMarketTokenInfo;
   chainId: number;
   isConnected: boolean;
   user?: any;
   userWallets?: any[];
   userPrevOrders?: any[];
+  marketSnapshotRef?: MarketSnapshotRef;
 }
 
-export default function spotTradeBox({
+const areEqualSpotTradeBoxProps = (
+  previous: spotTradeBoxProps,
+  next: spotTradeBoxProps,
+) => {
+  return (
+    previous.chainId === next.chainId &&
+    previous.isConnected === next.isConnected &&
+    previous.user === next.user &&
+    previous.userWallets === next.userWallets &&
+    previous.userPrevOrders === next.userPrevOrders &&
+    previous.marketSnapshotRef === next.marketSnapshotRef &&
+    previous.tokenInfo === next.tokenInfo
+  );
+};
+
+export default memo(SpotTradeBox, areEqualSpotTradeBoxProps);
+
+function SpotTradeBox({
   tokenInfo,
   chainId,
   isConnected,
   user,
   userWallets = [],
   userPrevOrders = [],
+  marketSnapshotRef,
 }: spotTradeBoxProps) {
   const { configureSpotOrder, submitOrder } = useOrder();
 
@@ -143,8 +163,8 @@ export default function spotTradeBox({
 
   // Order Configuration State
   const [initialOrderSize, setInitialOrderSize] = useState<string>("");
-  const [entryPrice, setEntryPrice] = useState<string>(tokenInfo?.priceUsd);
-  const [tpPrice, setTpPrice] = useState(tokenInfo?.priceUsd);
+  const [entryPrice, setEntryPrice] = useState<string>(tokenInfo?.priceUsd || "");
+  const [tpPrice, setTpPrice] = useState(tokenInfo?.priceUsd || "");
   const [technicalEntry, setTechnicalEntry] = useState<any>(null);
   const [technicalExit, setTechnicalExit] = useState<any>(null);
   const [orderName, setOrderName] = useState<string>("");
@@ -167,7 +187,7 @@ export default function spotTradeBox({
 
   // Advanced Settings State
   const [priority, setPriority] = useState<number>(2);
-  const [executionSpeed, setExecutionSpeed] = useState<string>("standard");
+  const executionSpeed = "standard";
 
   // Wallet & Order State
   const [gridsByWallet, setGridsByWallet] = useState<GridsByWallet>({});
@@ -184,6 +204,9 @@ export default function spotTradeBox({
 
   const [feeTokenPrice, setFeeTokenPrice] = useState<number>(0);
   const showFeeTokenSelector = shouldRenderFeeTokenSelector(user?.status);
+  const [liveTokenPriceUsd, setLiveTokenPriceUsd] = useState(
+    () => marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "",
+  );
 
   //order submission error
   const [submitText, setSubmitText] = useState("Create Order");
@@ -213,6 +236,29 @@ export default function spotTradeBox({
   // Effects
   // ========================================================================
 
+  const syncLiveMarketState = useCallback(() => {
+    const nextPriceUsd = marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "";
+
+    setLiveTokenPriceUsd((previous) =>
+      previous === nextPriceUsd ? previous : nextPriceUsd,
+    );
+  }, [marketSnapshotRef, tokenInfo?.priceUsd]);
+
+  useEffect(() => {
+    syncLiveMarketState();
+  }, [syncLiveMarketState, tokenInfo?.address]);
+
+  useEffect(() => {
+    if (!marketSnapshotRef) {
+      return undefined;
+    }
+
+    syncLiveMarketState();
+    const intervalId = window.setInterval(syncLiveMarketState, 500);
+
+    return () => window.clearInterval(intervalId);
+  }, [marketSnapshotRef, syncLiveMarketState, tokenInfo?.address]);
+
   // Fetch Collateral Price
   useEffect(() => {
     const fetchCollateralPrice = async () => {
@@ -227,8 +273,8 @@ export default function spotTradeBox({
         collateralToken.address.toLowerCase() ===
         tokenInfo?.address?.toLowerCase()
       ) {
-        if (tokenInfo?.priceUsd) {
-          setCollateralPrice(Number(tokenInfo.priceUsd));
+        if (liveTokenPriceUsd) {
+          setCollateralPrice(Number(liveTokenPriceUsd));
           return;
         }
       }
@@ -257,22 +303,29 @@ export default function spotTradeBox({
           // Fallback if fetch fails but we suspect it might be the main token
           setCollateralPrice(0);
         }
-      } catch (error) {
+      } catch {
         //console.error("Failed to fetch collateral price", error);
         setCollateralPrice(0);
       }
     };
 
     fetchCollateralPrice();
-  }, [collateralToken, tokenInfo, chainId]);
+  }, [collateralToken, tokenInfo?.address, liveTokenPriceUsd, chainId]);
 
   useEffect(() => {
-    const nextPrice = tokenInfo?.priceUsd ? String(tokenInfo.priceUsd) : "";
+    const nextPrice = marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "";
     setEntryPrice(nextPrice);
     setTpPrice(nextPrice);
-  }, [tokenInfo?.address]);
+  }, [marketSnapshotRef, tokenInfo?.address, tokenInfo?.priceUsd]);
 
-  console.log(chainId)
+  useEffect(() => {
+    if (!liveTokenPriceUsd) return;
+
+    setEntryPrice((previous) => (previous ? previous : String(liveTokenPriceUsd)));
+    setTpPrice((previous) => (previous ? previous : String(liveTokenPriceUsd)));
+  }, [liveTokenPriceUsd, tokenInfo?.address]);
+
+
 
   // ── Network-change reset ──────────────────────────────────────────────────
   // Single effect keyed only on chainId.  Resets every network-scoped token
@@ -289,7 +342,7 @@ export default function spotTradeBox({
   useEffect(() => {
     const chainTokens = (CollateralTokens[chainId] || {}) as Record<string, OrderTokenType>;
     const tokenList = Object.values(chainTokens) as OrderTokenType[];
-   
+
 
     // Native / ZeroAddress token is the standard collateral default.
     const nativeToken = chainTokens[ZeroAddress] ?? tokenList[0] ?? null;
@@ -298,7 +351,7 @@ export default function spotTradeBox({
 
     // Fee token: stable token > any ERC-20 > first in list.
     setFeeToken(getDefaultFeeToken(tokenList));
-  }, [chainId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chainId]);
 
   useEffect(() => {
     const fetchFeeTokenPrice = async () => {
@@ -315,9 +368,9 @@ export default function spotTradeBox({
       if (
         tokenInfo?.address &&
         feeToken.address.toLowerCase() === tokenInfo.address.toLowerCase() &&
-        tokenInfo?.priceUsd
+        liveTokenPriceUsd
       ) {
-        setFeeTokenPrice(Number(tokenInfo.priceUsd));
+        setFeeTokenPrice(Number(liveTokenPriceUsd));
         return;
       }
 
@@ -356,7 +409,14 @@ export default function spotTradeBox({
     };
 
     fetchFeeTokenPrice();
-  }, [feeToken, tokenInfo?.address, tokenInfo?.priceUsd, collateralPrice, collateralToken, chainId]);
+  }, [
+    feeToken,
+    tokenInfo?.address,
+    liveTokenPriceUsd,
+    collateralPrice,
+    collateralToken,
+    chainId,
+  ]);
 
   // ========================================================================
   // Event Handlers
@@ -434,12 +494,6 @@ export default function spotTradeBox({
 
     return new Set(walletKeys).size;
   }, [gridsByWallet]);
-
-  const minimumWalletCount = useMemo(() => {
-    return estOrders.length > 0 ? 1 : 0;
-  }, [estOrders.length]);
-
-  const feeTokenReady = !showFeeTokenSelector || (!!feeToken?.address && feeTokenPrice > 0);
 
   const strategyLabel = useMemo(() => {
     return (
@@ -771,7 +825,7 @@ export default function spotTradeBox({
         setIsConfirmationOpen(false);
         setIsOrderNameValidate(false);
       }
-    } catch (error) {
+    } catch {
       //console.error("Order submission failed:", error);
     } finally {
       setCreationPending(false);
@@ -855,7 +909,7 @@ export default function spotTradeBox({
         feeToken,
         feeTokenPrice,
         collateralPrice,
-        orderTokenPrice: tokenInfo?.priceUsd,
+        orderTokenPrice: liveTokenPriceUsd,
         feeTokenRequired: showFeeTokenSelector,
       };
       const _estOrders = configureSpotOrder(orderConfig);
@@ -890,7 +944,7 @@ export default function spotTradeBox({
     executionSpeed,
     collateralPrice,
     showFeeTokenSelector,
-    tokenInfo?.priceUsd,
+    liveTokenPriceUsd,
     tokenInfo.address,
     tokenInfo.decimals,
     tokenInfo.symbol,
@@ -930,7 +984,7 @@ export default function spotTradeBox({
     ],
   );
 
-  
+
 
   // ========================================================================
   // Render
@@ -1066,6 +1120,7 @@ export default function spotTradeBox({
                   tooltipText={"Price at which to enter the position"}
                   type={selectedStrategy.id !== "sellToken"}
                   tokenInfo={tokenInfo}
+                  currentPriceUsd={liveTokenPriceUsd}
                 />
               )}
             </div>
@@ -1304,6 +1359,7 @@ export default function spotTradeBox({
               tooltipText={"Price at which to exit the position"}
               type={selectedStrategy.id == "sellToken"}
               tokenInfo={tokenInfo}
+              currentPriceUsd={liveTokenPriceUsd}
             />
           )}
 

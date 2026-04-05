@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { memo, useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { FiSearch, FiX, FiAlertCircle, FiFilter } from "react-icons/fi";
 import { BiWallet } from "react-icons/bi";
@@ -10,6 +10,7 @@ import { ORDER_TYPE } from "@/type/order";
 
 // Hooks & Store
 import { useOrder } from "@/hooks/useOrder";
+import type { MarketSnapshotRef, StableMarketTokenInfo } from "@/type/market";
 
 // Components
 import StrategyGrouped from "./StrategyGrouped";
@@ -22,8 +23,9 @@ interface OrderListParams {
   walletAddress?: string | undefined;
   walletId?: string | undefined;
   isConnected: boolean;
-  tokenInfo?: any;
-  protocol?: string
+  tokenInfo?: StableMarketTokenInfo | null;
+  marketSnapshotRef?: MarketSnapshotRef;
+  protocol?: string;
 }
 
 // Helper to detect mobile screen on first render (SSR-safe)
@@ -32,7 +34,7 @@ function getInitialTableView(): boolean {
   return window.innerWidth >= 768;
 }
 
-export default function OrderList({
+const OrderList = ({
   network,
   userOrders,
   orderCategory,
@@ -40,8 +42,9 @@ export default function OrderList({
   walletId,
   isConnected,
   tokenInfo,
-  protocol
-}: OrderListParams) {
+  marketSnapshotRef,
+  protocol,
+}: OrderListParams) => {
   const { getOrders } = useOrder();
 
   // State
@@ -59,10 +62,6 @@ export default function OrderList({
   // View Mode — table on desktop, grid on mobile
   const [isTableOrder, setIsTableOrder] = useState<boolean>(getInitialTableView);
 
-  // Data (GMX – currently unused, kept for child components)
-  const [gmxOpenedPositionOrders, setGmxOpenedPositionOrders] = useState<Record<string, any>>({});
-  const [isGmxPosition, setIsGmxPosition] = useState<boolean>(false);
-  const gmxPositionUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync categoryFilter when the orderCategory prop changes
   useEffect(() => {
@@ -81,6 +80,8 @@ export default function OrderList({
   // ------------------------------------------------------------------
   // Memoized Filtering Logic (flattened and safe)
   // ------------------------------------------------------------------
+  const tokenAddressFilter = tokenInfo?.address?.toLowerCase() ?? "";
+
   const filteredOrders = useMemo(() => {
     return userOrders.filter((o) => {
       // Network filter – allow chainId 0
@@ -107,8 +108,8 @@ export default function OrderList({
       }
 
       // Token filter – normalize asset filtering across Spot & Perpetual
-      if (tokenInfo?.address) {
-        const term = tokenInfo.address.toLowerCase();
+      if (tokenAddressFilter) {
+        const term = tokenAddressFilter;
 
         let isMatch = false;
         if (o.category === "spot") {
@@ -144,7 +145,17 @@ export default function OrderList({
 
       return true;
     });
-  }, [userOrders, network, walletAddress, tokenInfo, categoryFilter, statusFilter, searchTerm]);
+  }, [
+    userOrders,
+    network,
+    walletAddress,
+    walletId,
+    tokenAddressFilter,
+    protocol,
+    categoryFilter,
+    statusFilter,
+    searchTerm,
+  ]);
 
   // ------------------------------------------------------------------
   // Memoized Sorting
@@ -218,7 +229,7 @@ export default function OrderList({
     setError(null);
     try {
       await getOrders();
-    } catch (e) {
+    } catch {
       setError("Failed to refresh orders. Please try again.");
     } finally {
       setIsLoading(false);
@@ -435,8 +446,6 @@ export default function OrderList({
             {isTableOrder ? (
               <OrderTable
                 orders={sortedOrders}
-                isGmxPosition={isGmxPosition}
-                orderGmxPositionData={gmxOpenedPositionOrders}
               />
             ) : (
               <div className="space-y-4">
@@ -445,8 +454,7 @@ export default function OrderList({
                     key={name}
                     strategyName={name}
                     groupData={data}
-                    isGmxPosition={isGmxPosition}
-                    orderGmxPositionData={gmxOpenedPositionOrders}
+                    marketSnapshotRef={marketSnapshotRef}
                   />
                 ))}
               </div>
@@ -456,4 +464,24 @@ export default function OrderList({
       </div>
     </div>
   );
-}
+};
+
+const areEqualOrderListProps = (
+  previous: OrderListParams,
+  next: OrderListParams,
+) => {
+  return (
+    previous.network === next.network &&
+    previous.userOrders === next.userOrders &&
+    previous.orderCategory === next.orderCategory &&
+    previous.walletAddress === next.walletAddress &&
+    previous.walletId === next.walletId &&
+    previous.isConnected === next.isConnected &&
+    previous.protocol === next.protocol &&
+    previous.marketSnapshotRef === next.marketSnapshotRef &&
+    previous.tokenInfo?.address === next.tokenInfo?.address &&
+    previous.tokenInfo?.chainId === next.tokenInfo?.chainId
+  );
+};
+
+export default memo(OrderList, areEqualOrderListProps);

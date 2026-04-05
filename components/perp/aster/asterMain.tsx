@@ -27,10 +27,10 @@ type AsterPerpTokenInfo = {
   quoteToken: { symbol: string; address: string; decimals: number };
   createdAt: number;
   chainId: number;
+  minQty: string;
+  maxQty: string;
   name: string;
   symbol: string;
-  decimals: number;
-  imageUrl: string;
   priceUsd: string;
 
 };
@@ -82,10 +82,10 @@ const buildAsterPerpTokenInfo = ({
     quoteToken: { symbol: "USDT", address: "USDT", decimals: 6 },
     createdAt: stats.eventTime > 0 ? stats.eventTime : previous?.createdAt ?? 0,
     chainId,
+    minQty: stats.minQty,
+    maxQty: stats.maxQty,
     name: baseSymbol,
     symbol: baseSymbol,
-    decimals: 8,
-    imageUrl: "/tokenLogo.png",
     priceUsd: resolvedPriceUsd,
   };
 };
@@ -118,6 +118,7 @@ const ChartSection = memo(
     leftWidth,
     isDesktop,
     isTradeBoxOpen,
+    perpTokenInfo
   }: {
     selectedSymbol: string;
     stats: AsterMarketStats;
@@ -130,6 +131,7 @@ const ChartSection = memo(
     leftWidth: number;
     isDesktop: boolean;
     isTradeBoxOpen: boolean;
+    perpTokenInfo: any
   }) => (
     <div
       style={isDesktop ? { width: `${leftWidth}%` } : undefined}
@@ -144,7 +146,7 @@ const ChartSection = memo(
         loading={loading}
         error={error}
       />
-      <OrderBox orderCategory="perpetual" userOrders={userOrders} isConnected={userConnected} protocol={'asterdex'} />
+      <OrderBox orderCategory="perpetual" tokenInfo={perpTokenInfo} userOrders={userOrders} isConnected={userConnected} protocol={'asterdex'} />
     </div>
   )
 );
@@ -313,9 +315,12 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
   );
 
   const [selectedSymbol, setSelectedSymbol] = useState(() => normalizeMarketSymbol(tokenSymbol));
+  const [selectedSymbolInfo, setSelectedSymbolInfo] = useState({});
   const [isTradeBoxOpen, setIsTradeBoxOpen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(75);
   const [isDesktop, setIsDesktop] = useState(false);
+
+
 
   // Caution modal: read sessionStorage in useEffect to avoid hydration mismatch
   const [hasAcceptedCaution, setHasAcceptedCaution] = useState(false);
@@ -349,7 +354,13 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+
   const { stats, connected, loading, error } = useAsterMarketStats(selectedSymbol);
+
+  console.log(stats)
+
+
+
   const tradeBoxTokenInfoRef = useRef<AsterPerpTokenInfo | null>(null);
 
   useEffect(() => {
@@ -492,6 +503,7 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
               leftWidth={leftWidth}
               isDesktop={isDesktop}
               isTradeBoxOpen={isTradeBoxOpen}
+              perpTokenInfo={perpTokenInfo}
             />
 
             <ResizeDivider onMouseDown={handleResizeDividerMouseDown} />

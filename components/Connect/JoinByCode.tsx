@@ -68,7 +68,6 @@ function JoinByCodeInner() {
         signUpMethod: "INVITATION_CODE",
         invitationCode: invitationCode || undefined,
       });
-      console.log(result)
 
       if (result.joined == true) {
         router.push("/");
@@ -160,10 +159,9 @@ function JoinByCodeInner() {
             disabled={!isCorrectWallet || isSubmitting}
             onClick={handleJoinProtocol}
             className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg
-              ${
-                isCorrectWallet
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
-                  : "bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed"
+              ${isCorrectWallet
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                : "bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed"
               }`}
           >
             {isSubmitting ? (

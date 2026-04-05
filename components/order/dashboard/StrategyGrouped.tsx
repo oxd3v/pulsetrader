@@ -10,9 +10,9 @@ import {
   FiChevronDown,
   FiActivity
 } from "react-icons/fi";
-import { TiWaves } from "react-icons/ti";
 import { ORDER_TYPE } from "@/type/order";
 import { useOrder } from "@/hooks/useOrder";
+import type { MarketSnapshotRef } from "@/type/market";
 
 import OrderCard from "./OrderCard";
 import ConfirmationModal from "@/components/common/Confirmation/ConfirmationBox";
@@ -31,15 +31,13 @@ interface StrategyGroupProps {
           closed: number;
       } 
   };
-  isGmxPosition: boolean;
-  orderGmxPositionData: any;
+  marketSnapshotRef?: MarketSnapshotRef;
 }
 
 export default function StrategyGroup({
   strategyName,
   groupData,
-  isGmxPosition,
-  orderGmxPositionData,
+  marketSnapshotRef,
 }: StrategyGroupProps) {
   const { closeStrategy, deleteStrategy } = useOrder();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -119,7 +117,7 @@ export default function StrategyGroup({
                {/* Status Pills */}
                {stats.opened > 0 && (
                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
-                       <TiWaves /> {stats.opened} Active
+                       <FiActivity /> {stats.opened} Active
                    </span>
                )}
                {stats.pending > 0 && (
@@ -188,8 +186,7 @@ export default function StrategyGroup({
               <OrderCard
                 key={order._id}
                 order={order}
-                isGmxPosition={isGmxPosition}
-                orderGmxPositionData={orderGmxPositionData}
+                marketSnapshotRef={marketSnapshotRef}
               />
             ))}
           </motion.div>

@@ -18,7 +18,7 @@ const headers = {
   "Sec-Fetch-Mode": "cors",
   "Sec-Fetch-Site": "same-origin",
   "Sec-Gpc": "1",
-  "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
 };
 
 // const headers = {
@@ -317,8 +317,7 @@ export const getDefinedCandleData = async ({
     }
   } catch (err: any) {
     throw new Error(
-      `Defined token candle bars api failed: ${
-        err.response.body || err.message || "UNKNOWN_ERROR"
+      `Defined token candle bars api failed: ${err.response.body || err.message || "UNKNOWN_ERROR"
       }`
     );
   }
@@ -383,7 +382,7 @@ export const getDefinedFilterTokens = async ({
 
     return response.data.filterTokens.results;
   } catch (err) {
-    console.log(err);
+    //console.log(err);
   }
 };
 
@@ -429,11 +428,11 @@ export const getDefinedTokenPrice = async ({
 
   let gotScrappedResponse = await gotScraping.post(DEFINED_URL, {
     headers,
-     headerGeneratorOptions: {
-        browsers: [{ name: 'chrome', minVersion: 120 }],
-        devices: ['desktop'],
-        locales: ['en-US'],
-      },
+    headerGeneratorOptions: {
+      browsers: [{ name: 'chrome', minVersion: 120 }],
+      devices: ['desktop'],
+      locales: ['en-US'],
+    },
     json: {
       operationName: "GetTokenPrice",
       query: TOKEN_PRICE_QUERY,

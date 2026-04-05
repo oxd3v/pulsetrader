@@ -425,8 +425,7 @@ export const useUserAuth = () => {
           invitationCode,
           encryptedToken,
         });
-        console.log(apiResponse, !apiResponse.joined, !apiResponse?.data?.userData?.account);
-        console.log(!apiResponse.joined || !apiResponse?.data?.userData?.account)
+
 
         if (!apiResponse.joined || !apiResponse?.data?.userData?.account) {
           // Clean up if API fails
@@ -623,7 +622,7 @@ export const useUserAuth = () => {
         return creationResult;
       } catch (err: any) {
         let key = handleServerErrorToast({ err });
-        console.log(key)
+        //console.log(key)
         creationResult.error = key;
         return creationResult;
       }

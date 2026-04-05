@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FiPlus, FiX } from "react-icons/fi";
-import Image from "next/image";
 import { useShallow } from "zustand/shallow";
 
 import ChartBox from "./ChartBox";
@@ -329,7 +328,7 @@ export default function GmxMain({ tokenSymbol }: GmxMainProps) {
         protocol="gmx"
       />
     );
-  }, [market, loading, isConnected, user, userOrders, userWallets]);
+  }, [error, isConnected, loading, market, perpTokenInfo, user, userOrders, userWallets]);
 
   const rightWidth = 100 - leftWidth;
 

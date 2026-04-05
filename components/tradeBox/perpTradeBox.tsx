@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { ORDER_TYPE, OrderTokenType } from "@/type/order";
 
@@ -16,7 +16,6 @@ import TakeProfitInput from "./TradeBoxCommon/TakeProfit";
 import StopLossInput from "./TradeBoxCommon/StopLoss";
 import SlippageInput from "./TradeBoxCommon/SlippageTolarence";
 import ReEntranceInput from "./TradeBoxCommon/ReEntrance";
-import OrderPriority from "./TradeBoxCommon/OrderPriority";
 import EntryPriceRendering from "./TradeBoxCommon/EntryPriceRendering";
 import OrderNameValidationInput from "./TradeBoxCommon/orderNameValidation";
 import GridInput from "./TradeBoxCommon/GridInput";
@@ -41,7 +40,7 @@ import {
   calculateEstLiquidationPrice,
 } from "@/utility/orderUtility";
 import { displayNumber } from "@/utility/displayPrice";
-import { BASIS_POINT_DIVISOR } from "@/constants/common/utils";
+import type { MarketSnapshotRef, StableMarketTokenInfo } from "@/type/market";
 
 // Constants
 const GRID_MULTIPLIER_OPTIONS = [
@@ -116,16 +115,35 @@ const RenderingTechnicalExit = ({
 };
 
 interface perpTradeBoxProps {
-  tokenInfo: any;
+  tokenInfo: StableMarketTokenInfo;
   chainId: number;
   isConnected: boolean;
   user?: any;
   userWallets?: any[];
   userPrevOrders?: any[];
   protocol: string;
+  marketSnapshotRef?: MarketSnapshotRef;
 }
 
-export default function PerpTradeBox({
+const areEqualPerpTradeBoxProps = (
+  previous: perpTradeBoxProps,
+  next: perpTradeBoxProps,
+) => {
+  return (
+    previous.chainId === next.chainId &&
+    previous.isConnected === next.isConnected &&
+    previous.user === next.user &&
+    previous.userWallets === next.userWallets &&
+    previous.userPrevOrders === next.userPrevOrders &&
+    previous.protocol === next.protocol &&
+    previous.marketSnapshotRef === next.marketSnapshotRef &&
+    previous.tokenInfo === next.tokenInfo
+  );
+};
+
+export default memo(PerpTradeBox, areEqualPerpTradeBoxProps);
+
+function PerpTradeBox({
   tokenInfo,
   chainId,
   isConnected,
@@ -133,8 +151,11 @@ export default function PerpTradeBox({
   userWallets = [],
   userPrevOrders = [],
   protocol,
+  marketSnapshotRef,
 }: perpTradeBoxProps) {
   const { configurePerpOrder, submitOrder } = useOrder();
+
+  //console.log(tokenInfo)
 
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -157,8 +178,8 @@ export default function PerpTradeBox({
 
   // Order Configuration State
   const [initialOrderSize, setInitialOrderSize] = useState<string>("");
-  const [entryPrice, setEntryPrice] = useState<string>(tokenInfo?.priceUsd);
-  const [tpPrice, setTpPrice] = useState(tokenInfo?.priceUsd);
+  const [entryPrice, setEntryPrice] = useState<string>(tokenInfo?.priceUsd || "");
+  const [tpPrice, setTpPrice] = useState(tokenInfo?.priceUsd || "");
   const [technicalEntry, setTechnicalEntry] = useState<any>(null);
   const [technicalExit, setTechnicalExit] = useState<any>(null);
   const [orderName, setOrderName] = useState<string>("");
@@ -180,8 +201,8 @@ export default function PerpTradeBox({
   const [reEntrancePercentage, setReEntrancePercentage] = useState<number>(1);
 
   // Advanced Settings State
-  const [priority, setPriority] = useState<number>(2);
-  const [executionSpeed, setExecutionSpeed] = useState<string>("standard");
+  const priority = 2;
+  const executionSpeed = "standard";
 
   // Wallet & Order State
   const [gridsByWallet, setGridsByWallet] = useState<GridsByWallet>({});
@@ -201,6 +222,12 @@ export default function PerpTradeBox({
   const [leverage, setLeverage] = useState(1);
   //const [leverageMultiplier, setLevrageMultiplier] = useState(1);
   const [isLong, setIsLong] = useState(false);
+  const [liveTokenPriceUsd, setLiveTokenPriceUsd] = useState(
+    () => marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "",
+  );
+  const [liveMarkPriceUsd, setLiveMarkPriceUsd] = useState<number>(
+    () => marketSnapshotRef?.current?.markPrice || 0,
+  );
 
   const [debouncedInitialOrderSize] = useDebounce(initialOrderSize, 300);
   const [debouncedEntryPrice] = useDebounce(entryPrice, 300);
@@ -230,6 +257,33 @@ export default function PerpTradeBox({
   // Effects
   // ========================================================================
 
+  const syncLiveMarketState = useCallback(() => {
+    const nextPriceUsd = marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "";
+    const nextMarkPriceUsd = marketSnapshotRef?.current?.markPrice || 0;
+
+    setLiveTokenPriceUsd((previous) =>
+      previous === nextPriceUsd ? previous : nextPriceUsd,
+    );
+    setLiveMarkPriceUsd((previous) =>
+      previous === nextMarkPriceUsd ? previous : nextMarkPriceUsd,
+    );
+  }, [marketSnapshotRef, tokenInfo?.priceUsd]);
+
+  useEffect(() => {
+    syncLiveMarketState();
+  }, [syncLiveMarketState, tokenInfo?.address]);
+
+  useEffect(() => {
+    if (!marketSnapshotRef) {
+      return undefined;
+    }
+
+    syncLiveMarketState();
+    const intervalId = window.setInterval(syncLiveMarketState, 500);
+
+    return () => window.clearInterval(intervalId);
+  }, [marketSnapshotRef, syncLiveMarketState, tokenInfo?.address]);
+
   // Fetch Collateral Price
   useEffect(() => {
     const fetchCollateralPrice = async () => {
@@ -244,8 +298,8 @@ export default function PerpTradeBox({
         collateralToken.address.toLowerCase() ===
         tokenInfo?.address?.toLowerCase()
       ) {
-        if (tokenInfo?.priceUsd) {
-          setCollateralPrice(Number(tokenInfo.priceUsd));
+        if (liveTokenPriceUsd) {
+          setCollateralPrice(Number(liveTokenPriceUsd));
           return;
         }
       }
@@ -274,20 +328,27 @@ export default function PerpTradeBox({
           // Fallback if fetch fails but we suspect it might be the main token
           setCollateralPrice(0);
         }
-      } catch (error) {
+      } catch {
         //console.error("Failed to fetch collateral price", error);
         setCollateralPrice(0);
       }
     };
 
     fetchCollateralPrice();
-  }, [collateralToken, tokenInfo, chainId]);
+  }, [collateralToken, tokenInfo?.address, liveTokenPriceUsd, chainId]);
 
   useEffect(() => {
-    const nextPrice = tokenInfo?.priceUsd ? String(tokenInfo.priceUsd) : "";
+    const nextPrice = marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "";
     setEntryPrice(nextPrice);
     setTpPrice(nextPrice);
-  }, [tokenInfo?.address]);
+  }, [marketSnapshotRef, tokenInfo?.address, tokenInfo?.priceUsd]);
+
+  useEffect(() => {
+    if (!liveTokenPriceUsd) return;
+
+    setEntryPrice((previous) => (previous ? previous : String(liveTokenPriceUsd)));
+    setTpPrice((previous) => (previous ? previous : String(liveTokenPriceUsd)));
+  }, [liveTokenPriceUsd, tokenInfo?.address]);
 
   useEffect(() => {
     const defaultFeeToken = getDefaultFeeToken(feeTokenOptions);
@@ -318,9 +379,9 @@ export default function PerpTradeBox({
       if (
         tokenInfo?.address &&
         feeToken.address.toLowerCase() === tokenInfo.address.toLowerCase() &&
-        tokenInfo?.priceUsd
+        liveTokenPriceUsd
       ) {
-        setFeeTokenPrice(Number(tokenInfo.priceUsd));
+        setFeeTokenPrice(Number(liveTokenPriceUsd));
         return;
       }
 
@@ -359,7 +420,14 @@ export default function PerpTradeBox({
     };
 
     fetchFeeTokenPrice();
-  }, [feeToken, tokenInfo?.address, tokenInfo?.priceUsd, collateralPrice, collateralToken, chainId]);
+  }, [
+    feeToken,
+    tokenInfo?.address,
+    liveTokenPriceUsd,
+    collateralPrice,
+    collateralToken,
+    chainId,
+  ]);
 
   // ========================================================================
   // Event Handlers
@@ -436,7 +504,10 @@ export default function PerpTradeBox({
     }
     if (selectedStrategy.id === "algo") {
       return (
-        Number(debouncedEntryPrice) || Number(tokenInfo?.priceUsd) || 0
+        Number(debouncedEntryPrice) ||
+        Number(liveMarkPriceUsd) ||
+        Number(liveTokenPriceUsd) ||
+        0
       );
     }
     return Number(debouncedEntryPrice) || 0;
@@ -445,7 +516,8 @@ export default function PerpTradeBox({
     isTechnicalExit,
     debouncedTpPrice,
     debouncedEntryPrice,
-    tokenInfo?.priceUsd,
+    liveMarkPriceUsd,
+    liveTokenPriceUsd,
   ]);
 
   const estLiquidationPriceUsd = useMemo(() => {
@@ -457,27 +529,37 @@ export default function PerpTradeBox({
     );
   }, [entryForLiquidationUsd, leverage, isLong]);
 
-  const selectedWalletCount = useMemo(() => {
-    const walletKeys = Object.values(gridsByWallet)
-      .map((wallet: any) => wallet?._id || wallet)
-      .filter(Boolean);
+  const resolvedMaxLeverage = useMemo(() => {
+    const parsed = Number(tokenInfo?.maxLeverage);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 50;
+    }
 
-    return new Set(walletKeys).size;
-  }, [gridsByWallet]);
+    return Math.max(1, parsed);
+  }, [tokenInfo?.maxLeverage]);
 
-  const minimumWalletCount = useMemo(() => {
-    return estOrders.length > 0 ? 1 : 0;
-  }, [estOrders.length]);
+  useEffect(() => {
+    if (leverage > resolvedMaxLeverage) {
+      setLeverage(resolvedMaxLeverage);
+    }
+  }, [leverage, resolvedMaxLeverage]);
 
-  const feeTokenReady = !showFeeTokenSelector || (!!feeToken?.address && feeTokenPrice > 0);
+  const estimatedAssetQuantity = useMemo(() => {
+    const collateralAmount = Number(initialOrderSize);
+    const collateralUsdPrice = Number(collateralPrice);
+    const marketEntryPrice = Number(entryForLiquidationUsd);
 
-  const strategyLabel = useMemo(() => {
-    return (
-      selectedStrategy?.name ||
-      selectedStrategy?.id ||
-      "Perp strategy"
-    );
-  }, [selectedStrategy]);
+    if (
+      collateralAmount <= 0 ||
+      collateralUsdPrice <= 0 ||
+      leverage <= 0 ||
+      marketEntryPrice <= 0
+    ) {
+      return 0;
+    }
+
+    return (collateralAmount * collateralUsdPrice * leverage) / marketEntryPrice;
+  }, [collateralPrice, entryForLiquidationUsd, initialOrderSize, leverage]);
 
 
 
@@ -584,6 +666,29 @@ export default function PerpTradeBox({
       _submitText = `Enter valid order size`;
       return withStatus(false, _submitText);
     }
+
+    if (leverage <= 0) {
+      _submitText = "Set leverage";
+      return withStatus(false, _submitText);
+    }
+
+    if (leverage > resolvedMaxLeverage) {
+      _submitText = `Max leverage ${resolvedMaxLeverage}x`;
+      return withStatus(false, _submitText);
+    }
+
+    const minQty = Number(tokenInfo?.minQty || 0);
+    if (minQty > 0 && estimatedAssetQuantity > 0 && estimatedAssetQuantity < minQty) {
+      _submitText = `Minimum quantity ${minQty}`;
+      return withStatus(false, _submitText);
+    }
+
+    const maxQty = Number(tokenInfo?.maxQty || 0);
+    if (maxQty > 0 && estimatedAssetQuantity > maxQty) {
+      _submitText = `Maximum quantity ${maxQty}`;
+      return withStatus(false, _submitText);
+    }
+
     if (
       isTrailingMode &&
       (slPercentage === 0 ||
@@ -718,6 +823,8 @@ export default function PerpTradeBox({
       return withStatus(false, _submitText);
     }
 
+    
+
     // Protocol specific position limits
     const selectedWalletIds = Object.values(gridsByWallet).map((w: any) => w._id);
     const uniqueWallets = Array.from(new Set(selectedWalletIds));
@@ -793,6 +900,10 @@ export default function PerpTradeBox({
     gridMultiplier,
     orderSizeMultiplier,
     collateralPrice,
+    estimatedAssetQuantity,
+    resolvedMaxLeverage,
+    tokenInfo?.minQty,
+    tokenInfo?.maxQty,
   ]);
 
   // ========================================================================
@@ -846,8 +957,8 @@ export default function PerpTradeBox({
         collateralToken,
         outputToken,
         symbolInfo: {
-          symbol: tokenInfo.address || tokenInfo.symbol,
           ...tokenInfo,
+          symbol: tokenInfo.address || tokenInfo.symbol,
         },
         orderToken: tokenInfo,
         priority,
@@ -889,7 +1000,7 @@ export default function PerpTradeBox({
         setIsConfirmationOpen(false);
         setIsOrderNameValidate(false);
       }
-    } catch (error) {
+    } catch {
       //console.error("Order submission failed:", error);
     } finally {
       setCreationPending(false);
@@ -1011,6 +1122,8 @@ export default function PerpTradeBox({
     showFeeTokenSelector,
     protocol,
   ]);
+
+  
 
   const MemoizedWalletSelector = useMemo(
     () => (
@@ -1188,7 +1301,11 @@ export default function PerpTradeBox({
             </div>
           </div>
 
-          <LeverageInput leverage={leverage} onLeverageChange={setLeverage} />
+          <LeverageInput
+            leverage={leverage}
+            onLeverageChange={setLeverage}
+            maxLeverage={resolvedMaxLeverage}
+          />
 
           {/* <div className="grid 2xl:grid-cols-2 gap-4">
             <NumberInput
@@ -1284,6 +1401,7 @@ export default function PerpTradeBox({
                   tooltipText={"Price at which to enter the position"}
                   type={selectedStrategy.id !== "sellToken"}
                   tokenInfo={tokenInfo}
+                  currentPriceUsd={liveTokenPriceUsd}
                 />
               )}
             </div>
@@ -1484,6 +1602,7 @@ export default function PerpTradeBox({
               tooltipText={"Price at which to exit the position"}
               type={selectedStrategy.id == "sellToken"}
               tokenInfo={tokenInfo}
+              currentPriceUsd={liveTokenPriceUsd}
             />
           )}
 

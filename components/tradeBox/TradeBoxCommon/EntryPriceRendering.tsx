@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import InfoTooltip from "./BoxTooltip";
 import { safeParseUnits, safeFormatNumber } from "@/utility/handy";
 import { PRECISION_DECIMALS } from "@/constants/common/utils";
@@ -9,24 +9,35 @@ interface EntryPriceRenderingProps {
     tooltipText:string;
     type: boolean;
     tokenInfo: any;
+    currentPriceUsd?: string;
 }
 
 const EntryPriceRendering = ({
     setEntryPrice,
     label,
     tooltipText,
-    chainId,
-    type,
-    tokenInfo
+    tokenInfo,
+    currentPriceUsd,
 }: EntryPriceRenderingProps) => {
     const [inputValue, setInputValue] = useState("");
+
+    useEffect(() => {
+        setInputValue("");
+    }, [tokenInfo?.address]);
     
     const handleInputChange = (value: string) => {
         setInputValue(value);
         setEntryPrice(value);
     };
     
-    let currentPrice = safeFormatNumber(safeParseUnits(tokenInfo?.priceUsd, PRECISION_DECIMALS).toString(), PRECISION_DECIMALS, 8).toString()
+    const currentPrice = useMemo(() => {
+        const safePrice = currentPriceUsd || tokenInfo?.priceUsd || "0";
+        return safeFormatNumber(
+            safeParseUnits(safePrice, PRECISION_DECIMALS).toString(),
+            PRECISION_DECIMALS,
+            8,
+        ).toString();
+    }, [currentPriceUsd, tokenInfo?.priceUsd]);
     return (
         <div className="space-y-2">
             <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">

@@ -14,9 +14,9 @@ export const encryptAuthToken = async (text: string) => {
 };
 
 
-export const decryptPrivateKey = async (secureKey:string)=>{
+export const decryptPrivateKey = async (secureKey: string) => {
   if (FRONT_END_WALLET_SECURITY) {
-    console.log(FRONT_END_WALLET_SECURITY, secureKey)
+    //console.log(FRONT_END_WALLET_SECURITY, secureKey)
     return decryptFromServer(secureKey.toString(), FRONT_END_WALLET_SECURITY);
   }
 }

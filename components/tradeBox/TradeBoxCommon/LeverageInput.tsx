@@ -4,12 +4,22 @@ import InfoTooltip from "./BoxTooltip";
 interface LeverageInputProps {
   leverage: number;
   onLeverageChange: (value: number) => void;
+  maxLeverage?: number;
 }
 
 const LeverageInput = ({
   leverage,
-  onLeverageChange
+  onLeverageChange,
+  maxLeverage,
 }: LeverageInputProps) => {
+  const resolvedMaxLeverage = useMemo(() => {
+    const parsedMax = Number(maxLeverage);
+    if (!Number.isFinite(parsedMax) || parsedMax <= 0) {
+      return 50;
+    }
+
+    return Math.max(1, Math.floor(parsedMax));
+  }, [maxLeverage]);
   const [inputValue, setInputValue] = useState(String(leverage));
 
   useEffect(() => {
@@ -23,7 +33,7 @@ const LeverageInput = ({
   const handleInputBlur = () => {
     let num = parseFloat(inputValue);
     if (isNaN(num) || num < 0) num = 0;
-    if (num > 100) num = 100;
+    if (num > resolvedMaxLeverage) num = resolvedMaxLeverage;
     onLeverageChange(num);
   };
 
@@ -48,7 +58,7 @@ const LeverageInput = ({
         <input
           type="range"
           min="0"
-          max="50"
+          max={resolvedMaxLeverage}
           step="1"
           value={leverage}
           onChange={handleSliderChange}
@@ -58,7 +68,7 @@ const LeverageInput = ({
           <input
             type="number"
             min="0"
-            max="50"
+            max={resolvedMaxLeverage}
             step="1"
             value={inputValue}
             onChange={handleInputChange}

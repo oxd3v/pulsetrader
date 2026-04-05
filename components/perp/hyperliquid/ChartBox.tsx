@@ -1,25 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { FiChevronUp } from "react-icons/fi";
 import { LuChartCandlestick } from "react-icons/lu";
 import { RiArrowDropDownLine } from "react-icons/ri";
-import TvChartContainer from "@/components/tradingView/perp/hyperliquid/chart";
-import OrderBook from "./OrderBook";
-import AssetSelect from "./assetSelect";
+
 import { formateNumberInUnit } from "@/utility/handy";
-import { useHyperliquidMarketStats } from "@/hooks/useHyperLiquidHooks/useHyperliquidMarketStats";
+import type { HyperliquidMarketStats } from "@/hooks/useHyperLiquidHooks/useHyperliquidMarketStats";
+import TvChartContainer from "@/components/tradingView/perp/hyperliquid/chart";
+import AssetSelect from "./assetSelect";
+import OrderBook from "./OrderBook";
 
 interface ChartBoxProps {
   tokenSymbol: string;
   handleTokenSelect?: () => void;
   onSymbolChange?: (symbol: string) => void;
+  stats: HyperliquidMarketStats;
+  connected: boolean;
+  loading: boolean;
+  error: string | null;
 }
 
 const normalizeMarketSymbol = (symbol: string): string => {
   const normalized = symbol.trim().toUpperCase();
   if (!normalized) return "";
-  if (normalized.endsWith("USDT") || normalized.endsWith("USDC") || normalized.endsWith("BUSD")) {
+  if (
+    normalized.endsWith("USDT") ||
+    normalized.endsWith("USDC") ||
+    normalized.endsWith("BUSD")
+  ) {
     return normalized;
   }
   return `${normalized}USDT`;
@@ -40,11 +49,6 @@ const formatPrice = (value: number): string => {
     });
   }
 
-  const formatCompactMetric = (value: number): string => {
-    if (!Number.isFinite(value) || value <= 0) return "--";
-    return formateNumberInUnit(value, 2);
-  };
-
   if (value >= 1) {
     return value.toLocaleString("en-US", {
       minimumFractionDigits: 2,
@@ -62,15 +66,6 @@ const formatPercent = (value: number): string => {
   if (!Number.isFinite(value)) return "--";
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
-};
-
-const formatUsd = (value: number): string => {
-  if (!Number.isFinite(value) || value <= 0) return "--";
-
-  return value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 };
 
 const formatCompactMetric = (value: number): string => {
@@ -94,50 +89,40 @@ const formatCountdown = (nextFundingTime: number, now: number): string => {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  const hoursText = String(hours).padStart(2, "0");
-  const minutesText = String(minutes).padStart(2, "0");
-  const secondsText = String(seconds).padStart(2, "0");
-
-  return `${hoursText}:${minutesText}:${secondsText}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0",
+  )}:${String(seconds).padStart(2, "0")}`;
 };
 
-export default function ChartBox({
+const ChartBox = memo(function ChartBox({
   tokenSymbol,
   handleTokenSelect,
   onSymbolChange,
+  stats,
+  connected,
+  loading,
+  error,
 }: ChartBoxProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAssetSelect, setShowAssetSelect] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState(() => normalizeMarketSymbol(tokenSymbol));
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const selectedSymbol = useMemo(
+    () => normalizeMarketSymbol(tokenSymbol),
+    [tokenSymbol],
+  );
 
-  const {
-    stats,
-    connected: marketConnected,
-    loading: marketLoading,
-    error: marketError,
-  } = useHyperliquidMarketStats(selectedSymbol);
+  void error;
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1026) {
-        setIsCollapsed(true);
-      } else {
-        setIsCollapsed(false);
-      }
+      setIsCollapsed(window.innerWidth < 1026);
     };
 
-    if (window.innerWidth < 1026) {
-      setIsCollapsed(true);
-    }
-
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    setSelectedSymbol(normalizeMarketSymbol(tokenSymbol));
-  }, [tokenSymbol]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -150,20 +135,15 @@ export default function ChartBox({
   const handleSelectSymbol = useCallback(
     (symbol: string) => {
       const normalizedSymbol = normalizeMarketSymbol(symbol);
-      setSelectedSymbol(normalizedSymbol);
-      if (onSymbolChange) {
-        onSymbolChange(normalizedSymbol);
-      }
-      if (handleTokenSelect) {
-        handleTokenSelect();
-      }
+      onSymbolChange?.(normalizedSymbol);
+      handleTokenSelect?.();
     },
-    [handleTokenSelect, onSymbolChange]
+    [handleTokenSelect, onSymbolChange],
   );
 
   const memoizedOrderBook = useMemo(
     () => <OrderBook key={selectedSymbol} symbol={selectedSymbol} />,
-    [selectedSymbol]
+    [selectedSymbol],
   );
 
   const metrics = useMemo(() => {
@@ -176,7 +156,10 @@ export default function ChartBox({
         value: `${formatFundingRate(stats.fundingRate)} / ${fundingCountdown}`,
       },
       { label: "24h Volume (USDT)", value: formatCompactMetric(stats.quoteVolume) },
-      { label: "Open Interest (USDT)", value: formatCompactMetric(stats.openInterestUsd) },
+      {
+        label: "Open Interest (USDT)",
+        value: formatCompactMetric(stats.openInterestUsd),
+      },
     ];
   }, [currentTime, stats]);
 
@@ -186,7 +169,6 @@ export default function ChartBox({
   return (
     <>
       <div className="bg-white dark:bg-gray-900 rounded-2xl font-mono shadow-sm p-1 lg:p-2 border border-gray-100 dark:border-gray-800">
-
         <div className="p-1 space-y-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="xl:flex min-w-0 xl:flex-1 items-start gap-3">
@@ -199,7 +181,9 @@ export default function ChartBox({
                     <span className="flex gap-1 items-center bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded">
                       {selectedSymbol || "SYMBOL"} <RiArrowDropDownLine />
                     </span>
-                    <span className="text-sm lg:text-md text-yellow-400">Perp</span>
+                    <span className="text-sm lg:text-md text-yellow-400">
+                      Perp
+                    </span>
                   </h2>
 
                   <div className="flex items-center gap-2 text-xs">
@@ -207,29 +191,30 @@ export default function ChartBox({
                       {formatPrice(stats.lastPrice)}
                     </span>
                     <span
-                      className={`font-semibold ${changeValue >= 0 ? "text-green-500" : "text-red-500"
-                        }`}
+                      className={`font-semibold ${
+                        changeValue >= 0 ? "text-green-500" : "text-red-500"
+                      }`}
                     >
                       {formatPercent(changeValue)}
                     </span>
                     <span
-                      className={`h-1.5 w-1.5 rounded-full ${marketConnected ? "bg-emerald-400" : marketLoading ? "bg-amber-400" : "bg-red-400"
-                        }`}
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        connected ? "bg-emerald-400" : loading ? "bg-amber-400" : "bg-red-400"
+                      }`}
                     />
                   </div>
                 </div>
               </div>
 
               <div className="flex justify-end items-center gap-2">
-                <div className="flex w-full  items-stretch justify-end gap-3 xl:w-auto xl:max-w-[760px]">
+                <div className="flex w-full items-stretch justify-end gap-3 xl:w-auto xl:max-w-[760px]">
                   {metrics.map((item) => (
-                    <div key={item.label} className="">
+                    <div key={item.label}>
                       <p className="text-[5px] xl:text-[11px] text-gray-500 dark:text-gray-400 truncate">
                         {item.label}
                       </p>
                       <p className="flex gap-1 text-xs xl:text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                        {item.value}{" "}
-                        {/* {item.helper ?? null} */}
+                        {item.value}
                       </p>
                     </div>
                   ))}
@@ -252,17 +237,17 @@ export default function ChartBox({
             </div>
           </div>
 
-          {/* {marketError ? (
-            <p className="text-[11px] text-red-500">{marketError}</p>
+          {/* {error ? (
+            <p className="text-[11px] text-red-500">{error}</p>
           ) : null} */}
         </div>
 
-
         <div
-          className={`overflow-hidden transition-all duration-300 border-t border-gray-300 dark:border-gray-800 ${isCollapsed
-            ? "h-0 border-none"
-            : "h-[400px] lg:h-[400px] 2xl:h-[400px]"
-            }`}
+          className={`overflow-hidden transition-all duration-300 border-t border-gray-300 dark:border-gray-800 ${
+            isCollapsed
+              ? "h-0 border-none"
+              : "h-[400px] lg:h-[400px] 2xl:h-[400px]"
+          }`}
         >
           <div className="lg:flex w-full h-full p-2">
             <div className="grow h-full rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800">
@@ -270,7 +255,6 @@ export default function ChartBox({
                 <div className="w-full h-full">
                   <TvChartContainer symbol={selectedSymbol} />
                 </div>
-
               ) : (
                 <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center">
                   <span className="text-gray-500 dark:text-gray-400">
@@ -280,7 +264,7 @@ export default function ChartBox({
               )}
             </div>
 
-            <div className=" xl:block  xl:h-full h-auto">
+            <div className="xl:block xl:h-full h-auto">
               {hasSymbol ? (
                 <div className="w-full h-full">{memoizedOrderBook}</div>
               ) : (
@@ -303,6 +287,6 @@ export default function ChartBox({
       />
     </>
   );
-}
+});
 
-
+export default ChartBox;

@@ -2,10 +2,9 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import {
   fetchCodexFilterTokens,
-  fetchCodexCandleBar,
 } from "@/lib/oracle/codex";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiPlus, FiX, FiActivity, FiAlertCircle } from "react-icons/fi";
+import { FiPlus, FiX, FiAlertCircle } from "react-icons/fi";
 import { chains } from "@/constants/common/chain";
 import { DEFAULT_SPOT_TOKENS } from "@/constants/common/tokens";
 
@@ -17,13 +16,14 @@ import SelectTokenModal from "@/components/spot/defined/selectToken";
 
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
+import type { LiveMarketSnapshot, StableMarketTokenInfo } from "@/type/market";
 
 interface DefinedSpotMainProps {
   tokenAddress: string;
 }
 
 // Separate static metadata from dynamic market data to optimize rendering
-interface StaticTokenInfo {
+interface StaticTokenInfo extends StableMarketTokenInfo {
   address: string;
   pairAddress: string;
   quoteToken: any;
@@ -33,6 +33,8 @@ interface StaticTokenInfo {
   symbol: string;
   decimals: number;
   imageUrl: string;
+  priceUsd: string;
+  token?: any;
 }
 
 interface DynamicTokenData {
@@ -65,6 +67,13 @@ export default function DefinedSpotMain({
   const [selectedAddress, setSelectedAddress] = useState(tokenAddress);
   const [staticInfo, setStaticInfo] = useState<StaticTokenInfo | null>(null);
   const [dynamicData, setDynamicData] = useState<DynamicTokenData | null>(null);
+  const marketSnapshotRef = useRef<LiveMarketSnapshot>({
+    priceUsd: "0",
+    liquidity: "0",
+    marketCap: "0",
+    volume24: "0",
+    change24: "0",
+  });
 
   // --- Status State ---
   const [loading, setLoading] = useState(false);
@@ -76,15 +85,13 @@ export default function DefinedSpotMain({
 
   // --- Resizing State (Percentages) ---
   const [leftWidth, setLeftWidth] = useState(75); // Width of Chart+Orders section
-  const [topHeight, setTopHeight] = useState(70); // Height of Chart relative to Orders
   const [isDraggingH, setIsDraggingH] = useState(false);
-  const [isDraggingV, setIsDraggingV] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   // --- Resize Handlers ---
   const startHorizontalDrag = () => setIsDraggingH(true);
-  const startVerticalDrag = () => setIsDraggingV(true);
 
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -96,29 +103,30 @@ export default function DefinedSpotMain({
         // Clamp between 40% and 85%
         if (newWidth > 40 && newWidth < 85) setLeftWidth(newWidth);
       }
-
-      if (isDraggingV) {
-        const containerHeight = containerRef.current.offsetHeight;
-        const newHeight = (e.clientY / containerHeight) * 100;
-        // Clamp between 20% and 80%
-        if (newHeight > 20 && newHeight < 80) setTopHeight(newHeight);
-      }
     },
-    [isDraggingH, isDraggingV],
+    [isDraggingH],
   );
 
-  console.log(network)
 
   const onMouseUp = useCallback(() => {
     setIsDraggingH(false);
-    setIsDraggingV(false);
   }, []);
 
   useEffect(() => {
-    if (isDraggingH || isDraggingV) {
+    const handleViewport = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+
+    handleViewport();
+    window.addEventListener("resize", handleViewport);
+    return () => window.removeEventListener("resize", handleViewport);
+  }, []);
+
+  useEffect(() => {
+    if (isDraggingH) {
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = isDraggingH ? "col-resize" : "row-resize";
+      document.body.style.cursor = "col-resize";
     } else {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
@@ -128,7 +136,7 @@ export default function DefinedSpotMain({
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
-  }, [isDraggingH, isDraggingV, onMouseMove, onMouseUp]);
+  }, [isDraggingH, onMouseMove, onMouseUp]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -180,17 +188,19 @@ export default function DefinedSpotMain({
       }
 
       // Set Static Info (Stable)
-      setStaticInfo({
-        address: validToken.token.address,
-        pairAddress: validToken.pair.address,
-        quoteToken: validToken.quoteToken,
-        createdAt: validToken.createdAt,
+        setStaticInfo({
+          address: validToken.token.address,
+          pairAddress: validToken.pair.address,
+          quoteToken: validToken.quoteToken,
+          createdAt: validToken.createdAt,
         chainId: validToken.token.networkId,
-        name: validToken.token.name,
-        symbol: validToken.token.symbol,
-        decimals: validToken.token.decimals,
-        imageUrl: validToken.token.imageLargeUrl || "/tokenLogo.png",
-      });
+          name: validToken.token.name,
+          symbol: validToken.token.symbol,
+          decimals: validToken.token.decimals,
+          imageUrl: validToken.token.imageLargeUrl || "/tokenLogo.png",
+          priceUsd: validToken.priceUSD || "0",
+          token: validToken.token,
+        });
 
       // Set Dynamic Data (Changeable)
       setDynamicData(validToken);
@@ -204,7 +214,7 @@ export default function DefinedSpotMain({
         setLoading(false);
       }
     }
-  }, []);
+  }, [network]);
 
   // Trigger fetch when selected address changes
   useEffect(() => {
@@ -268,27 +278,30 @@ export default function DefinedSpotMain({
 
   // Combine static and dynamic data for children props
   // We use useMemo to create a stable object reference for children props
-  const combinedTokenInfo = useMemo(() => {
-    if (!staticInfo || !dynamicData) return null;
-    return {
-      ...staticInfo,
-      priceUsd: dynamicData.priceUSD, // Inject current price into the object expected by children
+  useEffect(() => {
+    marketSnapshotRef.current = {
+      priceUsd: dynamicData?.priceUSD || staticInfo?.priceUsd || "0",
+      liquidity: dynamicData?.liquidity?.toString?.() || "0",
+      marketCap: dynamicData?.marketCap?.toString?.() || "0",
+      volume24: dynamicData?.volume24?.toString?.() || "0",
+      change24: dynamicData?.change24?.toString?.() || "0",
     };
-  }, [staticInfo, dynamicData?.priceUSD]); // Only updates when price or identity changes
+  }, [dynamicData, staticInfo?.priceUsd]);
 
   const renderTradeBox = useMemo(() => {
-    if (!combinedTokenInfo) return null;
+    if (!staticInfo) return null;
     return (
       <TradeBox
         chainId={network}
-        tokenInfo={combinedTokenInfo}
+        tokenInfo={staticInfo}
         isConnected={isConnected}
         user={user}
         userPrevOrders={userOrders}
         userWallets={userWallets}
+        marketSnapshotRef={marketSnapshotRef}
       />
     );
-  }, [combinedTokenInfo]);
+  }, [network, staticInfo, isConnected, user, userOrders, userWallets]);
 
   // Loading View
   if (loading && !staticInfo) {
@@ -329,7 +342,7 @@ export default function DefinedSpotMain({
   }
 
   // Empty State
-  if (!staticInfo || !combinedTokenInfo) {
+  if (!staticInfo) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <button
@@ -359,9 +372,7 @@ export default function DefinedSpotMain({
           <div
             style={{
               width:
-                typeof window !== "undefined" && window.innerWidth >= 1024
-                  ? `${leftWidth}%`
-                  : "100%",
+                isDesktop ? `${leftWidth}%` : "100%",
             }}
             className={`h-full flex flex-col transition-all duration-300 ${isTradeBoxOpen ? "hidden lg:flex" : "flex"
               }`}
@@ -369,7 +380,7 @@ export default function DefinedSpotMain({
             {/* 1. Chart Section */}
 
             <ChartBox
-              tokenInfo={combinedTokenInfo}
+              tokenInfo={staticInfo}
               tokenState={dynamicData}
               handleTokenSelect={handleTokenSelect}
             />
@@ -398,9 +409,7 @@ export default function DefinedSpotMain({
           <div
             style={{
               width:
-                typeof window !== "undefined" && window.innerWidth >= 1024
-                  ? `${100 - leftWidth}%`
-                  : "100%",
+                isDesktop ? `${100 - leftWidth}%` : "100%",
             }}
             className="hidden lg:block h-full flex-none min-w-[320px]"
           >

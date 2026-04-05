@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { TbSettingsExclamation } from "react-icons/tb";
 import {
   FiClock,
@@ -10,25 +10,25 @@ import {
   FiDollarSign,
   FiCreditCard,
 } from "react-icons/fi";
-
+import { IoIosArrowDropdown, IoIosArrowDropright } from "react-icons/io";
 import { motion } from "framer-motion";
+import { formatUnits } from "ethers";
 import toast from "react-hot-toast";
+
 import OrderAction from "@/components/order/dashboard/OrderAction";
 import LogicSummary from "@/components/order/common/LogicDisplay";
-import { ORDER_TYPE } from "@/type/order";
+import type { ORDER_TYPE } from "@/type/order";
+import type { MarketSnapshotRef } from "@/type/market";
 import {
   formatCustomizeTime,
   formateAmountWithFixedDecimals,
   safeFormatNumber,
+  safeParseUnits,
 } from "@/utility/handy";
 import { displayNumber } from "@/utility/displayPrice";
-import {
-  BASIS_POINT_DIVISOR,
-  PRECISION_DECIMALS,
-} from "@/constants/common/utils";
-import { formatUnits } from "ethers";
+import { PRECISION, PRECISION_DECIMALS } from "@/constants/common/utils";
+import { calculatePnl } from "@/utility/orderUtility";
 
-// Constant status icons
 const STATUS_ICONS = {
   PENDING: <FiClock className="w-4 h-4 text-yellow-500" />,
   PROCESSING: <TbSettingsExclamation className="w-4 h-4 text-yellow-500" />,
@@ -41,19 +41,44 @@ const STATUS_ICONS = {
 
 interface OrderCardProps {
   order: ORDER_TYPE;
-  isGmxPosition?: boolean;
-  orderGmxPositionData: Record<string, any>;
-  indexTokenInfo?: any;
+  marketSnapshotRef?: MarketSnapshotRef;
 }
 
-const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProps) => {
+const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-
-  // Memoize combined order with GMX data to prevent unnecessary re-renders of OrderAction
-  const orderWithPosition = useMemo(
-    () => ({ ...order, ...(order._id ? orderGmxPositionData[order._id] : {}) }),
-    [order, orderGmxPositionData],
+  const [livePriceUsd, setLivePriceUsd] = useState(
+    () => marketSnapshotRef?.current?.priceUsd || "0",
   );
+  const [liveMarkPrice, setLiveMarkPrice] = useState(
+    () => marketSnapshotRef?.current?.markPrice || 0,
+  );
+
+  const syncLiveMarketState = useCallback(() => {
+    const nextPriceUsd = marketSnapshotRef?.current?.priceUsd || "0";
+    const nextMarkPrice = marketSnapshotRef?.current?.markPrice || 0;
+
+    setLivePriceUsd((previous) =>
+      previous === nextPriceUsd ? previous : nextPriceUsd,
+    );
+    setLiveMarkPrice((previous) =>
+      previous === nextMarkPrice ? previous : nextMarkPrice,
+    );
+  }, [marketSnapshotRef]);
+
+  useEffect(() => {
+    syncLiveMarketState();
+  }, [syncLiveMarketState, order._id]);
+
+  useEffect(() => {
+    if (!marketSnapshotRef) {
+      return undefined;
+    }
+
+    syncLiveMarketState();
+    const intervalId = window.setInterval(syncLiveMarketState, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [marketSnapshotRef, syncLiveMarketState]);
 
   const copyWalletAddress = useCallback(() => {
     if (!order?.wallet?.address) return;
@@ -67,31 +92,6 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
     toast.success("Order ID copied");
   }, [order?._id]);
 
-  const renderOrderSize = useCallback(() => {
-    if (!order?.orderType) return "—";
-    const isCollateral = !(
-      order.orderType === "BUY" && order.category === "spot"
-    );
-    const orderData = order.category === "spot" ? order.spot : order.perp;
-    const orderAsset = orderData?.orderAsset;
-    const amount = orderData?.amount;
-    if (!orderAsset || !amount) return "—";
-
-    const token = isCollateral
-      ? orderAsset.collateralToken
-      : (orderAsset as any).orderToken;
-    const size = isCollateral
-      ? amount.orderSize
-      : (amount as any).tokenAmount;
-    if (!size || !token) return "—";
-    return (
-      <>
-        {displayNumber(Number(formatUnits(BigInt(size), token.decimals)))}
-        <span className="text-xs text-gray-500 ml-1">{token.symbol}</span>
-      </>
-    );
-  }, [order]);
-
   const formatUSD = useCallback((value: string | bigint) => {
     if (!value) return "$0.00";
     const num = Number(
@@ -100,31 +100,115 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
     return <div className="flex gap-1">${displayNumber(num)}</div>;
   }, []);
 
-  const totalCost = useMemo(() => {
-    if (order.category === "spot" && order.spot?.amount?.orderSizeUsd) {
-      return order.spot.amount.orderSizeUsd;
-    }
-    if (order.category === "perpetual" && order.perp?.amount?.marginSizeUsd) {
-      return order.perp.amount.marginSizeUsd;
-    }
-    return "0";
-  }, [
-    order.category,
-    order.spot?.amount?.orderSizeUsd,
-    order.perp?.amount?.marginSizeUsd,
-  ]);
+  if (!order) return null;
 
-  const entryPrice = order.additional?.entryPrice;
+  const isSpot = order.category === "spot";
+  const orderData = isSpot ? order.spot : order.perp;
+  const perpSymbolInfo =
+    (order.perp?.orderAsset as any)?.perpSymbolInfo ||
+    (order.perp?.orderAsset as any)?.persedSymbolInfo;
+  const amountToken = isSpot
+    ? (orderData?.orderAsset as any)?.orderToken
+    : perpSymbolInfo;
+  const collateralToken = orderData?.orderAsset?.collateralToken;
+  const entryPrice =
+    order.perp?.entryPrice ||
+    order.additional?.entryPrice ||
+    order.entry?.priceLogic?.threshold?.toString() ||
+    "0";
   const exitPrice = order.additional?.exitPrice;
   const message = order.message;
 
-  if (!order) return null;
+  const totalCost = useMemo(() => {
+    return BigInt(order.feeInUsd || 0) + BigInt(order.payInUsd || 0);
+  }, [order.feeInUsd, order.payInUsd]);
 
-  const orderData = order.category === "spot" ? order.spot : order.perp;
-  const amountObj = orderData?.amount || { orderSize: "0", tokenAmount: "0" };
-  const orderAssetObj = orderData?.orderAsset || {
-    collateralToken: { decimals: 18, symbol: "UNK" }
-  };
+  const formattedAmount = useMemo(() => {
+    if (order.category === "spot") {
+      return displayNumber(
+        Number(
+          formatUnits(
+            BigInt((orderData?.amount as any)?.tokenAmount || 0),
+            amountToken?.decimals || 18,
+          ),
+        ),
+      );
+    }
+
+    return order.perp?.quantity || "0";
+  }, [
+    amountToken?.decimals,
+    order.category,
+    order.perp?.quantity,
+    orderData?.amount,
+  ]);
+
+  const formattedSize = useMemo(() => {
+    return displayNumber(
+      Number(
+        formatUnits(
+          BigInt((orderData?.amount as any)?.orderSize || 0),
+          collateralToken?.decimals || 18,
+        ),
+      ),
+    );
+  }, [collateralToken?.decimals, orderData?.amount]);
+
+  const pnl = useMemo(() => {
+    if (isSpot) {
+      if (order.orderType !== "SELL") return BigInt(0);
+
+      const tokenAmount = BigInt(order.spot?.amount?.tokenAmount || 0);
+      if (tokenAmount === BigInt(0)) return BigInt(0);
+
+      const currentPriceUsd = safeParseUnits(livePriceUsd || "0", PRECISION_DECIMALS);
+      if (currentPriceUsd === BigInt(0)) return BigInt(0);
+
+      const grossValueUsd = (currentPriceUsd * tokenAmount) / PRECISION;
+      return grossValueUsd - totalCost;
+    }
+
+    if (order.orderStatus !== "OPENED") return BigInt(0);
+
+    const markPriceUsd = safeParseUnits(
+      liveMarkPrice > 0 ? String(liveMarkPrice) : livePriceUsd || "0",
+      PRECISION_DECIMALS,
+    );
+    const normalizedEntryPrice = BigInt(entryPrice || "0");
+    if (markPriceUsd === BigInt(0) || normalizedEntryPrice === BigInt(0)) {
+      return BigInt(0);
+    }
+
+    const rawPnl = calculatePnl({
+      entryPrice: normalizedEntryPrice,
+      markPrice: markPriceUsd,
+      quantity: order.perp?.quantity || "0",
+      isLong: order.perp?.isLong !== false,
+    });
+
+    const estimatedRoundTripFees = BigInt(order.feeInUsd || 0) * BigInt(2);
+    return rawPnl - estimatedRoundTripFees;
+  }, [
+    entryPrice,
+    isSpot,
+    liveMarkPrice,
+    livePriceUsd,
+    order.feeInUsd,
+    order.orderStatus,
+    order.orderType,
+    order.perp?.isLong,
+    order.perp?.quantity,
+    order.spot?.amount?.tokenAmount,
+    totalCost,
+  ]);
+
+  const shouldShowPnl = useMemo(() => {
+    if (isSpot) {
+      return order.orderType === "SELL" && pnl !== BigInt(0);
+    }
+
+    return order.orderStatus === "OPENED" && pnl !== BigInt(0);
+  }, [isSpot, order.orderStatus, order.orderType, pnl]);
 
   return (
     <motion.div
@@ -141,16 +225,23 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
             <div className="flex items-center gap-1">
               {STATUS_ICONS[order.orderStatus] || STATUS_ICONS.PENDING}
               <div
-                className={`flex gap-1 items-center font-semibold ${order.category.split(":")[0] === "perpetual"
-                  ? "text-blue-500"
-                  : order.category.split(":")[0] === "spot"
-                    ? "text-yellow-500"
-                    : "text-gray-800 dark:text-gray-200"
-                  }`}
+                className={`flex gap-1 items-center font-semibold ${
+                  order.category.split(":")[0] === "perpetual"
+                    ? "text-blue-500"
+                    : order.category.split(":")[0] === "spot"
+                      ? "text-yellow-500"
+                      : "text-gray-800 dark:text-gray-200"
+                }`}
               >
                 {order.category === "perpetual" && (
-                  <span className={`text-xs font-bold ${order.perp?.isLong == false ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                    {order.perp?.isLong ? 'LONG' : 'SHORT'}
+                  <span
+                    className={`text-xs font-bold ${
+                      order.perp?.isLong === false
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}
+                  >
+                    {order.perp?.isLong ? "LONG" : "SHORT"}
                   </span>
                 )}
                 <span>
@@ -169,75 +260,49 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
                   <FiCopy className="text-xs" />
                 </button>
               </div>
+              {isExpanded ? <IoIosArrowDropright /> : <IoIosArrowDropdown />}
             </div>
           </div>
-          <OrderAction order={orderWithPosition} />
+          <OrderAction order={order} />
         </div>
 
         {isExpanded && (
           <>
-            {/* Main expanded grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 items-center gap-4 mb-3">
-              {/* Entry / Cost */}
               <div>
                 <span className="text-xs text-gray-500">Entry Criteria</span>
-                {order.entry.isTechnicalEntry == true ? (
+                {order.entry.isTechnicalEntry === true ? (
                   <div className="overflow-x-auto pb-1 scrollbar-thin">
                     <LogicSummary node={order.entry.technicalLogic!} />
                   </div>
                 ) : order.entry.priceLogic?.threshold ? (
                   <div className="flex gap-1 items-center">
-                    $
-                    {displayNumber(
-                      Number(
-                        safeFormatNumber(
-                          order.entry.priceLogic.threshold.toString(),
-                          PRECISION_DECIMALS,
-                          6,
+                    <LogicSummary
+                      node={{
+                        ...order.entry.priceLogic,
+                        threshold: Number(
+                          safeFormatNumber(
+                            order.entry.priceLogic.threshold.toString(),
+                            PRECISION_DECIMALS,
+                            6,
+                          ),
                         ),
-                      ),
-                    )}
+                      }}
+                    />
                   </div>
                 ) : (
                   "_"
                 )}
               </div>
-              {/* <div>
-                <span className="text-xs text-gray-500">Type</span>
-                <div className="flex flex-col">
-                  <span
-                    className={`text-xs font-bold ${
-                      order.orderType === "BUY"
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {order.orderType}
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase">
-                    {order.strategy}
-                  </span>
-                </div>
-              </div> */}
 
-              {/* Size */}
               <div>
                 <span className="text-xs text-gray-500">Order Size</span>
                 <div className="text-sm font-medium flex items-center gap-1">
-                  {displayNumber(
-                    Number(
-                      safeFormatNumber(
-                        amountObj.orderSize?.toString() || "0",
-                        orderAssetObj.collateralToken?.decimals || 18,
-                        4,
-                      ),
-                    ),
-                  )}
-                  <p>{orderAssetObj.collateralToken?.symbol || "UNK"}</p>
+                  {formattedSize}
+                  <p>{collateralToken?.symbol || "UNK"}</p>
                 </div>
               </div>
 
-              {/* TP/SL */}
               <div>
                 <span className="text-xs text-gray-500">Exit Criteria</span>
                 <div className="text-sm font-medium flex items-center gap-1">
@@ -250,22 +315,29 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
                   ) : (
                     <div className="flex flex-col gap-1">
                       {order.exit.takeProfit.takeProfitPrice !== "0" ? (
-                        <div className="flex gap-1">
-                          <span className="text-xs text-green-500 flex items-center gap-1">
+                        <div className="flex gap-2 items-center">
+                          <span className="text-xs font-bold text-yellow-500 flex items-center gap-1">
                             TP
                           </span>
-                          <div className="text-sm font-medium">
-                            {formatUSD(order.exit.takeProfit.takeProfitPrice)}
+                          <div className="flex gap-1 text-sm font-medium">
+                            at:{" "}
+                            <span className="text-green-500">
+                              {formatUSD(order.exit.takeProfit.takeProfitPrice)}
+                            </span>{" "}
+                            with{" "}
+                            <span className="text-green-500">
+                              {formatUSD(order.exit.takeProfit.profit)}
+                            </span>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex ga-1">
-                          <span className="text-xs text-gray-500">TP</span>
+                        <div className="flex gap-2 items-center">
+                          <span className="text-xs text-yellow-500 font-bold">
+                            TP%
+                          </span>
                           <div className="text-sm font-medium text-green-600">
-                            {formateAmountWithFixedDecimals(
-                              order.exit.takeProfit.takeProfitPercentage,
-                              2,
-                              2,
+                            {Math.floor(
+                              order.exit.takeProfit.takeProfitPercentage / 100,
                             )}
                             %
                           </div>
@@ -299,7 +371,6 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
                 </div>
               </div>
 
-              {/* Wallet */}
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span title={order.wallet?.address}>
                   {order.wallet?.address?.slice(0, 6)}...
@@ -314,29 +385,18 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
                 </button>
               </div>
 
-              {/* Timestamp */}
               <div className="text-xs text-gray-500 font-mono">
                 {formatCustomizeTime(order.createdAt)}
               </div>
             </div>
 
-            {/* Extra details row (cost, amount, prices, message) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
               <div>
                 <span className="text-xs text-gray-500 flex items-center gap-1">
                   <FiDollarSign className="w-3 h-3" /> Amount
                 </span>
                 <div className="text-sm font-medium flex items-center gap-1">
-                  {displayNumber(
-                    Number(
-                      safeFormatNumber(
-                        (amountObj as any).tokenAmount?.toString() || "0",
-                        (orderAssetObj as any).orderToken?.decimals || orderAssetObj.collateralToken?.decimals || 18,
-                        4,
-                      ),
-                    ),
-                  )}
-                  <p>{(orderAssetObj as any).orderToken?.symbol || orderAssetObj.collateralToken?.symbol || "UNK"}</p>
+                  {formattedAmount} {amountToken?.symbol || "UNK"}
                 </div>
               </div>
 
@@ -349,11 +409,30 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
                 </div>
               </div>
 
-              {entryPrice && (
+              {entryPrice && entryPrice !== "0" && (
                 <div>
                   <span className="text-xs text-gray-500">Entry at</span>
                   <div className="text-sm font-medium flex items-center gap-1">
                     {formatUSD(entryPrice)}
+                  </div>
+                </div>
+              )}
+
+              {shouldShowPnl && (
+                <div>
+                  <span className="text-xs text-gray-500">
+                    {isSpot ? "Est. P&L" : "Net Unrealized P&L"}
+                  </span>
+                  <div
+                    className={`text-sm font-medium flex items-center gap-1 ${
+                      pnl > BigInt(0)
+                        ? "text-green-500"
+                        : pnl < BigInt(0)
+                          ? "text-red-500"
+                          : ""
+                    }`}
+                  >
+                    {formatUSD(pnl)}
                   </div>
                 </div>
               )}
@@ -369,31 +448,32 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
 
               {order.category === "perpetual" && order.perp?.leverage && (
                 <div>
-                  <span className="text-xs text-gray-500 flex items-center gap-1">Leverage & DEX</span>
+                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                    Leverage & DEX
+                  </span>
                   <div className="text-sm font-medium flex items-center gap-1.5 uppercase">
-                    <span className={`text-[11px] font-bold ${order.perp.leverage > 100000 ? "text-orange-500" : "text-blue-500"}`}>{order.perp.leverage}x</span>
-                    <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 rounded text-gray-500">{order.perp.protocol || 'DEX'}</span>
-                  </div>
-                </div>
-              )}
-
-              {(isGmxPosition || order.additional?.realizedPnl) && (
-                <div>
-                  <span className="text-xs text-gray-500 flex items-center gap-1">PnL</span>
-                  <div className="text-sm font-medium flex items-center gap-1">
-                    {order.orderStatus === "CLOSED" || order.orderStatus === "COMPLETED" ? (
-                      <span className={`font-mono ${Number(order.additional?.realizedPnl || 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
-                        ${displayNumber(Number(order.additional?.realizedPnl || 0))}
-                        {order.additional?.realizedPnl && <span className="text-[9px] text-gray-400 ml-1">(Net)</span>}
-                      </span>
-                    ) : orderWithPosition.gmxPnl !== undefined ? (
-                      <span className={`font-mono ${Number(orderWithPosition.gmxPnl) >= 0 ? "text-green-500" : "text-red-500"}`}>
-                        ${displayNumber(Number(orderWithPosition.gmxPnl))}
-                        <span className="text-[9px] text-gray-400 ml-1">(Live)</span>
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                    <span
+                      className={`text-[15px] font-bold ${
+                        order.perp.leverage > 100000
+                          ? "text-orange-500"
+                          : "text-blue-500"
+                      }`}
+                    >
+                      {order.perp.leverage}x
+                    </span>
+                    <span className="text-[10px] bg-gray-100 dark:bg-gray-800 px-1.5 rounded text-gray-500">
+                      <img
+                        src={
+                          order.perp.protocol === "asterdex"
+                            ? "https://static.asterindex.com/cloud-futures/static/images/aster/logo.svg"
+                            : order.perp.protocol === "hyperliquid"
+                              ? "./hyperliquidWhite.svg"
+                              : "./gmx.svg"
+                        }
+                        alt="DEX"
+                        className="w-15 h-10"
+                      />
+                    </span>
                   </div>
                 </div>
               )}
@@ -412,4 +492,14 @@ const OrderCard = ({ order, orderGmxPositionData, isGmxPosition }: OrderCardProp
   );
 };
 
-export default OrderCard;
+const areEqualOrderCardProps = (
+  previous: OrderCardProps,
+  next: OrderCardProps,
+) => {
+  return (
+    previous.order === next.order &&
+    previous.marketSnapshotRef === next.marketSnapshotRef
+  );
+};
+
+export default memo(OrderCard, areEqualOrderCardProps);

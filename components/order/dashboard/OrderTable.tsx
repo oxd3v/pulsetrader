@@ -58,47 +58,46 @@ const formatUSD = (value: string | bigint) => {
 const OrderTableRow = memo(
   ({
     order,
-    isGmxPosition,
-    orderGmxPositionData,
   }: {
     order: ORDER_TYPE;
-    isGmxPosition: boolean;
-    orderGmxPositionData: any;
   }) => {
     const hasTechEntry = order.entry.isTechnicalEntry;
     const hasTechExit = order.exit.isTechnicalExit;
 
     const totalCost = useMemo(() => {
-      if (order.category === "spot" && order.spot?.amount?.orderSizeUsd) {
-        return order.spot.amount.orderSizeUsd;
-      }
-      if (order.category === "perpetual" && order.perp?.amount?.marginSizeUsd) {
-        return order.perp.amount.marginSizeUsd;
-      }
-      return "0";
+      return BigInt(order.feeInUsd || 0) + BigInt(order.payInUsd || 0);
     }, [
-      order.category,
-      order.spot?.amount?.orderSizeUsd,
-      order.perp?.amount?.marginSizeUsd,
+      order.feeInUsd,
+      order.payInUsd,
     ]);
 
     const isBuy = order.orderType === "BUY";
     const orderData = order.category === "spot" ? order.spot : order.perp;
     const amountToken = isBuy
       ? orderData?.orderAsset?.collateralToken
-      : (orderData?.orderAsset as any)?.orderToken;
+      : (orderData?.orderAsset as any)?.perpSymbolInfo;
     const amountValue = isBuy ? (orderData?.amount as any)?.orderSize : (orderData?.amount as any)?.tokenAmount;
     const formattedAmount = useMemo(() => {
-      if (!amountValue || !amountToken) return "0";
-      return displayNumber(
-        Number(formatUnits(BigInt(amountValue), amountToken.decimals)),
-      );
-    }, [amountValue, amountToken?.decimals]);
+      if (order.category == 'spot') {
+        return displayNumber(
+          Number(formatUnits(BigInt(amountValue), amountToken.decimals)),
+        );
+      } else {
+        if (isBuy) {
+          return displayNumber(
+            Number(formatUnits(BigInt(amountValue), amountToken.decimals)),
+          );
+        } else {
+          return order.perp?.quantity;
+        }
+      }
+    }, [amountValue, amountToken?.decimals, order.orderType, order.category]);
 
-    const entryPrice = order.additional?.entryPrice;
+    const entryPrice = !isBuy && order.category == 'perpetual' ? BigInt(order.perp?.entryPrice || "0").toString() : BigInt(order.additional?.entryPrice || "0").toString();
     const exitPrice = order.additional?.exitPrice;
     const message = order.message;
 
+    
     return (
       <tr className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
         {/* Asset / ID */}
@@ -158,13 +157,24 @@ const OrderTableRow = memo(
                 <LogicSummary node={order.entry.technicalLogic!} />
               </div>
             </div>
-          ) : (
-            renderPriceField(
-              "PRICE ENTRY",
-              order.entry.priceLogic?.threshold || 0,
-              { color: "text-green-600" },
-            )
-          )}
+          ) : order.entry.priceLogic?.threshold ? (
+                  <div className="flex gap-1 items-center">
+                    <LogicSummary
+                      node={{
+                        ...order.entry.priceLogic,
+                        threshold: Number(
+                          safeFormatNumber(
+                            order.entry.priceLogic.threshold.toString(),
+                            PRECISION_DECIMALS,
+                            6,
+                          ),
+                        ),
+                      }}
+                    />
+                  </div>
+                ) : (
+                  "_"
+                )}
         </td>
 
         {/* EXIT | TP / SL */}
@@ -251,24 +261,6 @@ const OrderTableRow = memo(
           )}
         </td>
 
-        {/* GMX PnL */}
-        {isGmxPosition && (
-          <td className="px-4 py-3 whitespace-nowrap text-sm">
-            {order._id && orderGmxPositionData[order._id]?.gmxPnl ? (
-              <span
-                className={`font-medium ${Number(orderGmxPositionData[order._id].gmxPnl) >= 0
-                  ? "text-green-500"
-                  : "text-red-500"
-                  }`}
-              >
-                ${displayNumber(Number(orderGmxPositionData[order._id].gmxPnl))}
-              </span>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </td>
-        )}
-
         {/* Wallet */}
         <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
           {order.wallet?.address ? (
@@ -308,9 +300,7 @@ const OrderTableRow = memo(
   (prevProps, nextProps) => {
     // Custom comparison: re-render only if order data or GMX data changed
     return (
-      prevProps.order === nextProps.order &&
-      prevProps.isGmxPosition === nextProps.isGmxPosition &&
-      prevProps.orderGmxPositionData === nextProps.orderGmxPositionData
+      prevProps.order === nextProps.order 
     );
   },
 );
@@ -319,15 +309,12 @@ OrderTableRow.displayName = "OrderTableRow";
 
 interface OrderTableProps {
   orders: ORDER_TYPE[];
-  isGmxPosition: boolean;
-  orderGmxPositionData: any;
 }
 
 export default function OrderTable({
   orders,
-  isGmxPosition,
-  orderGmxPositionData,
 }: OrderTableProps) {
+  
   return (
     <div className="w-full h-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden flex flex-col">
       <div className="overflow-x-auto flex-1 custom-scrollbar">
@@ -355,11 +342,7 @@ export default function OrderTable({
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Trigger
               </th>
-              {isGmxPosition && (
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  PnL (GMX)
-                </th>
-              )}
+              
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Wallet
               </th>
@@ -376,8 +359,7 @@ export default function OrderTable({
               <OrderTableRow
                 key={order._id || `order-${index}`}
                 order={order}
-                isGmxPosition={isGmxPosition}
-                orderGmxPositionData={orderGmxPositionData}
+               
               />
             ))}
           </tbody>

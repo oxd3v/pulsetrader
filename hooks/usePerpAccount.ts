@@ -56,7 +56,7 @@ export const usePerpAccount = () => {
             return approveResult;
 
         } catch (err) {
-            console.log(err)
+            //console.log(err)
             let key = handleServerErrorToast({ err });
             approveResult.error = key;
             return approveResult;

@@ -7,6 +7,7 @@ import {
 } from "@/constants/common/order";
 import {
   BASIS_POINT_DIVISOR_BIGINT,
+  PRECISION,
   PRECISION_DECIMALS,
 } from "@/constants/common/utils";
 import { safeParseUnits } from "@/utility/handy";
@@ -93,6 +94,18 @@ export function calculateEstLiquidationPrice(
   const multiplier = 1 / assetTickSize;
   return Math.round(liqPrice * multiplier) / multiplier;
 }
+
+export const calculatePnl = ({entryPrice, markPrice, quantity, isLong}:{entryPrice:bigint, markPrice:bigint, quantity:string, isLong:boolean}) => {
+  const quantityBI = safeParseUnits(quantity|| "0", PRECISION_DECIMALS);
+  if (quantityBI === BigInt(0)) return BigInt(0);
+
+  const priceDiff = isLong
+    ? (BigInt(markPrice) - BigInt(entryPrice))
+    : (BigInt(entryPrice) - BigInt(markPrice));
+
+  // PnL = (PriceDiff * Quantity) / SCALE
+  return (priceDiff * quantityBI) / PRECISION;
+};
 
 export type OpenOrderPnLResult = {
   rawPnl: number;

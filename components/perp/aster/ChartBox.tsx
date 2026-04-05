@@ -143,6 +143,8 @@ const ChartBox = memo(function ChartBox({
     [tokenSymbol],
   );
 
+  void error;
+
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1026) {

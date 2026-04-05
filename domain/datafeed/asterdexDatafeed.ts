@@ -56,7 +56,7 @@ function getOrCreateWSConnection(
   const asterInterval = RESOLUTION_MAP[resolution] || "1m";
   const wsSymbol = symbol.toLowerCase(); // AsterDEX requires lowercase
   const streamName = `${wsSymbol}@kline_${asterInterval}`;
-  
+
   // Reuse existing connection
   const existing = wsConnections.get(streamName);
   if (existing?.ws.readyState === WebSocket.OPEN) {
@@ -73,8 +73,8 @@ function getOrCreateWSConnection(
   wsConnections.set(streamName, connection);
 
   ws.onopen = () => {
-    console.log(`[WS] Connected: ${streamName}`);
-    
+    //console.log(`[WS] Connected: ${streamName}`);
+
     // Setup ping/pong keepalive (AsterDEX sends ping every 3 min)
     connection.pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
@@ -86,23 +86,23 @@ function getOrCreateWSConnection(
   ws.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
-      
+
       // Handle kline event
       if (message.e === "kline" && message.k) {
         const bar = parseAsterKline(message.k);
         const isClosed = message.k.x; // true = candle closed
-        
+
         // Notify all subscribers
         connection.subscribers.forEach((callback) => {
           callback(bar);
         });
-        
+
         // Update last bar cache for continuity
         if (isClosed) {
           lastBarsCache.set(`${symbol}_${resolution}`, bar);
         }
       }
-      
+
       // Handle pong response
       if (message.method === "PONG") {
         // Connection healthy
@@ -117,13 +117,13 @@ function getOrCreateWSConnection(
   };
 
   ws.onclose = () => {
-   // console.log(`[WS] Closed: ${streamName}`);
-    
+    // console.log(`[WS] Closed: ${streamName}`);
+
     if (connection.pingInterval) {
       clearInterval(connection.pingInterval);
     }
     wsConnections.delete(streamName);
-    
+
     // Auto-reconnect after 3 seconds for active subscribers
     if (connection.subscribers.size > 0) {
       setTimeout(() => {
@@ -149,13 +149,13 @@ function unsubscribeWSConnection(
   const asterInterval = RESOLUTION_MAP[resolution] || "1m";
   const wsSymbol = symbol.toLowerCase();
   const streamName = `${wsSymbol}@kline_${asterInterval}`;
-  
+
   const connection = wsConnections.get(streamName);
   if (!connection) return;
-  
+
   // Remove subscriber
   connection.subscribers.delete(subscriberUID);
-  
+
   // Close connection if no more subscribers
   if (connection.subscribers.size === 0) {
     if (connection.pingInterval) {
@@ -165,7 +165,7 @@ function unsubscribeWSConnection(
       connection.ws.close();
     }
     wsConnections.delete(streamName);
-    console.log(`[WS] Cleaned up: ${streamName}`);
+    //console.log(`[WS] Cleaned up: ${streamName}`);
   }
 }
 
@@ -268,7 +268,7 @@ class AsterDexDataFeed {
     onErrorCallback: (error: Error) => void,
   ): Promise<void> {
     const { from, to, firstDataRequest } = periodParams;
-    
+
     try {
       const res: any = await getAsterKLines({
         symbol: symbolInfo.name,
@@ -315,11 +315,11 @@ class AsterDexDataFeed {
     onResetCacheCallback?: any,
   ): void {
     const cacheKey = `${symbolInfo.name}_${resolution}`;
-    
+
     // Create wrapper callback that handles candle update logic
     const wrappedCallback = (bar: Bar) => {
       const lastBar = lastBarsCache.get(cacheKey);
-      
+
       if (!lastBar) {
         // First bar received
         lastBarsCache.set(cacheKey, bar);
@@ -338,7 +338,7 @@ class AsterDexDataFeed {
         };
         lastBarsCache.set(cacheKey, updatedBar);
         onRealtimeCallback(updatedBar);
-      } 
+      }
       else if (bar.time > lastBar.time) {
         // New candle started
         lastBarsCache.set(cacheKey, bar);
@@ -370,7 +370,7 @@ class AsterDexDataFeed {
         const resolution = Object.keys(RESOLUTION_MAP).find(
           key => RESOLUTION_MAP[key] === interval
         );
-        
+
         if (resolution) {
           unsubscribeWSConnection(symbol, resolution, subscriberUID);
         }

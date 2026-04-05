@@ -1,27 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { FiPlus, FiX } from "react-icons/fi";
 import { useShallow } from "zustand/shallow";
-import PerpTradingCaution from "@/components/common/Confirmation/PerpCaution";
 
-import ChartBox from "./ChartBox";
+import PerpTradingCaution from "@/components/common/Confirmation/PerpCaution";
 import OrderBox from "@/components/order/dashboard/OrderList";
 import TradeBox from "@/components/tradeBox/perpTradeBox";
-import { useStore } from "@/store/useStore";
 import {
   useHyperliquidMarketStats,
   type HyperliquidMarketStats,
 } from "@/hooks/useHyperLiquidHooks/useHyperliquidMarketStats";
+import { useStore } from "@/store/useStore";
+import type {
+  LiveMarketSnapshot,
+  MarketSnapshotRef,
+  StableMarketTokenInfo,
+} from "@/type/market";
 import type { ORDER_TYPE } from "@/type/order";
+import ChartBox from "./ChartBox";
 
 interface DEFINED_PERP_MAIN_PROPS {
   tokenSymbol: string;
 }
 
-type HyperliquidPerpTokenInfo = {
+type HyperliquidPerpTokenInfo = StableMarketTokenInfo & {
   address: string;
   pairAddress: string;
   quoteToken: { symbol: string; address: string; decimals: number };
@@ -29,8 +42,6 @@ type HyperliquidPerpTokenInfo = {
   chainId: number;
   name: string;
   symbol: string;
-  decimals: number;
-  imageUrl: string;
   priceUsd: string;
 };
 
@@ -39,7 +50,11 @@ const DEFAULT_CHAIN_ID = 43114;
 const normalizeMarketSymbol = (symbol: string): string => {
   const normalized = symbol.trim().toUpperCase();
   if (!normalized) return "";
-  if (normalized.endsWith("USDT") || normalized.endsWith("USDC") || normalized.endsWith("BUSD")) {
+  if (
+    normalized.endsWith("USDT") ||
+    normalized.endsWith("USDC") ||
+    normalized.endsWith("BUSD")
+  ) {
     return normalized;
   }
   return `${normalized}USDT`;
@@ -53,62 +68,12 @@ const toPriceString = (value: number) => {
   return value > 0 ? value.toString() : "0";
 };
 
-const buildHyperliquidPerpTokenInfo = ({
-  symbol,
-  chainId,
-  stats,
-  previous,
-}: {
-  symbol: string;
-  chainId: number;
-  stats: HyperliquidMarketStats;
-  previous?: HyperliquidPerpTokenInfo | null;
-}): HyperliquidPerpTokenInfo => {
-  const baseSymbol = getBaseSymbol(symbol);
-  const isSameSymbol =
-    previous?.address === symbol && previous?.chainId === chainId;
-
-  const resolvedPriceUsd = isSameSymbol
-    ? previous?.priceUsd !== "0"
-      ? previous.priceUsd
-      : toPriceString(stats.lastPrice)
-    : toPriceString(stats.lastPrice);
-
-  return {
-    address: symbol,
-    pairAddress: symbol,
-    quoteToken: { symbol: "USDT", address: "USDT", decimals: 6 },
-    createdAt: stats.eventTime > 0 ? stats.eventTime : previous?.createdAt ?? 0,
-    chainId,
-    name: baseSymbol,
-    symbol: baseSymbol,
-    decimals: 8,
-    imageUrl: "/tokenLogo.png",
-    priceUsd: resolvedPriceUsd,
-  };
-};
-
-const isSameHyperliquidPerpTokenInfo = (
-  current: HyperliquidPerpTokenInfo | null | undefined,
-  next: HyperliquidPerpTokenInfo,
-) => {
-  if (!current) return false;
-
-  return (
-    current.address === next.address &&
-    current.chainId === next.chainId &&
-    current.createdAt === next.createdAt &&
-    current.priceUsd === next.priceUsd
-  );
-};
-
-// Memoized Chart Section
 const ChartSection = memo(
   ({
     selectedSymbol,
     stats,
     userConnected,
-    asterConnected,
+    marketConnected,
     userOrders,
     loading,
     error,
@@ -116,11 +81,13 @@ const ChartSection = memo(
     leftWidth,
     isDesktop,
     isTradeBoxOpen,
+    perpTokenInfo,
+    marketSnapshotRef,
   }: {
     selectedSymbol: string;
     stats: HyperliquidMarketStats;
     userConnected: boolean;
-    asterConnected: boolean;
+    marketConnected: boolean;
     userOrders: ORDER_TYPE[];
     loading: boolean;
     error: string | null;
@@ -128,23 +95,36 @@ const ChartSection = memo(
     leftWidth: number;
     isDesktop: boolean;
     isTradeBoxOpen: boolean;
+    perpTokenInfo: HyperliquidPerpTokenInfo;
+    marketSnapshotRef: MarketSnapshotRef;
   }) => (
     <div
       style={isDesktop ? { width: `${leftWidth}%` } : undefined}
-      className={`h-full flex flex-col transition-all duration-300 ${isTradeBoxOpen ? "hidden lg:flex" : "flex"
-        }`}
+      className={`h-full flex flex-col transition-all duration-300 ${
+        isTradeBoxOpen ? "hidden lg:flex" : "flex"
+      }`}
     >
       <ChartBox
         tokenSymbol={selectedSymbol}
         onSymbolChange={onSymbolChange}
+        stats={stats}
+        connected={marketConnected}
+        loading={loading}
+        error={error}
       />
-      <OrderBox orderCategory="perpetual" userOrders={userOrders} isConnected={userConnected} protocol={"hyperliquid"} />
+      <OrderBox
+        orderCategory="perpetual"
+        tokenInfo={perpTokenInfo}
+        userOrders={userOrders}
+        isConnected={userConnected}
+        protocol="hyperliquid"
+        marketSnapshotRef={marketSnapshotRef}
+      />
     </div>
-  )
+  ),
 );
 ChartSection.displayName = "ChartSection";
 
-// Memoized Resize Divider
 const ResizeDivider = memo(({ onMouseDown }: { onMouseDown: () => void }) => (
   <div
     onMouseDown={onMouseDown}
@@ -155,7 +135,6 @@ const ResizeDivider = memo(({ onMouseDown }: { onMouseDown: () => void }) => (
 ));
 ResizeDivider.displayName = "ResizeDivider";
 
-// Memoized Trade Box Section
 const TradeBoxSection = memo(
   ({
     rightWidth,
@@ -164,7 +143,7 @@ const TradeBoxSection = memo(
   }: {
     rightWidth: number;
     isDesktop: boolean;
-    renderTradeBox: React.ReactNode;
+    renderTradeBox: ReactNode;
   }) => (
     <div
       style={isDesktop ? { width: `${rightWidth}%` } : undefined}
@@ -172,22 +151,23 @@ const TradeBoxSection = memo(
     >
       {renderTradeBox}
     </div>
-  )
+  ),
 );
 TradeBoxSection.displayName = "TradeBoxSection";
 
-// Memoized Mobile Trade Modal
 const MobileTradeModal = memo(
   ({
     isOpen,
     onClose,
     perpTokenInfo,
+    currentPriceUsd,
     renderTradeBox,
   }: {
     isOpen: boolean;
     onClose: () => void;
     perpTokenInfo: HyperliquidPerpTokenInfo;
-    renderTradeBox: React.ReactNode;
+    currentPriceUsd: string;
+    renderTradeBox: ReactNode;
   }) => (
     <AnimatePresence>
       {isOpen ? (
@@ -210,7 +190,7 @@ const MobileTradeModal = memo(
             <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <Image
-                  src={perpTokenInfo?.imageUrl || './tokenlogo'}
+                  src={perpTokenInfo.imageUrl || "/tokenLogo.png"}
                   alt="Token"
                   width={32}
                   height={32}
@@ -221,7 +201,7 @@ const MobileTradeModal = memo(
                     Trade {perpTokenInfo.symbol}
                   </h3>
                   <p className="text-xs text-gray-500">
-                    ${Number(perpTokenInfo.priceUsd || 0).toFixed(4)}
+                    ${Number(currentPriceUsd || perpTokenInfo.priceUsd || 0).toFixed(4)}
                   </p>
                 </div>
               </div>
@@ -237,11 +217,10 @@ const MobileTradeModal = memo(
         </>
       ) : null}
     </AnimatePresence>
-  )
+  ),
 );
 MobileTradeModal.displayName = "MobileTradeModal";
 
-// Memoized Trade Button
 const TradeButton = memo(({ onClick }: { onClick: () => void }) => (
   <AnimatePresence>
     <motion.button
@@ -259,7 +238,9 @@ const TradeButton = memo(({ onClick }: { onClick: () => void }) => (
 ));
 TradeButton.displayName = "TradeButton";
 
-export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS) {
+export default function DefinedPerpMain({
+  tokenSymbol,
+}: DEFINED_PERP_MAIN_PROPS) {
   const { user, isConnected, network, userOrders, userWallets } = useStore(
     useShallow((state) => {
       const typedState = state as {
@@ -277,30 +258,33 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
         userWallets: typedState.userWallets,
         isConnected: typedState.isConnected,
       };
-    })
+    }),
   );
 
-  const [selectedSymbol, setSelectedSymbol] = useState(() => normalizeMarketSymbol(tokenSymbol));
+  const [selectedSymbol, setSelectedSymbol] = useState(() =>
+    normalizeMarketSymbol(tokenSymbol),
+  );
   const [isTradeBoxOpen, setIsTradeBoxOpen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(75);
   const [isDesktop, setIsDesktop] = useState(false);
-
-  // Caution modal: read sessionStorage in useEffect to avoid hydration mismatch
-  const [hasAcceptedCaution, setHasAcceptedCaution] = useState(false);
   const [showCaution, setShowCaution] = useState(true);
+  const [isDraggingH, setIsDraggingH] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const marketSnapshotRef = useRef<LiveMarketSnapshot>({ priceUsd: "0" });
+
+  const { stats, connected, loading, error } =
+    useHyperliquidMarketStats(selectedSymbol);
+
+  
 
   useEffect(() => {
-    const accepted = localStorage.getItem("perp_caution_hyperliquid") === "accepted";
-    if (accepted) {
-      setHasAcceptedCaution(true);
-      setShowCaution(false);
-    } else {
-      setShowCaution(true);
-    }
+    const accepted =
+      localStorage.getItem("perp_caution_hyperliquid") === "accepted";
+    setShowCaution(!accepted);
   }, []);
 
   const handleAcceptCaution = useCallback(() => {
-    setHasAcceptedCaution(true);
     setShowCaution(false);
     if (typeof window !== "undefined") {
       localStorage.setItem("perp_caution_hyperliquid", "accepted");
@@ -313,15 +297,35 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
     }
   }, []);
 
-  const [isDraggingH, setIsDraggingH] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const { stats, connected, loading, error } = useHyperliquidMarketStats(selectedSymbol);
-  const tradeBoxTokenInfoRef = useRef<HyperliquidPerpTokenInfo | null>(null);
-
   useEffect(() => {
+    marketSnapshotRef.current = { priceUsd: "0" };
     setSelectedSymbol(normalizeMarketSymbol(tokenSymbol));
   }, [tokenSymbol]);
+
+  useEffect(() => {
+    marketSnapshotRef.current = {
+      priceUsd: toPriceString(stats.lastPrice),
+      lastPrice: stats.lastPrice,
+      markPrice: stats.markPrice,
+      indexPrice: stats.indexPrice,
+      fundingRate: stats.fundingRate,
+      nextFundingTime: stats.nextFundingTime,
+      quoteVolume: stats.quoteVolume,
+      openInterest: stats.openInterest,
+      openInterestUsd: stats.openInterestUsd,
+      eventTime: stats.eventTime,
+    };
+  }, [
+    stats.eventTime,
+    stats.fundingRate,
+    stats.indexPrice,
+    stats.lastPrice,
+    stats.markPrice,
+    stats.nextFundingTime,
+    stats.openInterest,
+    stats.openInterestUsd,
+    stats.quoteVolume,
+  ]);
 
   useEffect(() => {
     const handleViewport = () => {
@@ -334,6 +338,7 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
   }, []);
 
   const handleSymbolChange = useCallback((symbol: string) => {
+    marketSnapshotRef.current = { priceUsd: "0" };
     setSelectedSymbol(normalizeMarketSymbol(symbol));
   }, []);
 
@@ -351,7 +356,7 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
         setLeftWidth(newWidth);
       }
     },
-    [isDraggingH]
+    [isDraggingH],
   );
 
   const onMouseUp = useCallback(() => {
@@ -372,31 +377,33 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
     };
   }, [isDraggingH, onMouseMove, onMouseUp]);
 
-  const chainId = useMemo(() => (typeof network === "number" ? network : DEFAULT_CHAIN_ID), [network]);
+  const chainId = useMemo(
+    () => (typeof network === "number" ? network : DEFAULT_CHAIN_ID),
+    [network],
+  );
 
-  const livePriceUsd = useMemo(() => toPriceString(stats.lastPrice), [stats.lastPrice]);
+  const livePriceUsd = useMemo(
+    () => toPriceString(stats.lastPrice),
+    [stats.lastPrice],
+  );
 
-  const perpTokenInfo = useMemo(() => {
+  const perpTokenInfo = useMemo<HyperliquidPerpTokenInfo>(() => {
     const normalizedSymbol = normalizeMarketSymbol(selectedSymbol);
-    const nextTokenInfo = buildHyperliquidPerpTokenInfo({
-      symbol: normalizedSymbol,
+    const baseSymbol = getBaseSymbol(normalizedSymbol);
+
+    return {
+      address: normalizedSymbol,
+      pairAddress: normalizedSymbol,
+      quoteToken: { symbol: "USDC", address: "USDC", decimals: 6 },
+      createdAt: 0,
       chainId,
-      stats,
-      previous: tradeBoxTokenInfoRef.current,
-    });
-
-    if (isSameHyperliquidPerpTokenInfo(tradeBoxTokenInfoRef.current, nextTokenInfo)) {
-      return tradeBoxTokenInfoRef.current as HyperliquidPerpTokenInfo;
-    }
-
-    tradeBoxTokenInfoRef.current = nextTokenInfo;
-    return nextTokenInfo;
-  }, [
-    chainId,
-    selectedSymbol,
-    stats.lastPrice,
-    stats.eventTime,
-  ]);
+      name: baseSymbol,
+      symbol: baseSymbol,
+      priceUsd: "0",
+      maxLeverage: stats.maxLeverage,
+      imageUrl: "/tokenLogo.png",
+    };
+  }, [chainId, selectedSymbol, stats.maxLeverage]);
 
   const renderTradeBox = useMemo(() => {
     return (
@@ -407,13 +414,30 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
         user={user}
         userPrevOrders={userOrders}
         userWallets={userWallets}
-        protocol='hyperliquid'
+        protocol="hyperliquid"
+        marketSnapshotRef={marketSnapshotRef}
       />
     );
-  }, [chainId, isConnected, perpTokenInfo, user, userOrders, userWallets]);
+  }, [
+    chainId,
+    isConnected,
+    marketSnapshotRef,
+    perpTokenInfo,
+    user,
+    userOrders,
+    userWallets,
+  ]);
 
   const handleResizeDividerMouseDown = useCallback(() => {
     setIsDraggingH(true);
+  }, []);
+
+  const handleTradeBoxOpen = useCallback(() => {
+    setIsTradeBoxOpen(true);
+  }, []);
+
+  const handleTradeBoxClose = useCallback(() => {
+    setIsTradeBoxOpen(false);
   }, []);
 
   const rightWidth = 100 - leftWidth;
@@ -426,7 +450,11 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
         onDecline={handleDeclineCaution}
         dex="hyperliquid"
       />
-      <div className={`w-full h-full relative select-none ${showCaution ? 'pointer-events-none opacity-30 blur-sm' : ''}`}>
+      <div
+        className={`w-full h-full relative select-none ${
+          showCaution ? "pointer-events-none opacity-30 blur-sm" : ""
+        }`}
+      >
         <div className="w-full h-full overflow-hidden flex flex-col">
           <div
             ref={containerRef}
@@ -437,13 +465,15 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
               userOrders={userOrders}
               stats={stats}
               userConnected={isConnected}
-              asterConnected={connected}
+              marketConnected={connected}
               loading={loading}
               error={error}
               onSymbolChange={handleSymbolChange}
               leftWidth={leftWidth}
               isDesktop={isDesktop}
               isTradeBoxOpen={isTradeBoxOpen}
+              perpTokenInfo={perpTokenInfo}
+              marketSnapshotRef={marketSnapshotRef}
             />
 
             <ResizeDivider onMouseDown={handleResizeDividerMouseDown} />
@@ -458,12 +488,13 @@ export default function DefinedPerpMain({ tokenSymbol }: DEFINED_PERP_MAIN_PROPS
 
         <MobileTradeModal
           isOpen={isTradeBoxOpen}
-          onClose={() => setIsTradeBoxOpen(false)}
+          onClose={handleTradeBoxClose}
           perpTokenInfo={perpTokenInfo}
+          currentPriceUsd={livePriceUsd}
           renderTradeBox={renderTradeBox}
         />
 
-        {!isTradeBoxOpen && <TradeButton onClick={() => setIsTradeBoxOpen(true)} />}
+        {!isTradeBoxOpen && <TradeButton onClick={handleTradeBoxOpen} />}
       </div>
     </>
   );

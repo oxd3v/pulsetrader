@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import {
   getAsterSymbolTradingLimits,
   type AsterExchangeSymbol,
-} from '@/lib/oracle/asterdexLimits';
+} from "@/lib/oracle/asterdexLimits";
 
 type RawTickerPayload = {
   e?: string;
@@ -81,6 +82,9 @@ interface UseAsterMarketStatsOptions {
 
 export interface AsterMarketStats {
   symbol: string;
+  minQty: string;
+  maxQty: string;
+  maxLeverage: number;
   lastPrice: number;
   priceChangePercent: number;
   markPrice: number;
@@ -101,8 +105,8 @@ interface UseAsterMarketStatsReturn {
   stats: AsterMarketStats;
 }
 
-const WS_BASE_URL = 'wss://fstream.asterdex.com/stream?streams=';
-const REST_BASE_URL = 'https://fapi.asterdex.com/fapi/v3';
+const WS_BASE_URL = "wss://fstream.asterdex.com/stream?streams=";
+const REST_BASE_URL = "https://fapi.asterdex.com/fapi/v3";
 const RECONNECT_DELAY_MS = 3000;
 const DEFAULT_OPEN_INTEREST_POLL_MS = 15000;
 
@@ -113,8 +117,12 @@ const toFiniteNumber = (value: unknown): number => {
 
 const normalizeSymbol = (symbol: string): string => {
   const normalized = symbol.trim().toUpperCase();
-  if (!normalized) return '';
-  if (normalized.endsWith('USDT') || normalized.endsWith('USDC') || normalized.endsWith('BUSD')) {
+  if (!normalized) return "";
+  if (
+    normalized.endsWith("USDT") ||
+    normalized.endsWith("USDC") ||
+    normalized.endsWith("BUSD")
+  ) {
     return normalized;
   }
   return `${normalized}USDT`;
@@ -122,6 +130,9 @@ const normalizeSymbol = (symbol: string): string => {
 
 const createEmptyStats = (symbol: string): AsterMarketStats => ({
   symbol,
+  minQty: "0",
+  maxQty: "0",
+  maxLeverage: 1,
   lastPrice: 0,
   priceChangePercent: 0,
   markPrice: 0,
@@ -131,7 +142,6 @@ const createEmptyStats = (symbol: string): AsterMarketStats => ({
   quoteVolume: 0,
   openInterest: 0,
   openInterestUsd: 0,
- 
   eventTime: 0,
 });
 
@@ -145,7 +155,7 @@ const toErrorMessage = (error: unknown, fallback: string): string => {
 const mergeStats = (
   previous: AsterMarketStats,
   patch: Partial<AsterMarketStats>,
-  exchangeSymbol: AsterExchangeSymbol | null
+  exchangeSymbol: AsterExchangeSymbol | null,
 ): AsterMarketStats => {
   const merged = {
     ...previous,
@@ -153,32 +163,58 @@ const mergeStats = (
   };
 
   const markReference = merged.markPrice > 0 ? merged.markPrice : merged.lastPrice;
-  merged.openInterestUsd =
-    markReference > 0 && merged.openInterest > 0 ? merged.openInterest * markReference : 0;
-
   const tradingLimits = getAsterSymbolTradingLimits(exchangeSymbol, markReference);
 
-  return merged;
+  const minQty =
+    tradingLimits.minOrderQty > 0
+      ? tradingLimits.minOrderQty.toString()
+      : merged.minQty;
+  const maxQty =
+    tradingLimits.maxOrderQty > 0
+      ? tradingLimits.maxOrderQty.toString()
+      : merged.maxQty;
+  const maxLeverage =
+    tradingLimits.maxLeverage > 0
+      ? tradingLimits.maxLeverage
+      : merged.maxLeverage;
+  const openInterestUsd =
+    markReference > 0 && merged.openInterest > 0
+      ? merged.openInterest * markReference
+      : 0;
+
+  return {
+    ...merged,
+    minQty,
+    maxQty,
+    maxLeverage,
+    openInterestUsd,
+  };
 };
 
 export const useAsterMarketStats = (
   symbol: string,
-  options: UseAsterMarketStatsOptions = {}
+  options: UseAsterMarketStatsOptions = {},
 ): UseAsterMarketStatsReturn => {
   const marketSymbol = useMemo(() => normalizeSymbol(symbol), [symbol]);
   const openInterestPollMs = useMemo(() => {
-    const pollMs = Math.trunc(options.openInterestPollMs ?? DEFAULT_OPEN_INTEREST_POLL_MS);
+    const pollMs = Math.trunc(
+      options.openInterestPollMs ?? DEFAULT_OPEN_INTEREST_POLL_MS,
+    );
     return Math.max(5000, pollMs);
   }, [options.openInterestPollMs]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [stats, setStats] = useState<AsterMarketStats>(() => createEmptyStats(marketSymbol));
+  const [stats, setStats] = useState<AsterMarketStats>(() =>
+    createEmptyStats(marketSymbol),
+  );
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openInterestIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const openInterestIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const exchangeSymbolRef = useRef<AsterExchangeSymbol | null>(null);
 
   const clearReconnectTimer = useCallback(() => {
@@ -207,7 +243,7 @@ export const useAsterMarketStats = (
       setLoading(false);
       setError(null);
       setConnected(false);
-      setStats(createEmptyStats(''));
+      setStats(createEmptyStats(""));
       return undefined;
     }
 
@@ -223,49 +259,70 @@ export const useAsterMarketStats = (
     const publishTicker = (tickerPayload: TickerLikePayload) => {
       const lastPrice = toFiniteNumber(tickerPayload.c ?? tickerPayload.lastPrice);
       const priceChangePercent = toFiniteNumber(
-        tickerPayload.P ?? tickerPayload.priceChangePercent
+        tickerPayload.P ?? tickerPayload.priceChangePercent,
       );
       const quoteVolume = toFiniteNumber(tickerPayload.q ?? tickerPayload.quoteVolume);
-      const eventTime = Math.trunc(toFiniteNumber(tickerPayload.E ?? tickerPayload.time));
-      
+      const eventTime = Math.trunc(
+        toFiniteNumber(tickerPayload.E ?? tickerPayload.time),
+      );
 
       setStats((previous) =>
-        mergeStats(previous, {
-          symbol: marketSymbol,
-          lastPrice: lastPrice > 0 ? lastPrice : previous.lastPrice,
-          priceChangePercent: Number.isFinite(priceChangePercent)
-            ? priceChangePercent
-            : previous.priceChangePercent,
-          quoteVolume: quoteVolume > 0 ? quoteVolume : previous.quoteVolume,
-          eventTime: eventTime > 0 ? eventTime : previous.eventTime,
-        }, exchangeSymbolRef.current)
+        mergeStats(
+          previous,
+          {
+            symbol: marketSymbol,
+            lastPrice: lastPrice > 0 ? lastPrice : previous.lastPrice,
+            priceChangePercent: Number.isFinite(priceChangePercent)
+              ? priceChangePercent
+              : previous.priceChangePercent,
+            quoteVolume: quoteVolume > 0 ? quoteVolume : previous.quoteVolume,
+            eventTime: eventTime > 0 ? eventTime : previous.eventTime,
+          },
+          exchangeSymbolRef.current,
+        ),
       );
     };
 
     const publishMarkPrice = (markPayload: MarkLikePayload) => {
       const markPrice = toFiniteNumber(markPayload.p ?? markPayload.markPrice);
       const indexPrice = toFiniteNumber(markPayload.i ?? markPayload.indexPrice);
-      const fundingRate = toFiniteNumber(markPayload.r ?? markPayload.lastFundingRate);
-      const nextFundingTime = Math.trunc(toFiniteNumber(markPayload.T ?? markPayload.nextFundingTime));
-      const eventTime = Math.trunc(toFiniteNumber(markPayload.E ?? markPayload.time));
+      const fundingRate = toFiniteNumber(
+        markPayload.r ?? markPayload.lastFundingRate,
+      );
+      const nextFundingTime = Math.trunc(
+        toFiniteNumber(markPayload.T ?? markPayload.nextFundingTime),
+      );
+      const eventTime = Math.trunc(
+        toFiniteNumber(markPayload.E ?? markPayload.time),
+      );
 
       setStats((previous) =>
-        mergeStats(previous, {
-          symbol: marketSymbol,
-          markPrice: markPrice > 0 ? markPrice : previous.markPrice,
-          indexPrice: indexPrice > 0 ? indexPrice : previous.indexPrice,
-          fundingRate: Number.isFinite(fundingRate) ? fundingRate : previous.fundingRate,
-          nextFundingTime: nextFundingTime > 0 ? nextFundingTime : previous.nextFundingTime,
-          eventTime: eventTime > 0 ? eventTime : previous.eventTime,
-        }, exchangeSymbolRef.current)
+        mergeStats(
+          previous,
+          {
+            symbol: marketSymbol,
+            markPrice: markPrice > 0 ? markPrice : previous.markPrice,
+            indexPrice: indexPrice > 0 ? indexPrice : previous.indexPrice,
+            fundingRate: Number.isFinite(fundingRate)
+              ? fundingRate
+              : previous.fundingRate,
+            nextFundingTime:
+              nextFundingTime > 0 ? nextFundingTime : previous.nextFundingTime,
+            eventTime: eventTime > 0 ? eventTime : previous.eventTime,
+          },
+          exchangeSymbolRef.current,
+        ),
       );
     };
 
     const fetchOpenInterest = async () => {
       try {
-        const response = await fetch(`${REST_BASE_URL}/openInterest?symbol=${marketSymbol}`, {
-          signal: abortController.signal,
-        });
+        const response = await fetch(
+          `${REST_BASE_URL}/openInterest?symbol=${marketSymbol}`,
+          {
+            signal: abortController.signal,
+          },
+        );
 
         if (!response.ok) {
           throw new Error(`Open interest request failed (${response.status})`);
@@ -278,15 +335,19 @@ export const useAsterMarketStats = (
         if (disposed) return;
 
         setStats((previous) =>
-          mergeStats(previous, {
-            symbol: marketSymbol,
-            openInterest: openInterest > 0 ? openInterest : previous.openInterest,
-            eventTime: eventTime > 0 ? eventTime : previous.eventTime,
-          }, exchangeSymbolRef.current)
+          mergeStats(
+            previous,
+            {
+              symbol: marketSymbol,
+              openInterest: openInterest > 0 ? openInterest : previous.openInterest,
+              eventTime: eventTime > 0 ? eventTime : previous.eventTime,
+            },
+            exchangeSymbolRef.current,
+          ),
         );
       } catch (fetchError) {
         if (disposed || abortController.signal.aborted) return;
-        setError(toErrorMessage(fetchError, 'Failed to fetch open interest'));
+        setError(toErrorMessage(fetchError, "Failed to fetch open interest"));
       }
     };
 
@@ -309,7 +370,9 @@ export const useAsterMarketStats = (
         }
 
         if (!premiumResponse.ok) {
-          throw new Error(`Premium index request failed (${premiumResponse.status})`);
+          throw new Error(
+            `Premium index request failed (${premiumResponse.status})`,
+          );
         }
 
         if (!exchangeResponse.ok) {
@@ -318,7 +381,8 @@ export const useAsterMarketStats = (
 
         const exchangePayload = (await exchangeResponse.json()) as RawExchangeInfoPayload;
         exchangeSymbolRef.current =
-          exchangePayload.symbols?.find((item) => item.symbol === marketSymbol) ?? null;
+          exchangePayload.symbols?.find((item) => item.symbol === marketSymbol) ??
+          null;
 
         const tickerPayload = (await tickerResponse.json()) as RawTickerRestPayload;
         const premiumPayload = (await premiumResponse.json()) as RawPremiumIndexPayload;
@@ -326,11 +390,15 @@ export const useAsterMarketStats = (
         if (!disposed) {
           publishTicker(tickerPayload);
           publishMarkPrice(premiumPayload);
-          setStats((previous) => mergeStats(previous, {}, exchangeSymbolRef.current));
+          setStats((previous) =>
+            mergeStats(previous, {}, exchangeSymbolRef.current),
+          );
         }
       } catch (fetchError) {
         if (!disposed && !abortController.signal.aborted) {
-          setError(toErrorMessage(fetchError, 'Failed to fetch initial market stats'));
+          setError(
+            toErrorMessage(fetchError, "Failed to fetch initial market stats"),
+          );
         }
       } finally {
         if (!disposed) {
@@ -357,34 +425,43 @@ export const useAsterMarketStats = (
         if (disposed) return;
 
         try {
-          const rawMessage = JSON.parse(event.data) as { stream?: string; data?: unknown };
-          const payload = (rawMessage.data ?? rawMessage) as RawTickerPayload & RawMarkPricePayload;
+          const rawMessage = JSON.parse(event.data) as {
+            stream?: string;
+            data?: unknown;
+          };
+          const payload = (rawMessage.data ?? rawMessage) as RawTickerPayload &
+            RawMarkPricePayload;
 
-          if (payload.e === '24hrTicker') {
+          if (payload.e === "24hrTicker") {
             publishTicker(payload);
             setLoading(false);
             return;
           }
 
-          if (payload.e === 'markPriceUpdate') {
+          if (payload.e === "markPriceUpdate") {
             publishMarkPrice(payload);
             setLoading(false);
           }
         } catch (parseError) {
-          setError(toErrorMessage(parseError, 'Failed to parse market stats payload'));
+          setError(
+            toErrorMessage(parseError, "Failed to parse market stats payload"),
+          );
         }
       };
 
       ws.onerror = () => {
         if (disposed) return;
-        setError('WebSocket error occurred');
+        setError("WebSocket error occurred");
       };
 
       ws.onclose = () => {
         if (disposed) return;
         setConnected(false);
         clearReconnectTimer();
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, RECONNECT_DELAY_MS);
+        reconnectTimeoutRef.current = setTimeout(
+          connectWebSocket,
+          RECONNECT_DELAY_MS,
+        );
       };
     };
 
@@ -392,7 +469,10 @@ export const useAsterMarketStats = (
     fetchOpenInterest();
     connectWebSocket();
 
-    openInterestIntervalRef.current = setInterval(fetchOpenInterest, openInterestPollMs);
+    openInterestIntervalRef.current = setInterval(
+      fetchOpenInterest,
+      openInterestPollMs,
+    );
 
     return () => {
       disposed = true;

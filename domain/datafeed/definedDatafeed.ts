@@ -123,56 +123,56 @@ export default class DataFeed {
     }, 0);
   }
 
- async getBars(
-  symbolInfo: SymbolInfo,
-  resolution: string,
-  periodParams: PeriodParams,
-  onHistoryCallback: (bars: Bar[], meta: { noData: boolean }) => void,
-  onErrorCallback: (error: Error) => void
-): Promise<void> {
-  const { from, to, firstDataRequest } = periodParams;
+  async getBars(
+    symbolInfo: SymbolInfo,
+    resolution: string,
+    periodParams: PeriodParams,
+    onHistoryCallback: (bars: Bar[], meta: { noData: boolean }) => void,
+    onErrorCallback: (error: Error) => void
+  ): Promise<void> {
+    const { from, to, firstDataRequest } = periodParams;
 
-  try {
-    
-    const res: any = await fetchCodexCandleBar({
-      pairAddress: this.pairAddress,
-      quoteToken: this.quoteToken,
-      chainId: this.chainId,
-      resolution,
-      from,
-      to,
-      createdAt: this.createdAt,
-      limit: 330, // Fetch enough bars to fill the request
-    });
+    try {
 
-    let bars = res.candles || [];
-    
-
-    // Validating bars are within the requested range
-    let filteredBars = bars.filter((bar: Bar) => !isNaN(bar.time)).filter((bar: Bar) => {
-      // Ensure bar is within the requested window (allowing a small buffer)
-      return  bar.time >= from * 1000 && bar.time <= to * 1000;;
-    });
-
-    
-    // Sort bars by time ascending (TradingView expects this)
-    filteredBars.sort((a: Bar, b: Bar) => a.time - b.time);
-
-    if (firstDataRequest && filteredBars.length > 0) {
-      lastBarsCache.set(symbolInfo.name, {
-        ...filteredBars[filteredBars.length - 1],
+      const res: any = await fetchCodexCandleBar({
+        pairAddress: this.pairAddress,
+        quoteToken: this.quoteToken,
+        chainId: this.chainId,
+        resolution,
+        from,
+        to,
+        createdAt: this.createdAt,
+        limit: 330, // Fetch enough bars to fill the request
       });
-    }
 
-    //console.log(`[getBars]: returned ${filteredBars.length} bar(s)`);
-    onHistoryCallback(filteredBars, {
-      noData: filteredBars.length === 0,
-    });
-  } catch (error) {
-    //console.log("[getBars]: Get error", error);
-    onErrorCallback(error as Error);
+      let bars = res.candles || [];
+
+
+      // Validating bars are within the requested range
+      let filteredBars = bars.filter((bar: Bar) => !isNaN(bar.time)).filter((bar: Bar) => {
+        // Ensure bar is within the requested window (allowing a small buffer)
+        return bar.time >= from * 1000 && bar.time <= to * 1000;;
+      });
+
+
+      // Sort bars by time ascending (TradingView expects this)
+      filteredBars.sort((a: Bar, b: Bar) => a.time - b.time);
+
+      if (firstDataRequest && filteredBars.length > 0) {
+        lastBarsCache.set(symbolInfo.name, {
+          ...filteredBars[filteredBars.length - 1],
+        });
+      }
+
+      //console.log(`[getBars]: returned ${filteredBars.length} bar(s)`);
+      onHistoryCallback(filteredBars, {
+        noData: filteredBars.length === 0,
+      });
+    } catch (error) {
+      //console.log("[getBars]: Get error", error);
+      onErrorCallback(error as Error);
+    }
   }
-}
 
   subscribeBars(
     symbolInfo: SymbolInfo,
@@ -229,7 +229,7 @@ export default class DataFeed {
 
       intervals.set(subscriberUID, intervalId);
     } catch (error) {
-      console.log("[subscribeBars]: Error", error);
+      //console.log("[subscribeBars]: Error", error);
     }
   }
 

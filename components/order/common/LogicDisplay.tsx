@@ -22,7 +22,7 @@ const LogicSummary = ({ node }: { node: TECHNICAL_LOGICS_TYPE }) => {
     
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-[10px] font-mono border border-gray-200 dark:border-gray-600 whitespace-nowrap">
-        <span className="font-semibold text-blue-600 dark:text-blue-400">{node.id}({fontendDisplayCharts[node.resolution as string]})</span>
+        <span className="font-semibold text-blue-600 dark:text-blue-400">{node.id}{node.resolution && (fontendDisplayCharts[node.resolution as string])}</span>
         <span className="text-gray-500">{opMap[node.operator] || node.operator} </span>
         <span className="text-gray-800 dark:text-gray-200">{node.threshold}</span>
       </span>

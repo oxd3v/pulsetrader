@@ -24,7 +24,6 @@ export const notify = (
 ) => {
   const config = NOTIFICATION_CONFIG[key] ?? NOTIFICATION_CONFIG.SERVER_ERROR;
   const message = fallback || config.message;
-  console.log(message)
   if (type === "success") {
     toast.success(message);
   } else {

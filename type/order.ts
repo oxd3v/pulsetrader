@@ -98,6 +98,7 @@ export type ORDER_TYPE = {
     positionMode: string,
     iswalletBasedContract: boolean,
     protocol: string,
+    entryPrice?: string;
     orderAsset: {
       collateralToken: OrderTokenType;
       outputToken: OrderTokenType;
@@ -143,7 +144,8 @@ export type ORDER_TYPE = {
     isReEntrance: boolean;
     reEntranceLimit: number;
   };
-  // @note perpetual is now handled within perp natively
+  feeInUsd?: string;
+  payInUsd?: string;
   additional?: {
     realizedPnl?: string;
     walletAddress?: string;

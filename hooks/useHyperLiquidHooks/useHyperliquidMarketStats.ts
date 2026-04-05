@@ -7,6 +7,7 @@ interface UseHyperliquidMarketStatsOptions {
 export interface HyperliquidMarketStats {
   symbol: string;
   lastPrice: number;
+  maxLeverage: number;
   priceChangePercent: number;
   markPrice: number;
   indexPrice: number;
@@ -28,6 +29,7 @@ interface UseHyperliquidMarketStatsReturn {
 
 type MetaUniverseItem = {
   name?: string;
+  maxLeverage?: number;
 };
 
 type MetaPayload = {
@@ -73,6 +75,7 @@ const toMarketSymbol = (coin: string): string => {
 const createEmptyStats = (symbol: string): HyperliquidMarketStats => ({
   symbol,
   lastPrice: 0,
+  maxLeverage: 0,
   priceChangePercent: 0,
   markPrice: 0,
   indexPrice: 0,
@@ -167,8 +170,10 @@ export const useHyperliquidMarketStats = (
           throw new Error(`HyperLiquid symbol not found: ${coin}`);
         }
 
+        const universeItem = universe[targetIndex] ?? {};
         const context = contexts[targetIndex] ?? {};
-
+        
+        const maxLeverage = toFiniteNumber(universeItem.maxLeverage);
         const markPrice = toFiniteNumber(context.markPx ?? context.midPx);
         const indexPrice = toFiniteNumber(context.oraclePx ?? context.midPx ?? context.markPx);
         const lastPrice = markPrice > 0 ? markPrice : toFiniteNumber(context.midPx);
@@ -198,6 +203,7 @@ export const useHyperliquidMarketStats = (
         setStats({
           symbol: marketSymbol,
           lastPrice,
+          maxLeverage,
           priceChangePercent,
           markPrice,
           indexPrice,
