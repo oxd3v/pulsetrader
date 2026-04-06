@@ -5,6 +5,8 @@ import {
   type AsterExchangeSymbol,
 } from "@/lib/oracle/asterdexLimits";
 
+import { getLeverageBracket } from "@/lib/oracle/asterdex";
+
 type RawTickerPayload = {
   e?: string;
   E?: number | string;
@@ -152,10 +154,16 @@ const toErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+/**
+ * Merge an incoming patch into previous stats, recomputing derived trading limits.
+ * bracketMaxLeverage – when > 0 it is the authoritative value from the signed
+ * leverageBracket API and overrides the margin-percent–derived value.
+ */
 const mergeStats = (
   previous: AsterMarketStats,
   patch: Partial<AsterMarketStats>,
   exchangeSymbol: AsterExchangeSymbol | null,
+  bracketMaxLeverage = 0,
 ): AsterMarketStats => {
   const merged = {
     ...previous,
@@ -173,10 +181,16 @@ const mergeStats = (
     tradingLimits.maxOrderQty > 0
       ? tradingLimits.maxOrderQty.toString()
       : merged.maxQty;
+
+  // Bracket API value is authoritative: use it when available.
+  // Fall back to exchangeInfo-derived value, then to whatever was previously held.
   const maxLeverage =
-    tradingLimits.maxLeverage > 0
-      ? tradingLimits.maxLeverage
-      : merged.maxLeverage;
+    bracketMaxLeverage > 0
+      ? bracketMaxLeverage
+      : tradingLimits.maxLeverage > 1
+        ? tradingLimits.maxLeverage
+        : merged.maxLeverage;
+
   const openInterestUsd =
     markReference > 0 && merged.openInterest > 0
       ? merged.openInterest * markReference
@@ -190,6 +204,7 @@ const mergeStats = (
     openInterestUsd,
   };
 };
+
 
 export const useAsterMarketStats = (
   symbol: string,
@@ -216,6 +231,8 @@ export const useAsterMarketStats = (
     null,
   );
   const exchangeSymbolRef = useRef<AsterExchangeSymbol | null>(null);
+  // Persists the bracket-API max leverage so every mergeStats call uses it
+  const bracketMaxLeverageRef = useRef<number>(0);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -255,6 +272,7 @@ export const useAsterMarketStats = (
     setConnected(false);
     setStats(createEmptyStats(marketSymbol));
     exchangeSymbolRef.current = null;
+    bracketMaxLeverageRef.current = 0; // reset on symbol change
 
     const publishTicker = (tickerPayload: TickerLikePayload) => {
       const lastPrice = toFiniteNumber(tickerPayload.c ?? tickerPayload.lastPrice);
@@ -279,6 +297,7 @@ export const useAsterMarketStats = (
             eventTime: eventTime > 0 ? eventTime : previous.eventTime,
           },
           exchangeSymbolRef.current,
+          bracketMaxLeverageRef.current,
         ),
       );
     };
@@ -311,6 +330,7 @@ export const useAsterMarketStats = (
             eventTime: eventTime > 0 ? eventTime : previous.eventTime,
           },
           exchangeSymbolRef.current,
+          bracketMaxLeverageRef.current,
         ),
       );
     };
@@ -319,9 +339,7 @@ export const useAsterMarketStats = (
       try {
         const response = await fetch(
           `${REST_BASE_URL}/openInterest?symbol=${marketSymbol}`,
-          {
-            signal: abortController.signal,
-          },
+          { signal: abortController.signal },
         );
 
         if (!response.ok) {
@@ -332,7 +350,7 @@ export const useAsterMarketStats = (
         const openInterest = toFiniteNumber(payload.openInterest);
         const eventTime = Math.trunc(toFiniteNumber(payload.time));
 
-        if (disposed) return;
+        if (disposed) return; // guard BEFORE any state mutation
 
         setStats((previous) =>
           mergeStats(
@@ -343,62 +361,70 @@ export const useAsterMarketStats = (
               eventTime: eventTime > 0 ? eventTime : previous.eventTime,
             },
             exchangeSymbolRef.current,
+            bracketMaxLeverageRef.current,
           ),
         );
       } catch (fetchError) {
         if (disposed || abortController.signal.aborted) return;
-        setError(toErrorMessage(fetchError, "Failed to fetch open interest"));
+        // non-critical: don't surface OI errors to the user
       }
     };
 
     const fetchInitialData = async () => {
       try {
-        const [tickerResponse, premiumResponse, exchangeResponse] = await Promise.all([
-          fetch(`${REST_BASE_URL}/ticker/24hr?symbol=${marketSymbol}`, {
-            signal: abortController.signal,
-          }),
-          fetch(`${REST_BASE_URL}/premiumIndex?symbol=${marketSymbol}`, {
-            signal: abortController.signal,
-          }),
-          fetch(`${REST_BASE_URL}/exchangeInfo`, {
-            signal: abortController.signal,
-          }),
-        ]);
+        // Fetch ALL symbol-specific data atomically so limits and price arrive together.
+        // getLeverageBracket uses a server action with its own auth — no AbortSignal.
+        const [tickerResponse, premiumResponse, exchangeResponse, leverageBrackets] =
+          await Promise.all([
+            fetch(`${REST_BASE_URL}/ticker/24hr?symbol=${marketSymbol}`, {
+              signal: abortController.signal,
+            }),
+            fetch(`${REST_BASE_URL}/premiumIndex?symbol=${marketSymbol}`, {
+              signal: abortController.signal,
+            }),
+            fetch(`${REST_BASE_URL}/exchangeInfo`, {
+              signal: abortController.signal,
+            }),
+            // Leverage brackets: fetched once per symbol change and cached in ref
+            getLeverageBracket(marketSymbol),
+          ]);
 
         if (!tickerResponse.ok) {
           throw new Error(`Ticker request failed (${tickerResponse.status})`);
         }
-
         if (!premiumResponse.ok) {
-          throw new Error(
-            `Premium index request failed (${premiumResponse.status})`,
-          );
+          throw new Error(`Premium index request failed (${premiumResponse.status})`);
         }
-
         if (!exchangeResponse.ok) {
           throw new Error(`Exchange info request failed (${exchangeResponse.status})`);
         }
 
+        // All responses resolved — check disposed BEFORE mutating any refs
+        if (disposed) return;
+
+        // Parse exchange info and set ref so all subsequent mergeStats calls use it
         const exchangePayload = (await exchangeResponse.json()) as RawExchangeInfoPayload;
         exchangeSymbolRef.current =
-          exchangePayload.symbols?.find((item) => item.symbol === marketSymbol) ??
-          null;
+          exchangePayload.symbols?.find((item) => item.symbol === marketSymbol) ?? null;
+
+        // Store bracket leverage — this is now the authoritative value for this symbol
+        if (leverageBrackets.maxLeverage > 0) {
+          bracketMaxLeverageRef.current = leverageBrackets.maxLeverage;
+        }
 
         const tickerPayload = (await tickerResponse.json()) as RawTickerRestPayload;
         const premiumPayload = (await premiumResponse.json()) as RawPremiumIndexPayload;
 
-        if (!disposed) {
-          publishTicker(tickerPayload);
-          publishMarkPrice(premiumPayload);
-          setStats((previous) =>
-            mergeStats(previous, {}, exchangeSymbolRef.current),
-          );
-        }
+        // Publish price + limits all at once
+        publishTicker(tickerPayload);
+        publishMarkPrice(premiumPayload);
+        // Final merge to ensure minQty/maxQty/maxLeverage are set after exchangeSymbolRef is populated
+        setStats((previous) =>
+          mergeStats(previous, {}, exchangeSymbolRef.current, bracketMaxLeverageRef.current),
+        );
       } catch (fetchError) {
         if (!disposed && !abortController.signal.aborted) {
-          setError(
-            toErrorMessage(fetchError, "Failed to fetch initial market stats"),
-          );
+          setError(toErrorMessage(fetchError, "Failed to fetch initial market stats"));
         }
       } finally {
         if (!disposed) {

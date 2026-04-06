@@ -19,17 +19,18 @@ import ConfirmationModal from "@/components/common/Confirmation/ConfirmationBox"
 
 interface StrategyGroupProps {
   strategyName: string;
-  groupData: { 
-      orders: ORDER_TYPE[]; 
-      strategy: string; 
-      category: string; 
-      stats: {
-          total: number;
-          pending: number;
-          opened: number;
-          reverted: number;
-          closed: number;
-      } 
+  groupData: {
+    orders: ORDER_TYPE[];
+    strategy: string;
+    category: string;
+    protocol: string;
+    stats: {
+      total: number;
+      pending: number;
+      opened: number;
+      reverted: number;
+      closed: number;
+    }
   };
   marketSnapshotRef?: MarketSnapshotRef;
 }
@@ -42,14 +43,14 @@ export default function StrategyGroup({
   const { closeStrategy, deleteStrategy } = useOrder();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showStrategyActions, setShowStrategyActions] = useState(false);
-  const { orders, strategy, category, stats } = groupData;
-  
+  const { orders, strategy, category, stats, protocol } = groupData;
+
   const [confirmationConfig, setConfirmationConfig] = useState<{
-      title: string;
-      description: string;
-      onSubmit: () => Promise<void>;
-      confirmText: string;
-      variant?: "default" | "destructive";
+    title: string;
+    description: string;
+    onSubmit: () => Promise<void>;
+    confirmText: string;
+    variant?: "default" | "destructive";
   } | null>(null);
 
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -69,9 +70,9 @@ export default function StrategyGroup({
       title: "Close Strategy Positions",
       description: `Are you sure you want to market close all ${stats.opened} active positions in "${strategyName}"?`,
       onSubmit: async () => {
-          await closeStrategy({ strategy, category, strategyName }); // Ensure backend accepts name if needed
-          setConfirmationConfig(null);
-          setShowStrategyActions(false);
+        await closeStrategy({ strategy, category, strategyName }); // Ensure backend accepts name if needed
+        setConfirmationConfig(null);
+        setShowStrategyActions(false);
       },
       confirmText: "Close All",
       variant: "destructive",
@@ -83,9 +84,9 @@ export default function StrategyGroup({
       title: "Delete Strategy",
       description: `Are you sure you want to delete all ${stats.total} orders in "${strategyName}"? This will cancel pending orders.`,
       onSubmit: async () => {
-          await deleteStrategy({ strategy, category, strategyName });
-          setConfirmationConfig(null);
-          setShowStrategyActions(false);
+        await deleteStrategy({ strategy, category, strategyName });
+        setConfirmationConfig(null);
+        setShowStrategyActions(false);
       },
       confirmText: "Delete All",
       variant: "destructive",
@@ -108,68 +109,79 @@ export default function StrategyGroup({
               <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
                 {strategy.toUpperCase()}
               </span>
+              <img
+                src={
+                  protocol === "asterdex"
+                    ? "https://static.asterindex.com/cloud-futures/static/images/aster/logo.svg"
+                    : protocol === "hyperliquid"
+                      ? "./hyperliquidWhite.svg"
+                      : "./gmx.svg"
+                }
+                alt="DEX"
+                className="w-15 h-10"
+              />
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-               <span className="text-gray-500">{category}</span>
-               <div className="w-px h-3 bg-gray-300 dark:bg-gray-700"></div>
-               
-               {/* Status Pills */}
-               {stats.opened > 0 && (
-                   <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
-                       <FiActivity /> {stats.opened} Active
-                   </span>
-               )}
-               {stats.pending > 0 && (
-                   <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400 font-medium">
-                       <FiClock /> {stats.pending} Pending
-                   </span>
-               )}
-               {stats.reverted > 0 && (
-                   <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                       <FiX /> {stats.reverted} Failed
-                   </span>
-               )}
-               {stats.closed > 0 && (
-                   <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                       <FiCheckCircle /> {stats.closed} Done
-                   </span>
-               )}
+              <span className="text-gray-500">{category}</span>
+              <div className="w-px h-3 bg-gray-300 dark:bg-gray-700"></div>
+
+              {/* Status Pills */}
+              {stats.opened > 0 && (
+                <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                  <FiActivity /> {stats.opened} Active
+                </span>
+              )}
+              {stats.pending > 0 && (
+                <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400 font-medium">
+                  <FiClock /> {stats.pending} Pending
+                </span>
+              )}
+              {stats.reverted > 0 && (
+                <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                  <FiX /> {stats.reverted} Failed
+                </span>
+              )}
+              {stats.closed > 0 && (
+                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <FiCheckCircle /> {stats.closed} Done
+                </span>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-             <div className="relative" ref={actionsRef}>
-                <button
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500"
-                    onClick={() => setShowStrategyActions(!showStrategyActions)}
-                >
-                    <FiMoreVertical className="w-5 h-5" />
-                </button>
-                
-                {showStrategyActions && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-20 py-1">
-                        {stats.opened > 0 && (
-                            <button
-                                onClick={handleCloseStrategy}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 flex items-center gap-2"
-                            >
-                                <FiX className="w-4 h-4" /> Close All Active
-                            </button>
-                        )}
-                        <button
-                            onClick={handleDeleteStrategy}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 flex items-center gap-2"
-                        >
-                            <FiTrash2 className="w-4 h-4" /> Delete Strategy
-                        </button>
-                    </div>
-                )}
-             </div>
+            <div className="relative" ref={actionsRef}>
+              <button
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500"
+                onClick={() => setShowStrategyActions(!showStrategyActions)}
+              >
+                <FiMoreVertical className="w-5 h-5" />
+              </button>
 
-             <button className="p-2 text-gray-400">
-                {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
-             </button>
+              {showStrategyActions && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-20 py-1">
+                  {stats.opened > 0 && (
+                    <button
+                      onClick={handleCloseStrategy}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600 flex items-center gap-2"
+                    >
+                      <FiX className="w-4 h-4" /> Close All Active
+                    </button>
+                  )}
+                  <button
+                    onClick={handleDeleteStrategy}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 flex items-center gap-2"
+                  >
+                    <FiTrash2 className="w-4 h-4" /> Delete Strategy
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button className="p-2 text-gray-400">
+              {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+            </button>
           </div>
         </div>
       </div>

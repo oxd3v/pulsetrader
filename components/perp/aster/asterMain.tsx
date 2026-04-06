@@ -16,23 +16,28 @@ import {
   type AsterMarketStats,
 } from "@/hooks/useAsterhooks/useAsterMarketStats";
 import type { ORDER_TYPE } from "@/type/order";
+import type {
+  LiveMarketSnapshot,
+  MarketSnapshotRef,
+  StableMarketTokenInfo,
+} from "@/type/market";
 
 interface ASTER_PERP_MAIN_PROPS {
   tokenSymbol: string;
 }
 
-type AsterPerpTokenInfo = {
+type AsterPerpTokenInfo = StableMarketTokenInfo & {
   address: string;
   pairAddress: string;
   quoteToken: { symbol: string; address: string; decimals: number };
   createdAt: number;
   chainId: number;
+  maxLeverage: number;
   minQty: string;
   maxQty: string;
   name: string;
   symbol: string;
   priceUsd: string;
-
 };
 
 // Extract constant to module level - prevents recreation
@@ -48,63 +53,14 @@ const normalizeMarketSymbol = (symbol: string): string => {
 };
 
 const getBaseSymbol = (symbol: string): string => {
-  return symbol.replace(/(USDT|USDC|BUSD)$/i, "");
+  return symbol;
 };
 
 const toPriceString = (value: number) => {
   return value > 0 ? value.toString() : "0";
 };
 
-const buildAsterPerpTokenInfo = ({
-  symbol,
-  chainId,
-  stats,
-  previous,
-}: {
-  symbol: string;
-  chainId: number;
-  stats: AsterMarketStats;
-  previous?: AsterPerpTokenInfo | null;
-}): AsterPerpTokenInfo => {
-  const baseSymbol = getBaseSymbol(symbol);
-  const isSameSymbol =
-    previous?.address === symbol && previous?.chainId === chainId;
-
-  const resolvedPriceUsd = isSameSymbol
-    ? previous?.priceUsd !== "0"
-      ? previous.priceUsd
-      : toPriceString(stats.lastPrice)
-    : toPriceString(stats.lastPrice);
-
-  return {
-    address: symbol,
-    pairAddress: symbol,
-    quoteToken: { symbol: "USDT", address: "USDT", decimals: 6 },
-    createdAt: stats.eventTime > 0 ? stats.eventTime : previous?.createdAt ?? 0,
-    chainId,
-    minQty: stats.minQty,
-    maxQty: stats.maxQty,
-    name: baseSymbol,
-    symbol: baseSymbol,
-    priceUsd: resolvedPriceUsd,
-  };
-};
-
-const isSameAsterPerpTokenInfo = (
-  current: AsterPerpTokenInfo | null | undefined,
-  next: AsterPerpTokenInfo,
-) => {
-  if (!current) return false;
-
-  return (
-    current.address === next.address &&
-    current.chainId === next.chainId &&
-    current.createdAt === next.createdAt &&
-    current.priceUsd === next.priceUsd
-  );
-};
-
-// ✅ NEW: Memoized Chart Section
+// ✅ Memoized Chart Section — uses stable perpTokenInfo + marketSnapshotRef
 const ChartSection = memo(
   ({
     selectedSymbol,
@@ -118,7 +74,8 @@ const ChartSection = memo(
     leftWidth,
     isDesktop,
     isTradeBoxOpen,
-    perpTokenInfo
+    perpTokenInfo,
+    marketSnapshotRef,
   }: {
     selectedSymbol: string;
     stats: AsterMarketStats;
@@ -131,7 +88,8 @@ const ChartSection = memo(
     leftWidth: number;
     isDesktop: boolean;
     isTradeBoxOpen: boolean;
-    perpTokenInfo: any
+    perpTokenInfo: AsterPerpTokenInfo;
+    marketSnapshotRef: MarketSnapshotRef;
   }) => (
     <div
       style={isDesktop ? { width: `${leftWidth}%` } : undefined}
@@ -146,7 +104,14 @@ const ChartSection = memo(
         loading={loading}
         error={error}
       />
-      <OrderBox orderCategory="perpetual" tokenInfo={perpTokenInfo} userOrders={userOrders} isConnected={userConnected} protocol={'asterdex'} />
+      <OrderBox
+        orderCategory="perpetual"
+        tokenInfo={perpTokenInfo}
+        userOrders={userOrders}
+        isConnected={userConnected}
+        protocol="asterdex"
+        marketSnapshotRef={marketSnapshotRef}
+      />
     </div>
   )
 );
@@ -268,18 +233,20 @@ const TradeButton = memo(({ onClick }: { onClick: () => void }) => (
 ));
 TradeButton.displayName = "TradeButton";
 
-// ✅ NEW: Memoized Order Box Section
+// ✅ Memoized Order Box Section
 const OrderBoxSection = memo(
   ({
     network,
     userOrders,
     isConnected,
     perpTokenInfo,
+    marketSnapshotRef,
   }: {
     network: number | undefined;
     userOrders: ORDER_TYPE[];
     isConnected: boolean;
     perpTokenInfo: AsterPerpTokenInfo;
+    marketSnapshotRef: MarketSnapshotRef;
   }) => (
     <OrderBox
       network={network}
@@ -288,6 +255,7 @@ const OrderBoxSection = memo(
       walletAddress=""
       isConnected={isConnected}
       tokenInfo={perpTokenInfo}
+      marketSnapshotRef={marketSnapshotRef}
     />
   )
 );
@@ -353,17 +321,14 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
   const [isDraggingH, setIsDraggingH] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-
+  const marketSnapshotRef = useRef<LiveMarketSnapshot>({ priceUsd: "0" });
 
   const { stats, connected, loading, error } = useAsterMarketStats(selectedSymbol);
 
-  console.log(stats)
 
-
-
-  const tradeBoxTokenInfoRef = useRef<AsterPerpTokenInfo | null>(null);
-
+  // Reset ref + symbol on token change
   useEffect(() => {
+    marketSnapshotRef.current = { priceUsd: "0" };
     setSelectedSymbol(normalizeMarketSymbol(tokenSymbol));
   }, [tokenSymbol]);
 
@@ -378,6 +343,7 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
   }, []);
 
   const handleSymbolChange = useCallback((symbol: string) => {
+    marketSnapshotRef.current = { priceUsd: "0" };
     setSelectedSymbol(normalizeMarketSymbol(symbol));
   }, []);
 
@@ -419,33 +385,54 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
   // ✅ OPTIMIZED: Only depends on network, not entire state
   const chainId = useMemo(() => (typeof network === "number" ? network : DEFAULT_CHAIN_ID), [network]);
 
-  // ✅ OPTIMIZED: Only depends on lastPrice
-  const livePriceUsd = useMemo(() => toPriceString(stats.lastPrice), [stats.lastPrice]);
-
-  // ✅ OPTIMIZED: Depends on specific stats values, not entire object
-  const perpTokenInfo = useMemo(() => {
-    const normalizedSymbol = normalizeMarketSymbol(selectedSymbol);
-    const nextTokenInfo = buildAsterPerpTokenInfo({
-      symbol: normalizedSymbol,
-      chainId,
-      stats,
-      previous: tradeBoxTokenInfoRef.current,
-    });
-
-    if (isSameAsterPerpTokenInfo(tradeBoxTokenInfoRef.current, nextTokenInfo)) {
-      return tradeBoxTokenInfoRef.current as AsterPerpTokenInfo;
-    }
-
-    tradeBoxTokenInfoRef.current = nextTokenInfo;
-    return nextTokenInfo;
+  // ✅ Push live market data into ref — NO re-render triggered
+  useEffect(() => {
+    marketSnapshotRef.current = {
+      priceUsd: toPriceString(stats.lastPrice),
+      lastPrice: stats.lastPrice,
+      markPrice: stats.markPrice,
+      indexPrice: stats.indexPrice,
+      fundingRate: stats.fundingRate,
+      nextFundingTime: stats.nextFundingTime,
+      quoteVolume: stats.quoteVolume,
+      openInterest: stats.openInterest,
+      openInterestUsd: stats.openInterestUsd,
+      eventTime: stats.eventTime,
+    };
   }, [
-    chainId,
-    selectedSymbol,
-    stats.lastPrice,
     stats.eventTime,
+    stats.fundingRate,
+    stats.indexPrice,
+    stats.lastPrice,
+    stats.markPrice,
+    stats.nextFundingTime,
+    stats.openInterest,
+    stats.openInterestUsd,
+    stats.quoteVolume,
   ]);
 
-  // ✅ OPTIMIZED: Only depends on critical values for TradeBox
+  // ✅ STATIC tokenInfo — only recalculates on symbol switch or leverage/qty limit changes
+  // Live price is read from marketSnapshotRef by children (TradeBox polls, OrderCard polls)
+  const perpTokenInfo = useMemo<AsterPerpTokenInfo>(() => {
+    const normalizedSymbol = normalizeMarketSymbol(selectedSymbol);
+    const baseSymbol = getBaseSymbol(normalizedSymbol);
+
+    return {
+      address: normalizedSymbol,
+      pairAddress: normalizedSymbol,
+      quoteToken: { symbol: "USDT", address: "USDT", decimals: 6 },
+      createdAt: 0,
+      chainId,
+      maxLeverage: stats.maxLeverage,
+      minQty: stats.minQty,
+      maxQty: stats.maxQty,
+      name: baseSymbol,
+      symbol: baseSymbol,
+      priceUsd: "0", // live price goes through marketSnapshotRef
+    };
+  }, [chainId, selectedSymbol, stats.maxLeverage, stats.minQty, stats.maxQty]);
+
+  // ✅ OPTIMIZED: renderTradeBox depends on stable perpTokenInfo + stable ref identity
   const renderTradeBox = useMemo(() => {
     return (
       <TradeBox
@@ -455,7 +442,8 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
         user={user}
         userPrevOrders={userOrders}
         userWallets={userWallets}
-        protocol='asterdex'
+        protocol="asterdex"
+        marketSnapshotRef={marketSnapshotRef}
       />
     );
   }, [chainId, isConnected, perpTokenInfo, user, userOrders, userWallets]);
@@ -504,6 +492,7 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
               isDesktop={isDesktop}
               isTradeBoxOpen={isTradeBoxOpen}
               perpTokenInfo={perpTokenInfo}
+              marketSnapshotRef={marketSnapshotRef}
             />
 
             <ResizeDivider onMouseDown={handleResizeDividerMouseDown} />

@@ -181,6 +181,7 @@ const OrderList = ({
           orders: [],
           strategy: order.strategy,
           category: order.category,
+          protocol: order.perp?.protocol || 'spot',
           stats: { total: 0, pending: 0, opened: 0, reverted: 0, closed: 0 },
         };
       }

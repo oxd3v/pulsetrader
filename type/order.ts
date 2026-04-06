@@ -124,12 +124,14 @@ export type ORDER_TYPE = {
       profit: string;
       takeProfitPercentage: number;
       takeProfitPrice: string;
+      operator: ComparisonOperator;
     };
     stopLoss: {
       isActive: boolean;
       save: string;
       stopLossPrice: string;
       stopLossPercentage: number;
+      operator: ComparisonOperator;
     };
     isTechnicalExit: boolean;
     technicalLogic?: TECHNICAL_LOGICS_TYPE

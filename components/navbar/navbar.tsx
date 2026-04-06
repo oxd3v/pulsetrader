@@ -28,7 +28,7 @@ export default function Navbar() {
       {showBanner && (
         <div className="relative w-full bg-violet-600 text-white px-4 py-2 flex items-center justify-center shadow-md">
           <p className="text-xs sm:text-sm font-medium tracking-wide text-center pr-8 sm:pr-0">
-            PULSETRADER 🌟 BETA IS LIVE! 🔥 — Trade with caution. Futures & AI bot coming soon.
+            PULSETRADER 🌟 BETA IS LIVE! 🔥 — Trade with caution. AI asset social signal and agent trading coming soon.
           </p>
           <button
             onClick={() => setShowBanner(false)}

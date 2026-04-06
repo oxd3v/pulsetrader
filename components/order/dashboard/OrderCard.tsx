@@ -164,8 +164,12 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
       const currentPriceUsd = safeParseUnits(livePriceUsd || "0", PRECISION_DECIMALS);
       if (currentPriceUsd === BigInt(0)) return BigInt(0);
 
-      const grossValueUsd = (currentPriceUsd * tokenAmount) / PRECISION;
-      return grossValueUsd - totalCost;
+      // soldValue = currentPrice × tokenAmount (respecting token decimals via PRECISION)
+      const soldValue = (currentPriceUsd * tokenAmount) / PRECISION;
+      // Cost = what was paid + 2× fee (open fee already paid + estimated close fee)
+      const payInUsd = BigInt(order.payInUsd || 0);
+      const doubleFees = BigInt(order.feeInUsd || 0) * BigInt(2);
+      return soldValue - payInUsd - doubleFees;
     }
 
     if (order.orderStatus !== "OPENED") return BigInt(0);
@@ -179,12 +183,15 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
       return BigInt(0);
     }
 
+    // Perp net unrealized PnL = raw position PnL − 2× fee (open already paid + estimated close)
     const rawPnl = calculatePnl({
       entryPrice: normalizedEntryPrice,
       markPrice: markPriceUsd,
       quantity: order.perp?.quantity || "0",
       isLong: order.perp?.isLong !== false,
     });
+
+
 
     const estimatedRoundTripFees = BigInt(order.feeInUsd || 0) * BigInt(2);
     return rawPnl - estimatedRoundTripFees;
@@ -225,21 +232,19 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
             <div className="flex items-center gap-1">
               {STATUS_ICONS[order.orderStatus] || STATUS_ICONS.PENDING}
               <div
-                className={`flex gap-1 items-center font-semibold ${
-                  order.category.split(":")[0] === "perpetual"
-                    ? "text-blue-500"
-                    : order.category.split(":")[0] === "spot"
-                      ? "text-yellow-500"
-                      : "text-gray-800 dark:text-gray-200"
-                }`}
+                className={`flex gap-1 items-center font-semibold ${order.category.split(":")[0] === "perpetual"
+                  ? "text-blue-500"
+                  : order.category.split(":")[0] === "spot"
+                    ? "text-yellow-500"
+                    : "text-gray-800 dark:text-gray-200"
+                  }`}
               >
                 {order.category === "perpetual" && (
                   <span
-                    className={`text-xs font-bold ${
-                      order.perp?.isLong === false
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-green-600 dark:text-green-400"
-                    }`}
+                    className={`text-xs font-bold ${order.perp?.isLong === false
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-green-600 dark:text-green-400"
+                      }`}
                   >
                     {order.perp?.isLong ? "LONG" : "SHORT"}
                   </span>
@@ -322,7 +327,20 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
                           <div className="flex gap-1 text-sm font-medium">
                             at:{" "}
                             <span className="text-green-500">
-                              {formatUSD(order.exit.takeProfit.takeProfitPrice)}
+                              <LogicSummary
+                                node={{
+                                  id: 'Price',
+                                  type: 'takeprofit',
+                                  operator: order.exit.takeProfit.operator,
+                                  threshold: Number(
+                                    safeFormatNumber(
+                                      order.exit.takeProfit.takeProfitPrice.toString(),
+                                      PRECISION_DECIMALS,
+                                      6,
+                                    ),
+                                  ),
+                                }}
+                              />
                             </span>{" "}
                             with{" "}
                             <span className="text-green-500">
@@ -350,7 +368,20 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
                               SL
                             </span>
                             <div className="text-sm font-medium">
-                              {formatUSD(order.exit.stopLoss.stopLossPrice)}
+                              <LogicSummary
+                                node={{
+                                  id: 'Price',
+                                  type: 'stoploss',
+                                  operator: order.exit.stopLoss.operator,
+                                  threshold: Number(
+                                    safeFormatNumber(
+                                      order.exit.stopLoss.stopLossPrice.toString(),
+                                      PRECISION_DECIMALS,
+                                      6,
+                                    ),
+                                  ),
+                                }}
+                              />
                             </div>
                           </div>
                         ) : (
@@ -424,13 +455,12 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
                     {isSpot ? "Est. P&L" : "Net Unrealized P&L"}
                   </span>
                   <div
-                    className={`text-sm font-medium flex items-center gap-1 ${
-                      pnl > BigInt(0)
-                        ? "text-green-500"
-                        : pnl < BigInt(0)
-                          ? "text-red-500"
-                          : ""
-                    }`}
+                    className={`text-sm font-medium flex items-center gap-1 ${pnl > BigInt(0)
+                      ? "text-green-500"
+                      : pnl < BigInt(0)
+                        ? "text-red-500"
+                        : ""
+                      }`}
                   >
                     {formatUSD(pnl)}
                   </div>
@@ -453,11 +483,10 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
                   </span>
                   <div className="text-sm font-medium flex items-center gap-1.5 uppercase">
                     <span
-                      className={`text-[15px] font-bold ${
-                        order.perp.leverage > 100000
-                          ? "text-orange-500"
-                          : "text-blue-500"
-                      }`}
+                      className={`text-[15px] font-bold ${order.perp.leverage > 100000
+                        ? "text-orange-500"
+                        : "text-blue-500"
+                        }`}
                     >
                       {order.perp.leverage}x
                     </span>

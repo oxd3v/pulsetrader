@@ -223,7 +223,7 @@ export default function PerpTab({ selectedWallet, chainId, perpBalances, onRefre
           </div>
 
           {!isApproved || !walletState.agentWallet?.address ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
               Make sure deposit first in perp account. If you have already sent transaction, wait a moment for changes to reflect.
               <p className={`text-sm font-bold ${dex.color}`}>
                 {
@@ -231,7 +231,7 @@ export default function PerpTab({ selectedWallet, chainId, perpBalances, onRefre
                     'Processing between Arbitrum and the AsterDEX ledger typically takes 5-30 minutes. Please wait for the protocol to sync your balance before approving the Agent Wallet.'
                 }
               </p>
-            </p>
+            </div>
           ) : (
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
               This is your agent wallet address. Please dont use this wallet to send or receive any other asset and purpose.

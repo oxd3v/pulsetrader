@@ -97,7 +97,7 @@ const OrderTableRow = memo(
     const exitPrice = order.additional?.exitPrice;
     const message = order.message;
 
-    
+
     return (
       <tr className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
         {/* Asset / ID */}
@@ -158,23 +158,23 @@ const OrderTableRow = memo(
               </div>
             </div>
           ) : order.entry.priceLogic?.threshold ? (
-                  <div className="flex gap-1 items-center">
-                    <LogicSummary
-                      node={{
-                        ...order.entry.priceLogic,
-                        threshold: Number(
-                          safeFormatNumber(
-                            order.entry.priceLogic.threshold.toString(),
-                            PRECISION_DECIMALS,
-                            6,
-                          ),
-                        ),
-                      }}
-                    />
-                  </div>
-                ) : (
-                  "_"
-                )}
+            <div className="flex gap-1 items-center">
+              <LogicSummary
+                node={{
+                  ...order.entry.priceLogic,
+                  threshold: Number(
+                    safeFormatNumber(
+                      order.entry.priceLogic.threshold.toString(),
+                      PRECISION_DECIMALS,
+                      6,
+                    ),
+                  ),
+                }}
+              />
+            </div>
+          ) : (
+            "_"
+          )}
         </td>
 
         {/* EXIT | TP / SL */}
@@ -191,9 +191,20 @@ const OrderTableRow = memo(
           ) : (
             <div className="flex flex-col gap-1">
               {order.exit.takeProfit.takeProfitPrice !== "0" ? (
-                renderPriceField("TP", order.exit.takeProfit.takeProfitPrice, {
-                  color: "text-green-600",
-                })
+                <LogicSummary
+                  node={{
+                    id: 'Price',
+                    type: 'takeprofit',
+                    operator: order.exit.takeProfit.operator,
+                    threshold: Number(
+                      safeFormatNumber(
+                        order.exit.takeProfit.takeProfitPrice.toString(),
+                        PRECISION_DECIMALS,
+                        6,
+                      ),
+                    ),
+                  }}
+                />
               ) : (
                 <div className="text-xs text-green-600 flex gap-1">
                   TP:{" "}
@@ -206,11 +217,20 @@ const OrderTableRow = memo(
                 </div>
               )}
               {order.exit.stopLoss.isActive &&
-                (order.exit.stopLoss.stopLossPrice !== "0" ? (
-                  renderPriceField("SL", order.exit.stopLoss.stopLossPrice, {
-                    color: "text-red-600",
-                  })
-                ) : (
+                (order.exit.stopLoss.stopLossPrice !== "0" ? <LogicSummary
+                  node={{
+                    id: 'Price',
+                    type: 'stoploss',
+                    operator: order.exit.stopLoss.operator,
+                    threshold: Number(
+                      safeFormatNumber(
+                        order.exit.stopLoss.stopLossPrice.toString(),
+                        PRECISION_DECIMALS,
+                        6,
+                      ),
+                    ),
+                  }}
+                /> : (
                   <div className="text-xs text-red-600 flex gap-1">
                     SL:{" "}
                     {formateAmountWithFixedDecimals(
@@ -300,7 +320,7 @@ const OrderTableRow = memo(
   (prevProps, nextProps) => {
     // Custom comparison: re-render only if order data or GMX data changed
     return (
-      prevProps.order === nextProps.order 
+      prevProps.order === nextProps.order
     );
   },
 );
@@ -314,7 +334,7 @@ interface OrderTableProps {
 export default function OrderTable({
   orders,
 }: OrderTableProps) {
-  
+
   return (
     <div className="w-full h-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden flex flex-col">
       <div className="overflow-x-auto flex-1 custom-scrollbar">
@@ -342,7 +362,7 @@ export default function OrderTable({
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Trigger
               </th>
-              
+
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Wallet
               </th>
@@ -359,7 +379,7 @@ export default function OrderTable({
               <OrderTableRow
                 key={order._id || `order-${index}`}
                 order={order}
-               
+
               />
             ))}
           </tbody>

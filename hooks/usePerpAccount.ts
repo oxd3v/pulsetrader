@@ -48,9 +48,10 @@ export const usePerpAccount = () => {
             setUserWallets(response.data.wallets);
             approveResult.approved = true;
             if (response?.success == true && response.message == 'ALREADY_APPROVED') {
-                notify('success', 'Agent already approved');
-            } else {
-                notify('success', 'Agent approved successfully');
+                notify('success', 'Agent already approved, Please refresh the site');
+            }
+            if (response?.success == true && response.message == 'AGENT_APPROVED') {
+                notify('success', 'Agent approved successfully, Please refresh the site');
             }
 
             return approveResult;

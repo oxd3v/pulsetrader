@@ -561,6 +561,25 @@ function PerpTradeBox({
     return (collateralAmount * collateralUsdPrice * leverage) / marketEntryPrice;
   }, [collateralPrice, entryForLiquidationUsd, initialOrderSize, leverage]);
 
+  // AsterDEX-only: inline quantity validation error displayed near order inputs
+  const qtyValidationError = useMemo(() => {
+    if (protocol !== 'asterdex') return null;
+    if (estimatedAssetQuantity <= 0) {
+      return `Invalid Est. quantity`;
+    }
+
+
+    const minQty = Number(tokenInfo?.minQty || 0);
+    const maxQty = Number(tokenInfo?.maxQty || 0);
+
+    if (minQty > 0 && estimatedAssetQuantity < minQty) {
+      return `Est. quantity ${estimatedAssetQuantity.toFixed(6)} is below AsterDEX minimum (${minQty})`;
+    }
+    if (maxQty > 0 && estimatedAssetQuantity > maxQty) {
+      return `Est. quantity ${estimatedAssetQuantity.toFixed(6)} exceeds AsterDEX maximum (${maxQty})`;
+    }
+    return null;
+  }, [protocol, estimatedAssetQuantity, tokenInfo?.minQty, tokenInfo?.maxQty]);
 
 
   // Replace the old confirmationDescription with this detailed trade summary
@@ -823,7 +842,7 @@ function PerpTradeBox({
       return withStatus(false, _submitText);
     }
 
-    
+
 
     // Protocol specific position limits
     const selectedWalletIds = Object.values(gridsByWallet).map((w: any) => w._id);
@@ -863,6 +882,8 @@ function PerpTradeBox({
 
     return withStatus(true, _submitText);
   };
+
+
 
   useEffect(() => {
     setReadyToSubmitOrder(isReadyToCreateOrder());
@@ -1123,7 +1144,7 @@ function PerpTradeBox({
     protocol,
   ]);
 
-  
+
 
   const MemoizedWalletSelector = useMemo(
     () => (
@@ -1160,6 +1181,8 @@ function PerpTradeBox({
       showFeeTokenSelector,
     ],
   );
+
+
 
 
 
@@ -1466,6 +1489,16 @@ function PerpTradeBox({
                 </div>
               )}
             </div>
+
+            {/* AsterDEX: estimated quantity out-of-range warning */}
+            {qtyValidationError && (
+              <div className="flex items-start gap-2 mt-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg">
+                <FiAlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <span className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                  {qtyValidationError}
+                </span>
+              </div>
+            )}
 
             {showFeeTokenSelector && feeToken && (
               <div className="space-y-1 md:space-y-2 mt-2">

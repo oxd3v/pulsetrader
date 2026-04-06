@@ -100,6 +100,7 @@ export const getAsterSymbolTradingLimits = (
   symbolInfo: AsterExchangeSymbol | null | undefined,
   referencePrice: number,
   leverage?: number,
+  maxLevrage?: number
 ): AsterTradingLimits => {
   if (!symbolInfo) {
     return {
@@ -122,7 +123,7 @@ export const getAsterSymbolTradingLimits = (
 
   const requiredMarginPercent = toFiniteNumber(symbolInfo.requiredMarginPercent);
   const maintMarginPercent = toFiniteNumber(symbolInfo.maintMarginPercent);
-  const maxLeverage = getAsterMaxLeverage(requiredMarginPercent);
+  const maxLeverage = maxLevrage ? maxLevrage : getAsterMaxLeverage(requiredMarginPercent);
   const minOrderQty = toFiniteNumber(
     lotSizeFilter?.minQty ?? marketLotSizeFilter?.minQty,
   );
