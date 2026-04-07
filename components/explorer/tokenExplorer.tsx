@@ -202,7 +202,7 @@ export default function TokenExplorer({
     );
     return new Set([...defaults, ...collateral]);
   }, [network]);
-  
+
 
   return (
     <div className="w-full min-h-screen bg-gray-50 dark:bg-[#0d1117] text-gray-900 dark:text-white transition-colors duration-200">
@@ -240,11 +240,10 @@ export default function TokenExplorer({
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2.5 rounded-xl border transition-all flex items-center gap-2 text-sm font-bold ${
-                showFilters
+              className={`p-2.5 rounded-xl border transition-all flex items-center gap-2 text-sm font-bold ${showFilters
                   ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400"
                   : "bg-white dark:bg-[#161b22] border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5"
-              }`}
+                }`}
             >
               <FiFilter />
               <span className="hidden sm:inline">Filters</span>
@@ -369,7 +368,7 @@ export default function TokenExplorer({
                     label="Token Name"
                     sortKey="name"
                     currentSort={sortConfig}
-                    onSort={() => {}} // Name is not sortable in this table, keep as is
+                    onSort={() => { }} // Name is not sortable in this table, keep as is
                     className="pl-6"
                   />
                   <SortableHeader
@@ -428,102 +427,100 @@ export default function TokenExplorer({
                 {isLoading && tokens.length === 0
                   ? [...Array(10)].map((_, i) => <SkeletonRow key={i} />)
                   : tokens.map((token: any) => (
-                      <tr
-                        key={token.token.address} // Use unique address as key
-                        className="hover:bg-blue-50/50 dark:hover:bg-white/[0.02] transition-colors group"
-                      >
-                        {/* Token Identity */}
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="relative">
-                              <img
-                                src={
-                                  token.token.imageSmallUrl || "/tokenLogo.png"
-                                }
-                                className="w-10 h-10 rounded-full border border-gray-100 dark:border-white/10"
-                                alt={token.token.symbol}
-                              />
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gray-100 dark:bg-[#161b22] rounded-full flex items-center justify-center">
-                                <div
-                                  className={`w-2 h-2 rounded-full ${
-                                    network === 1
-                                      ? "bg-indigo-500"
-                                      : network === 139
-                                        ? "bg-purple-500"
-                                        : "bg-red-500"
+                    <tr
+                      key={token.token.address} // Use unique address as key
+                      className="hover:bg-blue-50/50 dark:hover:bg-white/[0.02] transition-colors group"
+                    >
+                      {/* Token Identity */}
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <img
+                              src={
+                                token.token.imageSmallUrl || "/tokenLogo.png"
+                              }
+                              className="w-10 h-10 rounded-full border border-gray-100 dark:border-white/10"
+                              alt={token.token.symbol}
+                            />
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gray-100 dark:bg-[#161b22] rounded-full flex items-center justify-center">
+                              <div
+                                className={`w-2 h-2 rounded-full ${network === 1
+                                    ? "bg-indigo-500"
+                                    : network === 139
+                                      ? "bg-purple-500"
+                                      : "bg-red-500"
                                   }`}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
-                                {token.token.symbol}
-                                {token.token.isScam && (
-                                  <span className="text-[8px] bg-red-500 text-white px-1 rounded uppercase">
-                                    Scam
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-xs text-gray-500 font-mono">
-                                {token.token.name}
-                              </span>
+                              />
                             </div>
                           </div>
-                        </td>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                              {token.token.symbol}
+                              {token.token.isScam && (
+                                <span className="text-[8px] bg-red-500 text-white px-1 rounded uppercase">
+                                  Scam
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-xs text-gray-500 font-mono">
+                              {token.token.name}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-                        {/* Price */}
-                        <td className="py-4 px-6 text-right font-mono text-sm font-medium text-gray-900 dark:text-gray-200">
-                          {formatPrice(token.priceUSD)}
-                        </td>
+                      {/* Price */}
+                      <td className="py-4 px-6 text-right font-mono text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {formatPrice(token.priceUSD)}
+                      </td>
 
-                        {/* Age */}
-                        <td className="py-4 px-6 text-right text-xs text-gray-500 font-medium">
-                          {formatTimestamp(token.createdAt)}
-                        </td>
+                      {/* Age */}
+                      <td className="py-4 px-6 text-right text-xs text-gray-500 font-medium">
+                        {formatTimestamp(token.createdAt)}
+                      </td>
 
-                        {/* Txns */}
-                        <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
-                          {formatNumber(token.txnCount24 || 0, "number")}
-                        </td>
+                      {/* Txns */}
+                      <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
+                        {formatNumber(token.txnCount24 || 0, "number")}
+                      </td>
 
-                        {/* Volume */}
-                        <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
-                          {formatNumber(token.volume24 || 0)}
-                        </td>
+                      {/* Volume */}
+                      <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
+                        {formatNumber(token.volume24 || 0)}
+                      </td>
 
-                        {/* Liquidity */}
-                        <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
-                          {formatNumber(token.liquidity || 0)}
-                        </td>
+                      {/* Liquidity */}
+                      <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
+                        {formatNumber(token.liquidity || 0)}
+                      </td>
 
-                        {/* FDV/Mkt Cap */}
-                        <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
-                          {formatNumber(token.marketCap || 0)}
-                        </td>
+                      {/* FDV/Mkt Cap */}
+                      <td className="py-4 px-6 text-right text-sm text-gray-600 dark:text-gray-400">
+                        {formatNumber(token.marketCap || 0)}
+                      </td>
 
-                        {/* 24h Change */}
-                        <td className="py-4 px-6 text-right">
-                          <div
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${
-                              token.change24 >= 0
-                                ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                : "bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400"
+                      {/* 24h Change */}
+                      <td className="py-4 px-6 text-right">
+                        <div
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${token.change24 >= 0
+                              ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                              : "bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400"
                             }`}
-                          >
-                            {token.change24 >= 0 ? (
-                              <FiArrowUp />
-                            ) : (
-                              <FiArrowDown />
-                            )}
-                            {Math.abs(token.change24 || 0).toFixed(2)}%
-                          </div>
-                        </td>
+                        >
+                          {token.change24 >= 0 ? (
+                            <FiArrowUp />
+                          ) : (
+                            <FiArrowDown />
+                          )}
+                          {Math.abs(token.change24 || 0).toFixed(2)}%
+                        </div>
+                      </td>
 
-                        {/* Actions */}
-                        <td className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {/* Show bookmark only if token is not default/collateral AND user is logged in */}
-                            {!defaultTokenKeys.has(
+                      {/* Actions */}
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Show bookmark only if token is not default/collateral AND user is logged in */}
+                          {/* {!defaultTokenKeys.has(
                               `${token.token.address.toLowerCase()}:${token.token.networkId}`
                             ) && user?.account && (
                               <>
@@ -561,29 +558,29 @@ export default function TokenExplorer({
                                   </button>
                                 )}
                               </>
-                            )}
+                            )} */}
 
-                            <button
-                              onClick={() => setSelectedToken(token.token)}
-                              className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                              title="Fund token"
-                            >
-                              <div className="flex -space-x-1">
-                                <FiArrowUpRight className="w-4 h-4" />
-                                <FiArrowDownLeft className="w-4 h-4" />
-                              </div>
-                            </button>
-                            <Link
-                              href={`/strategy/spot/${token.token.address}`}
-                              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all"
-                              title="Trade now"
-                            >
-                              <BiRocket size={18} />
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <button
+                            onClick={() => setSelectedToken(token.token)}
+                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                            title="Fund token"
+                          >
+                            <div className="flex -space-x-1">
+                              <FiArrowUpRight className="w-4 h-4" />
+                              <FiArrowDownLeft className="w-4 h-4" />
+                            </div>
+                          </button>
+                          <Link
+                            href={`/strategy/spot/${token.token.address}`}
+                            className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all"
+                            title="Trade now"
+                          >
+                            <BiRocket size={18} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -611,11 +608,10 @@ export default function TokenExplorer({
                   </div>
                 </div>
                 <div
-                  className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                    token.change24 >= 0
+                  className={`px-2 py-1 rounded-lg text-xs font-bold ${token.change24 >= 0
                       ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600"
                       : "bg-red-100 dark:bg-red-500/10 text-red-600"
-                  }`}
+                    }`}
                 >
                   {token.change24 >= 0 ? "+" : ""}
                   {Number(token.change24).toFixed(2)}%
@@ -720,25 +716,22 @@ const SortableHeader = ({
       onClick={() => onSort(sortKey)}
     >
       <div
-        className={`flex items-center gap-1 ${
-          align === "right" ? "justify-end" : "justify-start"
-        }`}
+        className={`flex items-center gap-1 ${align === "right" ? "justify-end" : "justify-start"
+          }`}
       >
         {label}
         <div className="flex flex-col text-[8px] leading-[8px]">
           <FiArrowUp
-            className={`${
-              isActive && currentSort.direction === "ASC"
+            className={`${isActive && currentSort.direction === "ASC"
                 ? "text-blue-500"
                 : "text-gray-300"
-            }`}
+              }`}
           />
           <FiArrowDown
-            className={`${
-              isActive && currentSort.direction === "DESC"
+            className={`${isActive && currentSort.direction === "DESC"
                 ? "text-blue-500"
                 : "text-gray-300"
-            }`}
+              }`}
           />
         </div>
       </div>

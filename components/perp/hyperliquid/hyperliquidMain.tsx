@@ -55,9 +55,9 @@ const normalizeMarketSymbol = (symbol: string): string => {
     normalized.endsWith("USDC") ||
     normalized.endsWith("BUSD")
   ) {
-    return normalized;
+    return normalized.replace(/(USDT|USDC|BUSD)$/i, "");
   }
-  return `${normalized}USDT`;
+  return normalized;
 };
 
 const getBaseSymbol = (symbol: string): string => {
@@ -100,9 +100,8 @@ const ChartSection = memo(
   }) => (
     <div
       style={isDesktop ? { width: `${leftWidth}%` } : undefined}
-      className={`h-full flex flex-col transition-all duration-300 ${
-        isTradeBoxOpen ? "hidden lg:flex" : "flex"
-      }`}
+      className={`h-full flex flex-col transition-all duration-300 ${isTradeBoxOpen ? "hidden lg:flex" : "flex"
+        }`}
     >
       <ChartBox
         tokenSymbol={selectedSymbol}
@@ -276,7 +275,7 @@ export default function DefinedPerpMain({
   const { stats, connected, loading, error } =
     useHyperliquidMarketStats(selectedSymbol);
 
-  
+
 
   useEffect(() => {
     const accepted =
@@ -451,9 +450,8 @@ export default function DefinedPerpMain({
         dex="hyperliquid"
       />
       <div
-        className={`w-full h-full relative select-none ${
-          showCaution ? "pointer-events-none opacity-30 blur-sm" : ""
-        }`}
+        className={`w-full h-full relative select-none ${showCaution ? "pointer-events-none opacity-30 blur-sm" : ""
+          }`}
       >
         <div className="w-full h-full overflow-hidden flex flex-col">
           <div

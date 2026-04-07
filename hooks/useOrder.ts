@@ -520,18 +520,19 @@ export const useOrder = () => {
         return orderAddResult;
       }
 
+      // deprecated
       // Spot-only: verify user has the token added
-      if (category === "spot" && indexTokenAddress) {
-        const userAddedAssetes = user.assetes || [];
-        const userTokens = [...userAddedAssetes, ...userDeafultTokens]
-          .filter((t: string) => t.split(":")[1] == chainId)
-          .map((t: string) => t.toLowerCase());
-        if (!userTokens.includes(`${indexTokenAddress}:${chainId}`.toLowerCase())) {
-          notify("error", "TOKEN_NOT_ADDED");
-          orderAddResult.error = "TOKEN_NOT_ADDED";
-          return orderAddResult;
-        }
-      }
+      // if (category === "spot" && indexTokenAddress) {
+      //   const userAddedAssetes = user.assetes || [];
+      //   const userTokens = [...userAddedAssetes, ...userDeafultTokens]
+      //     .filter((t: string) => t.split(":")[1] == chainId)
+      //     .map((t: string) => t.toLowerCase());
+      //   if (!userTokens.includes(`${indexTokenAddress}:${chainId}`.toLowerCase())) {
+      //     notify("error", "TOKEN_NOT_ADDED");
+      //     orderAddResult.error = "TOKEN_NOT_ADDED";
+      //     return orderAddResult;
+      //   }
+      // }
 
       // Strategy support check
       if (user.status !== "admin") {

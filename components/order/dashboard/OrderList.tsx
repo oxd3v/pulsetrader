@@ -109,7 +109,8 @@ const OrderList = ({
 
       // Token filter – normalize asset filtering across Spot & Perpetual
       if (tokenAddressFilter) {
-        const term = tokenAddressFilter;
+        const term = tokenAddressFilter
+
 
         let isMatch = false;
         if (o.category === "spot") {
@@ -120,6 +121,7 @@ const OrderList = ({
           const perpIndexMatched = o.indexTokenAddress?.toLowerCase() === term;
           isMatch = perpIndexMatched;
         }
+
 
         if (!isMatch) {
           return false;

@@ -61,8 +61,8 @@ const OrderTableRow = memo(
   }: {
     order: ORDER_TYPE;
   }) => {
-    const hasTechEntry = order.entry.isTechnicalEntry;
-    const hasTechExit = order.exit.isTechnicalExit;
+    const hasTechEntry = order?.entry?.isTechnicalEntry || false;
+    const hasTechExit = order?.exit?.isTechnicalExit || false;
 
     const totalCost = useMemo(() => {
       return BigInt(order.feeInUsd || 0) + BigInt(order.payInUsd || 0);
@@ -72,26 +72,27 @@ const OrderTableRow = memo(
     ]);
 
     const isBuy = order.orderType === "BUY";
-    const orderData = order.category === "spot" ? order.spot : order.perp;
-    const amountToken = isBuy
-      ? orderData?.orderAsset?.collateralToken
-      : (orderData?.orderAsset as any)?.perpSymbolInfo;
-    const amountValue = isBuy ? (orderData?.amount as any)?.orderSize : (orderData?.amount as any)?.tokenAmount;
+    const isSpot = order.category == 'spot';
+    const collateralToken = isSpot ? order?.spot?.orderAsset?.collateralToken : order?.perp?.orderAsset?.collateralToken;
+    const orderToken = isSpot
+      ? order?.spot?.orderAsset?.orderToken
+      : (order?.perp?.orderAsset as any)?.perpSymbolInfo;
+    const amountToken = isBuy ? collateralToken : orderToken;
     const formattedAmount = useMemo(() => {
-      if (order.category == 'spot') {
+      if (isBuy) {
         return displayNumber(
-          Number(formatUnits(BigInt(amountValue), amountToken.decimals)),
+          Number(formatUnits(BigInt(order?.spot?.amount?.orderSize || 0), amountToken?.decimals)),
         );
       } else {
-        if (isBuy) {
+        if (isSpot) {
           return displayNumber(
-            Number(formatUnits(BigInt(amountValue), amountToken.decimals)),
+            Number(formatUnits(BigInt(order?.spot?.amount?.tokenAmount || 0), amountToken.decimals)),
           );
         } else {
           return order.perp?.quantity;
         }
       }
-    }, [amountValue, amountToken?.decimals, order.orderType, order.category]);
+    }, [order, isBuy, isSpot]);
 
     const entryPrice = !isBuy && order.category == 'perpetual' ? BigInt(order.perp?.entryPrice || "0").toString() : BigInt(order.additional?.entryPrice || "0").toString();
     const exitPrice = order.additional?.exitPrice;
@@ -154,17 +155,17 @@ const OrderTableRow = memo(
                 <FiActivity /> Technical Entry
               </span>
               <div className="overflow-x-auto pb-1 scrollbar-thin">
-                <LogicSummary node={order.entry.technicalLogic!} />
+                <LogicSummary node={order?.entry?.technicalLogic!} />
               </div>
             </div>
-          ) : order.entry.priceLogic?.threshold ? (
+          ) : order?.entry?.priceLogic?.threshold ? (
             <div className="flex gap-1 items-center">
               <LogicSummary
                 node={{
-                  ...order.entry.priceLogic,
+                  ...order?.entry?.priceLogic,
                   threshold: Number(
                     safeFormatNumber(
-                      order.entry.priceLogic.threshold.toString(),
+                      order?.entry?.priceLogic.threshold.toString(),
                       PRECISION_DECIMALS,
                       6,
                     ),

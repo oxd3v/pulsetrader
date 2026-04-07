@@ -53,7 +53,7 @@ const normalizeMarketSymbol = (symbol: string): string => {
 };
 
 const getBaseSymbol = (symbol: string): string => {
-  return symbol;
+  return symbol.replace(/(USDT|USDC|BUSD)$/i, "");;
 };
 
 const toPriceString = (value: number) => {
@@ -416,9 +416,10 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
   const perpTokenInfo = useMemo<AsterPerpTokenInfo>(() => {
     const normalizedSymbol = normalizeMarketSymbol(selectedSymbol);
     const baseSymbol = getBaseSymbol(normalizedSymbol);
-
+    console.log(normalizedSymbol, 'normalizeSymbol');
+    console.log(baseSymbol, 'baseSymbol');
     return {
-      address: normalizedSymbol,
+      address: baseSymbol,
       pairAddress: normalizedSymbol,
       quoteToken: { symbol: "USDT", address: "USDT", decimals: 6 },
       createdAt: 0,
@@ -427,7 +428,7 @@ export default function AsterPerpMain({ tokenSymbol }: ASTER_PERP_MAIN_PROPS) {
       minQty: stats.minQty,
       maxQty: stats.maxQty,
       name: baseSymbol,
-      symbol: baseSymbol,
+      symbol: normalizedSymbol,
       priceUsd: "0", // live price goes through marketSnapshotRef
     };
   }, [chainId, selectedSymbol, stats.maxLeverage, stats.minQty, stats.maxQty]);

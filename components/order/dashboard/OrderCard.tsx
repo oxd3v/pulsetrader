@@ -114,9 +114,10 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
   const entryPrice =
     order.perp?.entryPrice ||
     order.additional?.entryPrice ||
-    order.entry?.priceLogic?.threshold?.toString() ||
+    order?.entry?.priceLogic?.threshold?.toString() ||
     "0";
   const exitPrice = order.additional?.exitPrice;
+  const realizedPnl = order.additional?.realizedPnl || '0';
   const message = order.message;
 
   const totalCost = useMemo(() => {
@@ -276,18 +277,18 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
             <div className="grid grid-cols-2 lg:grid-cols-4 items-center gap-4 mb-3">
               <div>
                 <span className="text-xs text-gray-500">Entry Criteria</span>
-                {order.entry.isTechnicalEntry === true ? (
+                {order?.entry?.isTechnicalEntry === true ? (
                   <div className="overflow-x-auto pb-1 scrollbar-thin">
-                    <LogicSummary node={order.entry.technicalLogic!} />
+                    <LogicSummary node={order?.entry?.technicalLogic!} />
                   </div>
-                ) : order.entry.priceLogic?.threshold ? (
+                ) : order?.entry?.priceLogic?.threshold ? (
                   <div className="flex gap-1 items-center">
                     <LogicSummary
                       node={{
-                        ...order.entry.priceLogic,
+                        ...order?.entry?.priceLogic,
                         threshold: Number(
                           safeFormatNumber(
-                            order.entry.priceLogic.threshold.toString(),
+                            order?.entry?.priceLogic.threshold.toString(),
                             PRECISION_DECIMALS,
                             6,
                           ),
@@ -472,6 +473,15 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
                   <span className="text-xs text-gray-500">Exit at</span>
                   <div className="text-sm font-medium flex items-center gap-1">
                     {formatUSD(exitPrice)}
+                  </div>
+                </div>
+              )}
+
+              {realizedPnl && (
+                <div>
+                  <span className="text-xs text-gray-500">Realized P&L</span>
+                  <div className="text-sm font-medium flex items-center gap-1">
+                    {formatUSD(realizedPnl)}
                   </div>
                 </div>
               )}

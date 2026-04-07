@@ -31,7 +31,7 @@ const normalizeMarketSymbol = (symbol: string): string => {
   ) {
     return normalized;
   }
-  return `${normalized}USDT`;
+  return `${normalized}`;
 };
 
 const toFiniteNumber = (value: unknown): number => {
@@ -191,16 +191,14 @@ const ChartBox = memo(function ChartBox({
                       {formatPrice(stats.lastPrice)}
                     </span>
                     <span
-                      className={`font-semibold ${
-                        changeValue >= 0 ? "text-green-500" : "text-red-500"
-                      }`}
+                      className={`font-semibold ${changeValue >= 0 ? "text-green-500" : "text-red-500"
+                        }`}
                     >
                       {formatPercent(changeValue)}
                     </span>
                     <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        connected ? "bg-emerald-400" : loading ? "bg-amber-400" : "bg-red-400"
-                      }`}
+                      className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-400" : loading ? "bg-amber-400" : "bg-red-400"
+                        }`}
                     />
                   </div>
                 </div>
@@ -243,11 +241,10 @@ const ChartBox = memo(function ChartBox({
         </div>
 
         <div
-          className={`overflow-hidden transition-all duration-300 border-t border-gray-300 dark:border-gray-800 ${
-            isCollapsed
+          className={`overflow-hidden transition-all duration-300 border-t border-gray-300 dark:border-gray-800 ${isCollapsed
               ? "h-0 border-none"
               : "h-[400px] lg:h-[400px] 2xl:h-[400px]"
-          }`}
+            }`}
         >
           <div className="lg:flex w-full h-full p-2">
             <div className="grow h-full rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800">

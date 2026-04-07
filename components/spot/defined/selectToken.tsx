@@ -23,6 +23,8 @@ import { displayNumber } from "@/utility/displayPrice";
 import { formateNumberInUnit } from "@/utility/handy";
 import { useStore } from "@/store/useStore";
 import { useUserAuth } from "@/hooks/useAuth";
+import { useOrder } from "@/hooks/useOrder";
+import { ORDER_TYPE } from "@/type/order";
 
 // --- Types ---
 interface TokenSelectionParams {
@@ -97,13 +99,12 @@ const TokenRow = memo(
         layout
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`w-full flex items-center p-3 xl:p-4 rounded-xl hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg transition-all duration-200 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 ${
-          isLoading
-            ? "opacity-50 pointer-events-none"
-            : isSelected
+        className={`w-full flex items-center p-3 xl:p-4 rounded-xl hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg transition-all duration-200 border border-transparent hover:border-gray-100 dark:hover:border-gray-700 ${isLoading
+          ? "opacity-50 pointer-events-none"
+          : isSelected
             ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
             : ""
-        }`}
+          }`}
       >
         <div className="relative flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-700 dark:to-gray-800 rounded-xl shadow-sm flex items-center justify-center overflow-hidden">
           <img
@@ -140,7 +141,7 @@ const TokenRow = memo(
           </div>
         </div>
         <div className="flex-shrink-0 flex gap-2 items-center ml-2">
-          {showBookmark && (
+          {/* {showBookmark && (
             <>
               {!isAlreadyAdded ? (
                 <button
@@ -160,7 +161,7 @@ const TokenRow = memo(
                 </button>
               )}
             </>
-          )}
+          )} */}
           <button
             onClick={() => onSelect(tokenInfo.token.address)}
             className="px-3 py-2 text-sm border border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg font-medium transition-colors inline-flex items-center gap-2"
@@ -239,10 +240,11 @@ const TokenSelection = ({
   selectedToken,
   setSelectedToken,
 }: TokenSelectionParams) => {
-  const { chainId, user, isConnected } = useStore(
+  const { chainId, user, isConnected, userOrders, } = useStore(
     useShallow((state: any) => ({
       chainId: state.network,
       user: state.user,
+      userOrders: state.userOrders,
       isConnected: state.isConnected,
     }))
   );
@@ -269,16 +271,15 @@ const TokenSelection = ({
   const userAddedTokens = useMemo(() => {
     if (!isConnected || !user?.assetes) return [];
     const defaults = userDeafultTokens.filter((token: string) => {
-        const parts = token.split(":");
-        return parts.length > 1 && parts[1] === String(chainId);
-      })
+      const parts = token.split(":");
+      return parts.length > 1 && parts[1] === String(chainId);
+    })
       .map((token: string) => token);;
-    const onlyUserAdded =  user.assetes
-      .filter((token: string) => {
-        const parts = token.split(":");
-        return parts.length > 1 && parts[1] === String(chainId);
+    const onlyUserAdded = userOrders
+      .filter((order: ORDER_TYPE) => {
+        return order.category == 'spot' && order.chainId == chainId;
       })
-      .map((token: string) => token);
+      .map((order: ORDER_TYPE) => order.spot?.orderAsset?.orderToken?.address);
     return [...defaults, ...onlyUserAdded]
   }, [isConnected, user, chainId]);
 

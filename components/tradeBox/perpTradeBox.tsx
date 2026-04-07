@@ -885,6 +885,8 @@ function PerpTradeBox({
 
 
 
+
+
   useEffect(() => {
     setReadyToSubmitOrder(isReadyToCreateOrder());
   }, [
@@ -979,7 +981,7 @@ function PerpTradeBox({
         outputToken,
         symbolInfo: {
           ...tokenInfo,
-          symbol: tokenInfo.address || tokenInfo.symbol,
+          symbol: tokenInfo.symbol,
         },
         orderToken: tokenInfo,
         priority,
@@ -1027,6 +1029,8 @@ function PerpTradeBox({
       setCreationPending(false);
     }
   };
+
+  console.log(tokenInfo)
 
   // ========================================================================
   // Order Configuration Effect
