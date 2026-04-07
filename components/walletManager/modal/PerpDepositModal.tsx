@@ -10,6 +10,7 @@ import Service from "@/service/api-service";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/shallow";
 import { calculateWalletTokenAllocation } from "@/utility/orderUtility";
+import { MIN_PERP_DEPOSIT } from "@/constants/common/order";
 
 interface TokenOption {
   symbol: string;
@@ -27,7 +28,7 @@ interface PerpDepositModalProps {
   initialDex: string; // 'asterdex' | 'hyperliquid'
 }
 
-const MIN_DEPOSIT_USDC = 10;
+
 
 // Available tokens users can deposit from
 const TOKEN_OPTIONS: TokenOption[] = [
@@ -116,7 +117,7 @@ export default function PerpDepositModal({
     }
   })();
 
-  const isBelowMinimum = false;//parsedAmount !== null && Number(amount) < MIN_DEPOSIT_USDC;
+  const isBelowMinimum = parsedAmount !== null && Number(amount) < MIN_PERP_DEPOSIT;
   const isInsufficientBalance = parsedAmount !== null && parsedAmount > availableBalance;
   const needsBridgeOrSwap = !selectedToken.isArbUsdc;
 
@@ -170,7 +171,7 @@ export default function PerpDepositModal({
       } else {
         const msg = res?.data?.message || res?.message || "Deposit failed";
         if (msg === "MINIMUM_DEPOSIT_REQUIRED") {
-          toast.error(`Minimum deposit is ${MIN_DEPOSIT_USDC} USDC`);
+          toast.error(`Minimum deposit is ${MIN_PERP_DEPOSIT} USDC`);
         } else {
           toast.error(msg);
         }
@@ -207,7 +208,7 @@ export default function PerpDepositModal({
             <div>
               <h2 className="text-xl font-bold text-white">Deposit to {selectedDex === "asterdex" ? "Asterdex" : "Hyperliquid"}</h2>
               <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 mt-1">
-                Minimum {MIN_DEPOSIT_USDC} USDC
+                Minimum {MIN_PERP_DEPOSIT} USDC
               </p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-gray-500">
@@ -309,7 +310,7 @@ export default function PerpDepositModal({
                     setQuoteInfo(null);
                   }}
                   placeholder="0.00"
-                  min={MIN_DEPOSIT_USDC}
+                  min={MIN_PERP_DEPOSIT}
                   className="bg-transparent outline-none text-2xl font-black text-white w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button
@@ -327,7 +328,7 @@ export default function PerpDepositModal({
               {isBelowMinimum && (
                 <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
                   <FiAlertCircle className="w-3 h-3" />
-                  Minimum deposit is {MIN_DEPOSIT_USDC} USDC
+                  Minimum deposit is {MIN_PERP_DEPOSIT} USDC
                 </p>
               )}
               {isInsufficientBalance && !isBelowMinimum && (

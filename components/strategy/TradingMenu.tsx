@@ -187,6 +187,62 @@ export default function TradingStrategyMenu() {
             </motion.div>
           </motion.div>
           {/*  Trenches */}
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${
+              selectedType === "ai"
+                ? "ring-2 ring-green-500"
+                : "hover:shadow-xl"
+            }`}
+            
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+                AI Sentiment Alpha
+              </h2>
+
+              <div className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase">
+                Neural Intelligence
+              </div>
+            </div>
+            <p className="text-gray-600 mb-6 dark:text-gray-300 leading-relaxed">
+              Harness the power of neural networks to decode social sentiment and on-chain noise. Get real-time alpha before it hits the mainstream.
+            </p>
+
+            <div className="mt-auto flex items-center gap-2 text-purple-500 font-medium italic">
+              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+              <span className="text-sm tracking-wide">Synthesizing Market Signals...</span>
+            </div>
+          </motion.div>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${
+              selectedType === "ai"
+                ? "ring-2 ring-green-500"
+                : "hover:shadow-xl"
+            }`}
+            
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+                Autonomous Agents
+              </h2>
+
+              <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase">
+                AGI Autopilot
+              </div>
+            </div>
+            <p className="text-gray-600 mb-6 dark:text-gray-300 leading-relaxed">
+              Deploy personalized AI agents that execute complex strategies 24/7. Your vision, our precision—making winning moves while you sleep.
+            </p>
+
+            <div className="mt-auto flex items-center gap-2 text-amber-500 font-medium italic">
+              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-sm tracking-wide">Initializing Agent Core...</span>
+            </div>
+          </motion.div>
         </div>
 
         {/* Help Section */}
