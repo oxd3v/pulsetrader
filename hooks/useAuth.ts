@@ -56,7 +56,7 @@ export const useUserAuth = () => {
       inviter: userData?.inviter || "",
       invitationCodes: userData?.invitationCodes || [],
       isBlocked: userData?.isBlocked || false,
-      assetes: userData?.assetes || [],
+      assetes: userData?.assets || [],
     });
   };
 
@@ -178,6 +178,8 @@ export const useUserAuth = () => {
       connectionResult.error = key;
       return connectionResult;
     }
+
+
 
     try {
       const address = (await signer.getAddress()).toLowerCase();
@@ -444,7 +446,7 @@ export const useUserAuth = () => {
         joinedResult.joined = true;
         return joinedResult;
       } catch (err: any) {
-        //console.log(err)
+
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         const key = handleServerErrorToast({ err });
         joinedResult.error = key;
@@ -521,7 +523,7 @@ export const useUserAuth = () => {
 
         if (!apiResponse.success || !apiResponse?.data?.signature) {
           let key = apiResponse.message || "SERVER_ERROR";
-          notify("success", key);
+          notify("error", key);
           withdrawResult.error = key;
           return withdrawResult;
         }
@@ -622,7 +624,6 @@ export const useUserAuth = () => {
         return creationResult;
       } catch (err: any) {
         let key = handleServerErrorToast({ err });
-        //console.log(key)
         creationResult.error = key;
         return creationResult;
       }

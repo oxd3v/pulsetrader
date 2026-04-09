@@ -34,11 +34,11 @@ const FUTURES_PROTOCOL = [
 export default function TradingStrategyMenu() {
   const [selectedType, setSelectedType] = useState<any>(null);
   const router = useRouter();
-  const { setNetwork  } = useStore(
-      useShallow((state: any) => ({
-        setNetwork: state.setNetwork,
-      }))
-    );
+  const { setNetwork } = useStore(
+    useShallow((state: any) => ({
+      setNetwork: state.setNetwork,
+    }))
+  );
   return (
     <div className="h-full  p-8">
       <div className="max-w-4xl mx-auto">
@@ -72,11 +72,10 @@ export default function TradingStrategyMenu() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300  ${
-              selectedType === "perpetual"
-                ? "ring-2 ring-blue-500"
-                : "hover:shadow-xl"
-            }`}
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300  ${selectedType === "perpetual"
+              ? "ring-2 ring-blue-500"
+              : "hover:shadow-xl"
+              }`}
             onClick={() => {
               setSelectedType("perpetual");
               //router.push("/strategy/perpetual");
@@ -137,11 +136,10 @@ export default function TradingStrategyMenu() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 ${
-              selectedType === "spot"
-                ? "ring-2 ring-green-500"
-                : "hover:shadow-xl"
-            }`}
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 ${selectedType === "spot"
+              ? "ring-2 ring-green-500"
+              : "hover:shadow-xl"
+              }`}
             onClick={() => {
               setSelectedType("spot");
               router.push(
@@ -190,12 +188,11 @@ export default function TradingStrategyMenu() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${
-              selectedType === "ai"
-                ? "ring-2 ring-green-500"
-                : "hover:shadow-xl"
-            }`}
-            
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${selectedType === "ai"
+              ? "ring-2 ring-green-500"
+              : "hover:shadow-xl"
+              }`}
+
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
@@ -206,7 +203,7 @@ export default function TradingStrategyMenu() {
                 Neural Intelligence
               </div>
             </div>
-            <p className="text-gray-600 mb-6 dark:text-gray-300 leading-relaxed">
+            <p className="text-gray-600 text-sm mb-4 dark:text-gray-300">
               Harness the power of neural networks to decode social sentiment and on-chain noise. Get real-time alpha before it hits the mainstream.
             </p>
 
@@ -218,12 +215,11 @@ export default function TradingStrategyMenu() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${
-              selectedType === "ai"
-                ? "ring-2 ring-green-500"
-                : "hover:shadow-xl"
-            }`}
-            
+            className={`bg-white dark:bg-gray-800 rounded-xl dark:shadow-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 pointer-events-none opacity-50 ${selectedType === "ai"
+              ? "ring-2 ring-green-500"
+              : "hover:shadow-xl"
+              }`}
+
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
@@ -234,7 +230,7 @@ export default function TradingStrategyMenu() {
                 AGI Autopilot
               </div>
             </div>
-            <p className="text-gray-600 mb-6 dark:text-gray-300 leading-relaxed">
+            <p className="text-gray-600 text-sm mb-4 dark:text-gray-300">
               Deploy personalized AI agents that execute complex strategies 24/7. Your vision, our precision—making winning moves while you sleep.
             </p>
 

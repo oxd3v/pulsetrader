@@ -135,7 +135,7 @@ export const useOrder = () => {
             orderAsset: {
               collateralToken,
               outputToken,
-              persedSymbolInfo: orderToken,
+              parsedSymbolInfo: orderToken,
               symbol: orderToken.symbol,
             },
             amount: {
@@ -214,7 +214,7 @@ export const useOrder = () => {
           orderAsset: {
             collateralToken,
             outputToken,
-            persedSymbolInfo: orderToken,
+            parsedSymbolInfo: orderToken,
             symbol: orderToken.symbol,
           },
           amount: {
@@ -523,7 +523,7 @@ export const useOrder = () => {
       // deprecated
       // Spot-only: verify user has the token added
       // if (category === "spot" && indexTokenAddress) {
-      //   const userAddedAssetes = user.assetes || [];
+      //   const userAddedAssets = user.assets || [];
       //   const userTokens = [...userAddedAssetes, ...userDeafultTokens]
       //     .filter((t: string) => t.split(":")[1] == chainId)
       //     .map((t: string) => t.toLowerCase());
@@ -564,7 +564,7 @@ export const useOrder = () => {
       // The fee token is unrestricted (stable or volatile), but collateral
       // must be stable so that margin / sizing math is predictable and the
       // protocol can safely liquidate / settle positions.
-      if (orderParams.collateralToken && !validateCollateralIsStable(orderParams.collateralToken)) {
+      if (orderParams.collateralToken && category == 'perpetual' && !validateCollateralIsStable(orderParams.collateralToken)) {
         notify("error", "COLLATERAL_MUST_BE_STABLE_TOKEN");
         orderAddResult.error = "COLLATERAL_MUST_BE_STABLE_TOKEN";
         return orderAddResult;
@@ -665,7 +665,7 @@ export const useOrder = () => {
         closedResult.error = key;
         return closedResult;
       }
-      notify("success", "ORDER_DELETE_SUCCESS");
+      notify("success", "ORDER_CLOSED_SUCCESS");
 
       if (apiResponse.data.orders) {
         setUserOrders(apiResponse.data.orders);

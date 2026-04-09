@@ -42,22 +42,25 @@ export const usePerpAccount = () => {
                 mainWalletId,
                 dex
             });
+            if (response?.success == true && response.data.wallets) {
+                setUserWallets(response.data.wallets);
+            }
             if (response?.success == false) {
                 notify('error', response.message);
             }
-            setUserWallets(response.data.wallets);
+
             approveResult.approved = true;
             if (response?.success == true && response.message == 'ALREADY_APPROVED') {
-                notify('success', 'Agent already approved, Please refresh the site');
+                notify('success', 'ALREADY_APPROVED');
             }
             if (response?.success == true && response.message == 'AGENT_APPROVED') {
-                notify('success', 'Agent approved successfully, Please refresh the site');
+                notify('success', 'AGENT_APPROVED');
             }
 
             return approveResult;
 
         } catch (err) {
-            //console.log(err)
+
             let key = handleServerErrorToast({ err });
             approveResult.error = key;
             return approveResult;

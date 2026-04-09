@@ -155,8 +155,6 @@ function PerpTradeBox({
 }: perpTradeBoxProps) {
   const { configurePerpOrder, submitOrder } = useOrder();
 
-  //console.log(tokenInfo)
-
   // UI State
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
   const [openEstOrderModal, setOpenEstimatedOrderModal] = useState(false);
@@ -1617,6 +1615,7 @@ function PerpTradeBox({
               handleTrailingMode={handleTrailingMode}
               initialOrderSize={initialOrderSize}
               collateralToken={collateralToken}
+              trailingMode={!isTechnicalExit}
             />
           )}
 

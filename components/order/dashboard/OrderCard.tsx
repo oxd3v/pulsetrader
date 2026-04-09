@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import { formatUnits } from "ethers";
 import toast from "react-hot-toast";
 
+import ToolTip from "@/components/tradeBox/TradeBoxCommon/BoxTooltip"
 import OrderAction from "@/components/order/dashboard/OrderAction";
 import LogicSummary from "@/components/order/common/LogicDisplay";
 import type { ORDER_TYPE } from "@/type/order";
@@ -106,7 +107,7 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
   const orderData = isSpot ? order.spot : order.perp;
   const perpSymbolInfo =
     (order.perp?.orderAsset as any)?.perpSymbolInfo ||
-    (order.perp?.orderAsset as any)?.persedSymbolInfo;
+    (order.perp?.orderAsset as any)?.parsedSymbolInfo;
   const amountToken = isSpot
     ? (orderData?.orderAsset as any)?.orderToken
     : perpSymbolInfo;
@@ -453,7 +454,8 @@ const OrderCard = ({ order, marketSnapshotRef }: OrderCardProps) => {
               {shouldShowPnl && (
                 <div>
                   <span className="text-xs text-gray-500">
-                    {isSpot ? "Est. P&L" : "Net Unrealized P&L"}
+                    {isSpot ? "Est. P&L" : "Est. Net Unrealized P&L"}
+                    <ToolTip id="est-pnl-tooltip" content={isSpot ? "Est. P&L" : "Estimated unrealized pnl excluding buffer fee(open & close). Fee calculate not including dex funding rate on close dex will apply some extra fee on top"} />
                   </span>
                   <div
                     className={`text-sm font-medium flex items-center gap-1 ${pnl > BigInt(0)

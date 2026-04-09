@@ -105,7 +105,7 @@ export type ORDER_TYPE = {
       marketTokenAddress?: string;
       pairAddress?: string;
       symbol: string;
-      persedSymbolInfo: any
+      parsedSymbolInfo: any
     },
     amount: {
       orderSize: string;

@@ -57,6 +57,11 @@ export const NOTIFICATION_CONFIG: Record<
     message:
       "Agent already approved",
   },
+  ["AGENT_APPROVED"]: {
+    title: "Agent Approved",
+    message:
+      "Agent approved successfully, refresh it",
+  },
   ["INSUFFICIENT_DEX_BALANCE_FOR_AGENT"]: {
     title: "Deposit First",
     message:
@@ -332,6 +337,10 @@ export const NOTIFICATION_CONFIG: Record<
   ["ORDER_CLOSE_FAILED"]: {
     title: "Order closed",
     message: "Failed to close order",
+  },
+  ["ORDER_CLOSED_SUCCESS"]: {
+    title: "Order closed",
+    message: "Order closed successfully",
   },
   ["ORDER_DELETE_SUCCESS"]: {
     title: "delete success",

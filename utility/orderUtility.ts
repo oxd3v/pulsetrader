@@ -95,8 +95,8 @@ export function calculateEstLiquidationPrice(
   return Math.round(liqPrice * multiplier) / multiplier;
 }
 
-export const calculatePnl = ({entryPrice, markPrice, quantity, isLong}:{entryPrice:bigint, markPrice:bigint, quantity:string, isLong:boolean}) => {
-  const quantityBI = safeParseUnits(quantity|| "0", PRECISION_DECIMALS);
+export const calculatePnl = ({ entryPrice, markPrice, quantity, isLong }: { entryPrice: bigint, markPrice: bigint, quantity: string, isLong: boolean }) => {
+  const quantityBI = safeParseUnits(quantity || "0", PRECISION_DECIMALS);
   if (quantityBI === BigInt(0)) return BigInt(0);
 
   const priceDiff = isLong
@@ -143,7 +143,7 @@ export const getOrderIndexTokenAddress = (order: ORDER_TYPE) => {
   return (
     order?.indexTokenAddress ||
     order?.spot?.orderAsset?.orderToken?.address ||
-    (order?.perp?.orderAsset as any)?.persedSymbolInfo?.address ||
+    (order?.perp?.orderAsset as any)?.parsedSymbolInfo?.address ||
     (order?.perp?.orderAsset as any)?.perpSymbolInfo?.address ||
     (order?.perp?.orderAsset as any)?.symbol ||
     ""

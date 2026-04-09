@@ -36,7 +36,7 @@ const OrderNameValidationInput = ({
                 value={name}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder="Enter order name (max 50 characters)"
-                className={`w-full px-3 py-2 bg-white dark:bg-gray-800 border ${isOrderNameValidate || !isConnected ? 'border-gray-200 dark:border-gray-700' : 'border-red-500'} rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 bg-white dark:bg-gray-900 border ${isOrderNameValidate || !isConnected ? 'border-gray-200 dark:border-gray-700' : 'border-red-500'} rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 maxLength={50}
             />
             {!isOrderNameValidate && isConnected && name.trim().length === 0 && (

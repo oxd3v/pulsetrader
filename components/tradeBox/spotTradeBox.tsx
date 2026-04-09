@@ -1337,6 +1337,7 @@ function SpotTradeBox({
               handleTrailingMode={handleTrailingMode}
               initialOrderSize={initialOrderSize}
               collateralToken={collateralToken}
+              trailingMode={!isTechnicalExit}
             />
           )}
 

@@ -8,6 +8,7 @@ interface TakeProfitInputProps {
   handleTrailingMode: (value: boolean) => void;
   initialOrderSize: string;
   collateralToken: any;
+  trailingMode: boolean
 }
 
 const TakeProfitInput = ({
@@ -17,6 +18,7 @@ const TakeProfitInput = ({
   handleTrailingMode,
   initialOrderSize,
   collateralToken,
+  trailingMode
 }: TakeProfitInputProps) => {
   const [inputValue, setInputValue] = useState(String(takeProfitPercentage));
 
@@ -51,23 +53,26 @@ const TakeProfitInput = ({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-         {isTrailingMode && 'Trailing'} Take Profit
+          {isTrailingMode && 'Trailing'} Take Profit
           <InfoTooltip
             id="tp-tooltip"
             content="Percentage profit target to close position"
           />
         </label>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center text-xs text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              checked={isTrailingMode}
-              onChange={(e) => handleTrailingMode(e.target.checked)}
-              className="w-4 h-4 mr-1 text-blue-500 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-            />
-            Trailing Mode
-          </label>
-        </div>
+        {
+          trailingMode && <div className="flex items-center gap-2">
+            <label className="flex items-center text-xs text-gray-600 dark:text-gray-400">
+              <input
+                type="checkbox"
+                checked={isTrailingMode}
+                onChange={(e) => handleTrailingMode(e.target.checked)}
+                className="w-4 h-4 mr-1 text-blue-500 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              />
+              Trailing Mode
+            </label>
+          </div>
+        }
+
       </div>
       <div className="flex items-center gap-3">
         <input

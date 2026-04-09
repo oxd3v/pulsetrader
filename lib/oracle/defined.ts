@@ -382,7 +382,7 @@ export const getDefinedFilterTokens = async ({
 
     return response.data.filterTokens.results;
   } catch (err) {
-    //console.log(err);
+    ;
   }
 };
 
