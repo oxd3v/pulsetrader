@@ -272,12 +272,13 @@ export const calculateWalletTokenAllocation = ({
       // it possible to place an order that the wallet cannot actually fund.
       //
       // NOTE: for a spot BUY order where feeToken == collateralToken the
-      // order-size amount is already counted above, and the fee amount is an
-      // *additional* reservation from the same pool, so both must be summed.
-      if (!isTradeFeeExemptStatus(order.user?.status)) {
+      // order-size amount is already counted above, and the fee amount is implicitly
+      // deducted from the spot swap input, so it's NOT an additional reservation.
+      if (!isTradeFeeExemptStatus(order.user?.status) && order.category !== "spot") {
         if (order.feeToken?.address &&
           order.feeToken.address.toLowerCase() == tokenAddress.toLowerCase()) {
-          totalAllocation += BigInt(order.feeToken?.amount || 0);
+          const feeCount = getOrderFeeCollectionCount(order);
+          totalAllocation += BigInt(order.feeToken?.amount || 0) * BigInt(feeCount);
         }
       }
     }
@@ -330,7 +331,7 @@ export const getOrderCosts = ({
   user: any;
   treatCollateralTokenAsWalletBalance: boolean;
 }): OrderCosts => {
-  const feeTokenAddress = order?.feeToken?.address?.toLowerCase?.();
+  let feeTokenAddress = order?.feeToken?.address?.toLowerCase?.();
 
   const orderGasFee = gasFee || BigInt(0);
 
@@ -369,19 +370,38 @@ export const getOrderCosts = ({
   // ---------------------------------------------------------------------------
   let feeTokenAmount = toBigIntSafe(order?.feeToken?.amount);
 
-  if (feeTokenAmount === BigInt(0) && feeTokenAddress) {
+  if (order?.category === "spot") {
+    feeTokenAmount = BigInt(0);
+    feeTokenAddress = undefined;
+  } else if (feeTokenAmount === BigInt(0) && feeTokenAddress) {
     // Pick the raw order size in the appropriate token units.
     const rawOrderAmount =
-      order?.category === "spot"
-        ? order.orderType === "BUY"
-          ? toBigIntSafe(order?.spot?.amount?.orderSize)
-          : toBigIntSafe(order?.spot?.amount?.tokenAmount)
-        : toBigIntSafe(order?.perp?.amount?.orderSize) ||
-        toBigIntSafe(order?.perp?.quantity);
+      toBigIntSafe(order?.perp?.amount?.orderSize) ||
+      toBigIntSafe(order?.perp?.quantity);
 
     if (rawOrderAmount > BigInt(0)) {
-      feeTokenAmount =
-        (rawOrderAmount * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
+      if (
+        !order?.feeToken?.address ||
+        order.feeToken.address.toLowerCase() === collateralTokenAddress?.toLowerCase()
+      ) {
+        feeTokenAmount =
+          (rawOrderAmount * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
+      } else {
+        const orderSizeUsdStr = (order?.perp?.amount as any)?.orderSizeUsd;
+        const feeTokenParsedPriceStr = (order?.feeToken as any)?.parsedPrice;
+
+        if (orderSizeUsdStr && feeTokenParsedPriceStr && order?.feeToken?.decimals != null) {
+          const usd = toBigIntSafe(orderSizeUsdStr);
+          const feeInUsd = (usd * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
+          const feePrice = toBigIntSafe(feeTokenParsedPriceStr);
+          if (feePrice > BigInt(0)) {
+            feeTokenAmount = (feeInUsd * (BigInt(10) ** BigInt(order.feeToken.decimals))) / feePrice;
+          }
+        } else {
+          feeTokenAmount =
+            (rawOrderAmount * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
+        }
+      }
     }
   }
 
@@ -410,11 +430,13 @@ export const getOrderCosts = ({
     typeof user?.status === "string" &&
     ORDER_TRADE_FEE_EXEMPT_STATUS.includes(user.status.toLowerCase());
 
+  const feeCount = getOrderFeeCollectionCount(order);
+
   return {
     dexOrderAmount,
     walletOrderAmount,
     orderGasFee,
-    feeTokenAmount: isFeeExempt ? BigInt(0) : feeTokenAmount,
+    feeTokenAmount: isFeeExempt ? BigInt(0) : feeTokenAmount * BigInt(feeCount),
     feeTokenAddress: isFeeExempt ? undefined : feeTokenAddress,
   };
 };

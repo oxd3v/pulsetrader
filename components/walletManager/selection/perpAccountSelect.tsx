@@ -50,6 +50,7 @@ import { ZeroAddress } from "ethers";
 import {
   SINGLE_PERPETUAL_STRATEGY,
   SINGLE_SPOT_STRATEGY_,
+  ORDER_FEE_COLLECTION_GAS_FEE,
 } from "@/constants/common/order";
 import { chains } from "@/constants/common/chain";
 
@@ -306,8 +307,14 @@ const WalletCard = React.memo(
       const selectedFeeTokenLocked =
         (feeTokenAddress && walletData.feeTokenPending[feeTokenAddress]) || BigInt(0);
 
+      const feeTokenApplied = Object.keys(estimates.estFeeByToken || {}).length > 0;
+      let requiredNative = estimates.estCost || BigInt(0);
+      if (feeTokenApplied) {
+          requiredNative += BigInt(ORDER_FEE_COLLECTION_GAS_FEE[chainId] || 0);
+      }
+
       const hasInsufficientBalance =
-        availableBalance < (estimates.estCost || BigInt(0));
+        availableBalance < requiredNative;
       const hasInsufficientTokens =
         availableTokens < (estimates.estAmount || BigInt(0));
       const hasInsufficientFeeToken =
@@ -1280,9 +1287,15 @@ const WalletSelector = ({
 
       const isApproved = (wallet as any).isApproved?.[normalizeProtocolKey(protocol)] === true;
 
+      const feeTokenApplied = Object.keys(estimate.estFeeByToken || {}).length > 0;
+      let requiredNative = estimate.estCost;
+      if (feeTokenApplied) {
+          requiredNative += BigInt(ORDER_FEE_COLLECTION_GAS_FEE[chainId] || 0);
+      }
+
       return (
         isApproved &&
-        availableNative >= estimate.estCost &&
+        availableNative >= requiredNative &&
         availableTokens >= estimate.estAmount &&
         hasFeeTokenLiquidity
       );

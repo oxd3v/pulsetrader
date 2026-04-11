@@ -21,7 +21,7 @@ import {
   ORDER_TRADE_FEE_BIGINT,
   validateCollateralIsStable,
 } from "@/utility/orderUtility";
-import { convertToUsd } from "@/utility/number";
+import { convertToUsd, convertToTokenAmount } from "@/utility/number";
 
 interface AddOrderProps {
   estOrders: ORDER_TYPE[];
@@ -301,11 +301,30 @@ export const useOrder = () => {
     const isSellStrategy = strategy == "sellToken";
     let parsedBaseTragetPrice = safeParseUnits(targetPrice, PRECISION_DECIMALS);
     let parsedBaseAmount = safeParseUnits(initialOrderSize, collateralToken.decimals);
+    let sourceTokenDecimals = collateralToken.decimals;
+    let sourceTokenPriceStr = collateralPrice;
+    let sourceTokenAddress = collateralToken.address;
 
     if (isSellStrategy) {
       parsedBaseTragetPrice = safeParseUnits(tpPrice, PRECISION_DECIMALS);
       parsedBaseAmount = safeParseUnits(initialOrderSize, orderToken.decimals);
+      sourceTokenDecimals = orderToken.decimals;
+      sourceTokenPriceStr = orderTokenPrice;
+      sourceTokenAddress = orderToken.address;
     }
+
+    const computeFeeAmount = (amountOverride: bigint) => {
+      if (!feeToken || !feeToken.address) return BigInt(0);
+      if (sourceTokenAddress?.toLowerCase() === feeToken.address?.toLowerCase()) {
+        return (amountOverride * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
+      }
+      const sourceAmountUsd = convertToUsd(amountOverride, sourceTokenDecimals, safeParseUnits(sourceTokenPriceStr, PRECISION_DECIMALS)) || BigInt(0);
+      const feeInUsd = (sourceAmountUsd * ORDER_TRADE_FEE_BIGINT) / BASIS_POINT_DIVISOR_BIGINT;
+      if (feeTokenPrice != null) {
+        return convertToTokenAmount(feeInUsd, feeToken.decimals, safeParseUnits(feeTokenPrice, PRECISION_DECIMALS)) || BigInt(0);
+      }
+      return BigInt(0);
+    };
 
     const slBps = BigInt(Math.floor(slPercentage * 100));
     const tpBps = BigInt(Math.floor(tpPercentage * 100));
@@ -359,7 +378,10 @@ export const useOrder = () => {
               orderSizeUsd: convertToUsd(parsedRawSize, collateralToken.decimals, safeParseUnits(collateralPrice, PRECISION_DECIMALS))?.toString() || '0',
             },
           },
-          feeToken,
+          feeToken: feeToken ? {
+            ...feeToken,
+            amount: computeFeeAmount(parsedRawSize).toString()
+          } : undefined,
           slippage,
           sl: i + 1,
           isTrailingMode,
@@ -433,7 +455,10 @@ export const useOrder = () => {
             orderSizeUsd: convertToUsd(parsedBaseAmount, collateralToken.decimals, safeParseUnits(collateralPrice, PRECISION_DECIMALS))?.toString() || '0',
           },
         },
-        feeToken,
+        feeToken: feeToken ? {
+          ...feeToken,
+          amount: computeFeeAmount(parsedBaseAmount).toString()
+        } : undefined,
         slippage,
         sl: 1,
         isTrailingMode,

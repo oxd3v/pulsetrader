@@ -62,8 +62,6 @@ interface WalletData {
   totalCollateralPending: bigint; // From EXISTING orders
   balance: bigint; // Native balance for gas
   tokenBalance: bigint; // ERC20 collateral balance
-  feeTokenPending: Record<string, bigint>;
-  feeTokenBalances: Record<string, bigint>;
 }
 
 interface WalletEstimates {
@@ -84,7 +82,6 @@ interface WalletSelectorProps {
   setWalletsReady: (ready: boolean) => void;
   chainId: number;
   collateralToken: OrderTokenType;
-  feeToken?: OrderTokenType | null;
   selectedStrategy: any;
   estOrders: Order[];
   user: any;
@@ -149,7 +146,6 @@ interface WalletCardProps {
   onSelect?: (wallet: WalletConfig) => void | Promise<void>;
   onRemove: (wallet: WalletConfig) => void;
   collateralToken: OrderTokenType;
-  feeToken?: OrderTokenType | null;
   estOrders: Order[];
   selectedGrids: number[];
   selectGrid?: (wallet: WalletConfig, order: Order) => void;
@@ -166,7 +162,6 @@ const WalletCard = React.memo(
     onSelect,
     onRemove,
     collateralToken,
-    feeToken,
     estOrders,
     selectedGrids,
     selectGrid,
@@ -179,19 +174,11 @@ const WalletCard = React.memo(
     const {
       hasInsufficientBalance,
       hasInsufficientTokens,
-      hasInsufficientFeeToken,
-      selectedFeeTokenBalance,
-      selectedFeeTokenLocked,
-      showFeeTokenCard,
     } = useMemo(() => {
       if (!walletData) {
         return {
           hasInsufficientBalance: false,
           hasInsufficientTokens: false,
-          hasInsufficientFeeToken: false,
-          selectedFeeTokenBalance: BigInt(0),
-          selectedFeeTokenLocked: BigInt(0),
-          showFeeTokenCard: false,
         };
       }
       const availableBalance =
@@ -199,38 +186,17 @@ const WalletCard = React.memo(
       const availableTokens =
         walletData.tokenBalance - walletData.totalCollateralPending;
 
-      const feeTokenAddress = feeToken?.address?.toLowerCase();
-      const showFeeTokenCard =
-        Boolean(feeTokenAddress) &&
-        feeTokenAddress !== ZeroAddress.toLowerCase();
-
-      const selectedFeeTokenBalance =
-        (feeTokenAddress && walletData.feeTokenBalances[feeTokenAddress]) || BigInt(0);
-      const selectedFeeTokenLocked =
-        (feeTokenAddress && walletData.feeTokenPending[feeTokenAddress]) || BigInt(0);
-
       const hasInsufficientBalance =
         availableBalance < (estimates.estCost || BigInt(0));
       const hasInsufficientTokens =
         availableTokens <
-        (estimates.estAmount || BigInt(0)) +
-        (!showFeeTokenCard && feeTokenAddress
-          ? estimates.estFeeAmount || BigInt(0)
-          : BigInt(0));
-      const hasInsufficientFeeToken =
-        showFeeTokenCard &&
-        selectedFeeTokenBalance - selectedFeeTokenLocked <
-        (estimates.estFeeAmount || BigInt(0));
+        (estimates.estAmount || BigInt(0));
 
       return {
         hasInsufficientBalance,
         hasInsufficientTokens,
-        hasInsufficientFeeToken,
-        selectedFeeTokenBalance,
-        selectedFeeTokenLocked,
-        showFeeTokenCard,
       };
-    }, [walletData, estimates, feeToken]);
+    }, [walletData, estimates]);
 
     const handleSelectWallet = useCallback(async (e?: React.MouseEvent) => {
       e?.stopPropagation();
@@ -348,8 +314,7 @@ const WalletCard = React.memo(
           ? "border-blue-500/60 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-900/20 dark:to-indigo-900/10 shadow-sm shadow-blue-500/10"
           : "border-gray-200/80 dark:border-gray-700/80 bg-white/50 dark:bg-gray-800/50 hover:border-blue-400 hover:shadow-md hover:shadow-blue-500/5 hover:-translate-y-0.5"
           } ${(hasInsufficientBalance ||
-            hasInsufficientTokens ||
-            hasInsufficientFeeToken) &&
+            hasInsufficientTokens) &&
             isSelected
             ? "border-red-400/60 dark:border-red-500/60 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-900/20 dark:to-orange-900/10 shadow-red-500/10"
             : ""
@@ -603,80 +568,7 @@ const WalletCard = React.memo(
                 </div>
               )}
 
-              {/* Fee Token Balance
-              {showFeeTokenCard && feeToken && (
-                <div className="p-3.5 bg-white/80 dark:bg-gray-800/80 rounded-xl border border-gray-200/80 dark:border-gray-700/80 shadow-sm backdrop-blur-md transition-all hover:shadow-md group/card">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={feeToken.imageUrl}
-                        className="w-5 h-5 rounded-full"
-                        alt={feeToken.symbol}
-                      />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {feeToken.symbol}
-                      </span>
-                    </div>
-                    <FaCoins className="w-4 h-4 text-gray-400" />
-                  </div>
 
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Wallet Balance
-                      </div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {formatBalance(
-                          selectedFeeTokenBalance,
-                          feeToken.decimals,
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                        <FaLock className="w-3 h-3 text-red-400" />
-                        Locked Balance
-                      </div>
-                      <div className="text-sm font-semibold text-red-600 dark:text-red-400">
-                        {formatBalance(
-                          selectedFeeTokenLocked,
-                          feeToken.decimals,
-                        )}
-                      </div>
-                    </div>
-
-                    <div
-                      className={`p-2.5 rounded-lg transition-all ${hasInsufficientFeeToken
-                        ? "bg-red-50/80 dark:bg-red-900/20 border border-red-200/80 dark:border-red-800/80"
-                        : "bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/80"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                          Est. Fee Token
-                        </span>
-                        <InfoTooltip
-                          id="Est_feeTokenAmount"
-                          content="Reserved Pulse fee amount for pending and active orders."
-                        />
-                      </div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {formatBalance(
-                          estimates.estFeeAmount,
-                          feeToken.decimals,
-                        )}
-                      </div>
-                      {hasInsufficientFeeToken && (
-                        <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
-                          <FiAlertCircle className="w-3 h-3" />
-                          <span>Insufficient fee token</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )} */}
             </div>
 
             {/* Grid Selection */}
@@ -724,8 +616,7 @@ const WalletCard = React.memo(
         {isSelected &&
           !isExpanded &&
           (hasInsufficientBalance ||
-            hasInsufficientTokens ||
-            hasInsufficientFeeToken) && (
+            hasInsufficientTokens) && (
             <div className="px-3 pb-3 border-t border-gray-200 dark:border-gray-700 pt-2">
               <div className="flex items-center gap-2 text-xs text-red-500">
                 <FiAlertCircle className="w-3 h-3 flex-shrink-0" />
@@ -735,11 +626,6 @@ const WalletCard = React.memo(
                     ? " and "
                     : ""}
                   {hasInsufficientTokens ? "tokens" : ""}
-                  {(hasInsufficientBalance || hasInsufficientTokens) &&
-                    hasInsufficientFeeToken
-                    ? " and "
-                    : ""}
-                  {hasInsufficientFeeToken ? "fee token" : ""}
                 </span>
               </div>
             </div>
@@ -766,7 +652,6 @@ const WalletSelector = ({
   setWalletsReady,
   chainId,
   collateralToken,
-  feeToken,
   selectedStrategy,
   estOrders,
   user,
@@ -781,9 +666,9 @@ const WalletSelector = ({
   const [loadingWallets, setLoadingWallets] = useState<Set<string>>(new Set());
 
   const [gasFee, setGasFee] = useState<bigint>(BigInt(0));
+
   const isMounted = useRef(true);
   const fetchGenByAddressRef = useRef<Record<string, number>>({});
-  const selectedFeeTokenAddress = feeToken?.address?.toLowerCase();
 
   useEffect(() => {
     isMounted.current = true;
@@ -875,38 +760,8 @@ const WalletSelector = ({
           false // isPerpetual parameter (spot = false)
         );
 
-        const trackedFeeTokens = new Map<
-          string,
-          { address: string; decimals: number; chainId: number }
-        >();
-
-        const addTrackedFeeToken = (
-          tokenAddress?: string,
-          tokenDecimals?: number,
-          tokenChainId?: number
-        ) => {
-          if (!tokenAddress || tokenDecimals == null || tokenChainId == null) return;
-
-          const normalizedAddress = tokenAddress.toLowerCase();
-          if (normalizedAddress === ZeroAddress.toLowerCase()) {
-            return;
-          }
-
-          trackedFeeTokens.set(normalizedAddress, {
-            address: tokenAddress,
-            decimals: tokenDecimals,
-            chainId: tokenChainId
-          });
-        };
-
-        addTrackedFeeToken(feeToken?.address, feeToken?.decimals, chainId);
-
-        walletOrders.forEach((order) => {
-          addTrackedFeeToken(order.feeToken?.address, order.feeToken?.decimals, chainId);
-        });
-
-
-
+        // Spot: only fetch native balance + collateral token balance
+        // Fee token is not separately validated - it's deducted from collateral (open) or output (close)
         const fetchPromise = Promise.all([
           getWalletBalance({ walletAddress: wallet.address, chainId }),
           collateralToken?.address && collateralToken.address !== ZeroAddress
@@ -916,50 +771,20 @@ const WalletSelector = ({
               chainId,
             })
             : Promise.resolve(BigInt(0)),
-          Promise.all(
-            Array.from(trackedFeeTokens.entries()).map(
-              async ([normalizedAddress, tokenConfig]) => [
-                normalizedAddress,
-                await getWalletTokenBalance({
-                  walletAddress: wallet.address,
-                  tokenAddress: tokenConfig.address,
-                  chainId,
-                }),
-                tokenConfig.decimals,
-              ],
-            ),
-          ),
         ]);
 
-        const [balance, tokenBalance, trackedFeeTokenBalances] = (await Promise.race([
+        const [balance, tokenBalance] = (await Promise.race([
           fetchPromise,
           timeoutPromise,
-        ])) as [any, any, Array<[string, any, number]>];
+        ])) as [any, any];
 
         if (!isMounted.current) return undefined;
         if (fetchGenByAddressRef.current[address] !== myGen) return undefined;
 
-        const feeTokenBalances = trackedFeeTokenBalances.reduce<
-          Record<string, bigint>
-        >((acc, [normalizedAddress, trackedBalance, decimals]) => {
-          acc[normalizedAddress] = toBigIntBalance(trackedBalance, decimals);
-          return acc;
-        }, {});
-
-        // --- NEW EXACT ALLOCATION CALCULATION ---
         const exactLockedCollateral = calculateWalletTokenAllocation({
           orders: walletOrders,
           walletId: wallet._id,
           tokenAddress: collateralToken?.address || ZeroAddress
-        });
-
-        const exactFeeTokenPending: Record<string, bigint> = {};
-        Array.from(trackedFeeTokens.keys()).forEach((address) => {
-          exactFeeTokenPending[address] = calculateWalletTokenAllocation({
-            orders: walletOrders,
-            walletId: wallet._id,
-            tokenAddress: address
-          });
         });
 
         const newData: WalletData = {
@@ -967,7 +792,6 @@ const WalletSelector = ({
           totalActiveOrders: walletLockedFunds.totalActiveOrders,
           lockedFundBalance: walletLockedFunds.lockedFundBalance, // Native Gas Locks
           totalCollateralPending: exactLockedCollateral,          // Replaced generic collateral pending
-          feeTokenPending: exactFeeTokenPending,                  // Replaced generic fee token pending
           balance:
             typeof balance === "string"
               ? safeParseUnits(balance, 18)
@@ -976,7 +800,6 @@ const WalletSelector = ({
             typeof tokenBalance === "string"
               ? safeParseUnits(tokenBalance, collateralToken?.decimals || 18)
               : BigInt(tokenBalance || 0),
-          feeTokenBalances,
         };
 
         if (fetchGenByAddressRef.current[address] !== myGen) return undefined;
@@ -1007,7 +830,7 @@ const WalletSelector = ({
         }
       }
     },
-    [ordersByWallet, collateralToken, gasFee, chainId, user, walletDataMap, feeToken],
+    [ordersByWallet, collateralToken, gasFee, chainId, user, walletDataMap],
   );
 
   // Centralized Estimation Logic (Memoized)
@@ -1049,14 +872,10 @@ const WalletSelector = ({
           estimates[address].estCost += costs.orderGasFee + costs.walletOrderAmount;
         }
 
-        if (costs.feeTokenAmount > BigInt(0) && costs.feeTokenAddress) {
-          estimates[address].estFeeByToken[costs.feeTokenAddress] =
-            (estimates[address].estFeeByToken[costs.feeTokenAddress] || BigInt(0)) +
-            costs.feeTokenAmount;
-
-          if (selectedFeeTokenAddress === costs.feeTokenAddress) {
-            estimates[address].estFeeAmount += costs.feeTokenAmount;
-          }
+        // Spot: fee is deducted from collateral (open) or output (close),
+        // but we still need extra gas for the fee transfer transaction
+        if (costs.feeTokenAmount > BigInt(0)) {
+          estimates[address].estCost += costs.orderGasFee > BigInt(0) ? gasFee : BigInt(0);
         }
       }
     });
@@ -1070,7 +889,6 @@ const WalletSelector = ({
     collateralToken.address,
     gasFee,
     user,
-    selectedFeeTokenAddress,
   ]);
 
   // Readiness Check
@@ -1091,20 +909,11 @@ const WalletSelector = ({
       const availableNative = data.balance - data.lockedFundBalance;
       const availableTokens = data.tokenBalance - data.totalCollateralPending;
 
-      const hasFeeTokenLiquidity = Object.entries(
-        estimate.estFeeByToken || {},
-      ).every(([tokenAddress, feeAmount]) => {
-        const availableFeeToken =
-          (data.feeTokenBalances[tokenAddress] || BigInt(0)) -
-          (data.feeTokenPending[tokenAddress] || BigInt(0));
-
-        return availableFeeToken >= feeAmount;
-      });
-
+      // Spot: fee is deducted from collateral (open) or output (close)
+      // so we only need gas + collateral. Add extra gas for fee transfer.
       return (
         availableNative >= estimate.estCost &&
-        availableTokens >= estimate.estAmount &&
-        hasFeeTokenLiquidity
+        availableTokens >= estimate.estAmount
       );
     });
 
@@ -1322,7 +1131,6 @@ const WalletSelector = ({
                   isSelected={true}
                   onRemove={handleRemoveWallet}
                   collateralToken={collateralToken}
-                  feeToken={feeToken}
                   estOrders={estOrders}
                   selectedGrids={walletGrids}
                   selectGrid={handleGridForWallet}
@@ -1382,7 +1190,6 @@ const WalletSelector = ({
                 onSelect={handleSelectWallet}
                 onRemove={handleRemoveWallet}
                 collateralToken={collateralToken}
-                feeToken={feeToken}
                 estOrders={estOrders}
                 selectedGrids={[]}
                 chainId={chainId}

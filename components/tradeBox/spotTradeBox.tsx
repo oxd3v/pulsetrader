@@ -30,10 +30,6 @@ import { useOrder } from "@/hooks/useOrder";
 
 //library
 import { fetchCodexTokenPrice } from "@/lib/oracle/codex";
-import {
-  getDefaultFeeToken,
-  shouldRenderFeeTokenSelector,
-} from "@/utility/orderUtility";
 import type { MarketSnapshotRef, StableMarketTokenInfo } from "@/type/market";
 
 // Constants
@@ -48,20 +44,6 @@ const GRID_MULTIPLIER_OPTIONS = [
 interface GridsByWallet {
   [walletIndex: number]: any;
 }
-
-const renderTokenOption = (token: any) => ({
-  label: (
-    <div className="flex items-center gap-1 text-gray-900 dark:text-gray-200">
-      <img
-        src={token.imageUrl}
-        className="w-4 h-4 rounded-full"
-        alt={token.symbol}
-      />
-      <span>{token.symbol}</span>
-    </div>
-  ),
-  value: token,
-});
 
 const RenderingTechnicalExit = ({
   isTechnicalExit,
@@ -193,17 +175,7 @@ function SpotTradeBox({
   const [gridsByWallet, setGridsByWallet] = useState<GridsByWallet>({});
   const [areWalletsReady, setWalletsReady] = useState<boolean>(false);
   const [estOrders, setEstOrders] = useState<ORDER_TYPE[]>([]);
-  const feeTokenOptions = useMemo(
-    () => Object.values(CollateralTokens[chainId] || {}) as OrderTokenType[],
-    [chainId],
-  );
-
-  const [feeToken, setFeeToken] = useState<OrderTokenType | null>(
-    getDefaultFeeToken(feeTokenOptions),
-  );
-
-  const [feeTokenPrice, setFeeTokenPrice] = useState<number>(0);
-  const showFeeTokenSelector = shouldRenderFeeTokenSelector(user?.status);
+  const feeToken = collateralToken;
   const [liveTokenPriceUsd, setLiveTokenPriceUsd] = useState(
     () => marketSnapshotRef?.current?.priceUsd || tokenInfo?.priceUsd || "",
   );
@@ -348,75 +320,10 @@ function SpotTradeBox({
     const nativeToken = chainTokens[ZeroAddress] ?? tokenList[0] ?? null;
     setCollateralToken(nativeToken);
     setOutputToken(nativeToken);
-
-    // Fee token: stable token > any ERC-20 > first in list.
-    setFeeToken(getDefaultFeeToken(tokenList));
   }, [chainId]);
 
-  useEffect(() => {
-    const fetchFeeTokenPrice = async () => {
-      if (!feeToken) {
-        setFeeTokenPrice(0);
-        return;
-      }
+  // Fee token is tied to collateralToken for Spot
 
-      if (feeToken.isStable) {
-        setFeeTokenPrice(1);
-        return;
-      }
-
-      if (
-        tokenInfo?.address &&
-        feeToken.address.toLowerCase() === tokenInfo.address.toLowerCase() &&
-        liveTokenPriceUsd
-      ) {
-        setFeeTokenPrice(Number(liveTokenPriceUsd));
-        return;
-      }
-
-      if (
-        collateralToken?.address &&
-        feeToken.address.toLowerCase() ===
-        collateralToken.address.toLowerCase() &&
-        collateralPrice > 0
-      ) {
-        setFeeTokenPrice(collateralPrice);
-        return;
-      }
-
-      try {
-        let queryAddress = feeToken.address;
-
-        if (queryAddress === ZeroAddress) {
-          const wrappedNative = Object.values(CollateralTokens[chainId]).find(
-            (token: any) => token.isWrappedNative,
-          ) as any;
-
-          if (wrappedNative) {
-            queryAddress = wrappedNative.address;
-          }
-        }
-
-        const price = await fetchCodexTokenPrice({
-          tokenAddress: queryAddress,
-          chainId,
-        });
-
-        setFeeTokenPrice(price ? Number(price) : 0);
-      } catch {
-        setFeeTokenPrice(0);
-      }
-    };
-
-    fetchFeeTokenPrice();
-  }, [
-    feeToken,
-    tokenInfo?.address,
-    liveTokenPriceUsd,
-    collateralPrice,
-    collateralToken,
-    chainId,
-  ]);
 
   // ========================================================================
   // Event Handlers
@@ -524,7 +431,7 @@ function SpotTradeBox({
               Fee Token
             </div>
             <div className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
-              {showFeeTokenSelector ? feeToken?.symbol || "Not selected" : "Auto / exempt"}
+              {feeToken?.symbol || "Auto (collateral)"}
             </div>
           </div>
         </div>
@@ -537,7 +444,6 @@ function SpotTradeBox({
       estOrders.length,
       feeToken?.symbol,
       selectedWalletCount,
-      showFeeTokenSelector,
       strategyLabel,
     ],
   );
@@ -690,16 +596,6 @@ function SpotTradeBox({
       return withStatus(false, _submitText);
     }
 
-    if (showFeeTokenSelector && !feeToken?.address) {
-      _submitText = `Select fee token`;
-      return withStatus(false, _submitText);
-    }
-
-    if (showFeeTokenSelector && feeTokenPrice <= 0) {
-      _submitText = `Fee token price unavailable`;
-      return withStatus(false, _submitText);
-    }
-
     return withStatus(true, _submitText);
   };
 
@@ -726,9 +622,6 @@ function SpotTradeBox({
     isConnected,
     isOrderNameValidate,
     orderName,
-    showFeeTokenSelector,
-    feeToken,
-    feeTokenPrice,
     gridsByWallet,
     collateralPrice,
   ]);
@@ -907,10 +800,8 @@ function SpotTradeBox({
         reEntrancePercentage,
         slippage,
         feeToken,
-        feeTokenPrice,
         collateralPrice,
         orderTokenPrice: liveTokenPriceUsd,
-        feeTokenRequired: showFeeTokenSelector,
       };
       const _estOrders = configureSpotOrder(orderConfig);
 
@@ -937,13 +828,11 @@ function SpotTradeBox({
     slippage,
     collateralToken,
     feeToken,
-    feeTokenPrice,
     selectedStrategy,
     priority,
     isTechnicalExit,
     executionSpeed,
     collateralPrice,
-    showFeeTokenSelector,
     liveTokenPriceUsd,
     tokenInfo.address,
     tokenInfo.decimals,
@@ -966,7 +855,6 @@ function SpotTradeBox({
         selectedStrategy={selectedStrategy}
         estOrders={estOrders}
         user={user}
-        feeToken={showFeeTokenSelector ? feeToken : undefined}
       />
     ),
     [
@@ -977,10 +865,8 @@ function SpotTradeBox({
       selectedStrategy,
       chainId,
       collateralToken,
-      feeToken,
       gridsByWallet,
       areWalletsReady,
-      showFeeTokenSelector,
     ],
   );
 
@@ -1223,23 +1109,6 @@ function SpotTradeBox({
                 </div>
               )}
             </div>
-
-            {showFeeTokenSelector && feeToken && (
-              <div className="space-y-1 md:space-y-2 mt-2">
-                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Fee Token
-                  <InfoTooltip
-                    id="fee-token-tooltip"
-                    content="Pulse fee will be collected in this token."
-                  />
-                </label>
-                <DropDown
-                  options={feeTokenOptions.map(renderTokenOption)}
-                  onChange={setFeeToken}
-                  value={feeToken}
-                />
-              </div>
-            )}
           </div>
 
           {/* Order Name Validation */}

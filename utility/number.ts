@@ -101,7 +101,7 @@ export const formateUsdAmount = (usdAmount: any, displayDecimals: number) => {
 
 
 export const isValidPrice = (price:bigint) => {
-  return price !== undefined && Number(price/PRECISION) > 0;  
+  return price !== undefined && price > BigInt(0);  
 }
 
 export function getUsd(amount:bigint, tokenDecimals:number, triggerPriceUsd:bigint) {
