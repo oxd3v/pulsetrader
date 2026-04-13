@@ -1028,7 +1028,7 @@ function PerpTradeBox({
     }
   };
 
-  console.log(tokenInfo)
+  
 
   // ========================================================================
   // Order Configuration Effect

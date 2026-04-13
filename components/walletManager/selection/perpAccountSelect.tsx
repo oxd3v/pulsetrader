@@ -275,6 +275,8 @@ const WalletCard = React.memo(
       (wallet as WalletConfig & { isApproved?: Record<string, boolean> })
         .isApproved?.[dexKey] === true;
 
+
+
     // Derived state for validation (only if data is loaded)
     const {
       hasInsufficientBalance,
@@ -284,6 +286,7 @@ const WalletCard = React.memo(
       selectedFeeTokenLocked,
       showFeeTokenCard,
     } = useMemo(() => {
+
       if (!walletData) {
         return {
           hasInsufficientBalance: false,
@@ -294,6 +297,9 @@ const WalletCard = React.memo(
           showFeeTokenCard: false,
         };
       }
+
+
+
       const availableBalance =
         walletData.balance - walletData.lockedFundBalance;
       const availableTokens =
@@ -308,13 +314,14 @@ const WalletCard = React.memo(
         (feeTokenAddress && walletData.feeTokenPending[feeTokenAddress]) || BigInt(0);
 
       const feeTokenApplied = Object.keys(estimates.estFeeByToken || {}).length > 0;
-      let requiredNative = estimates.estCost || BigInt(0);
+      let requiredNative = BigInt(0);
       if (feeTokenApplied) {
-          requiredNative += BigInt(ORDER_FEE_COLLECTION_GAS_FEE[chainId] || 0);
+        requiredNative = (estimates.estCost || BigInt(0)) + BigInt(ORDER_FEE_COLLECTION_GAS_FEE[chainId] || 0);
       }
 
-      const hasInsufficientBalance =
-        availableBalance < requiredNative;
+
+      // Only verify native balance if fee token is applicable
+      const hasInsufficientBalance = feeTokenApplied ? (availableBalance < requiredNative) : false;
       const hasInsufficientTokens =
         availableTokens < (estimates.estAmount || BigInt(0));
       const hasInsufficientFeeToken =
@@ -503,6 +510,10 @@ const WalletCard = React.memo(
         </div>
       );
     }
+
+
+
+
 
     // Full view with data
     return (
@@ -907,6 +918,7 @@ const WalletSelector = ({
   const fetchGenByAddressRef = useRef<Record<string, number>>({});
   const selectedFeeTokenAddress = feeToken?.address?.toLowerCase();
 
+
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -956,19 +968,18 @@ const WalletSelector = ({
         _id: w._id,
       }));
   }, [availableWallets, chainId, protocol]);
-
   // Fetch Gas Fee
-  useEffect(() => {
-    const fetchGasFee = async () => {
-      try {
-        const fee = await getNetworkfee(chainId, protocol, category);
-        setGasFee(fee);
-      } catch (error) {
-        setGasFee(BigInt(0));
-      }
-    };
-    fetchGasFee();
-  }, [category, chainId, protocol]);
+  // useEffect(() => {
+  //   const fetchGasFee = async () => {
+  //     try {
+  //       const fee = await getNetworkfee(chainId, protocol, category);
+  //       setGasFee(fee);
+  //     } catch (error) {
+  //       setGasFee(BigInt(0));
+  //     }
+  //   };
+  //   fetchGasFee();
+  // }, [category, chainId, protocol]);
 
   // Pre-group orders by wallet
   const ordersByWallet = useMemo(() => {
@@ -982,6 +993,8 @@ const WalletSelector = ({
     });
     return map;
   }, [orders]);
+
+
 
   // Per-wallet data fetcher
   // Removed global abort controller to prevent race conditions during multiple selections
@@ -1072,6 +1085,7 @@ const WalletSelector = ({
           timeoutPromise,
         ])) as [any, any, Array<[string, any, number]>];
 
+
         if (!isMounted.current) return undefined;
         if (fetchGenByAddressRef.current[address] !== myGen) return undefined;
 
@@ -1151,6 +1165,8 @@ const WalletSelector = ({
     ],
   );
 
+
+
   const handleApproveAgentForWallet = useCallback(
     async (wallet: WalletConfig) => {
       try {
@@ -1215,7 +1231,6 @@ const WalletSelector = ({
       const order = estOrders.find((o) => o.sl === Number(gridSl));
       if (order && walletConfig && walletConfig.address) {
         const address = walletConfig.address.toLowerCase();
-
         // Ensure entry exists
         if (!estimates[address]) estimates[address] = createEmptyWalletEstimate();
 
@@ -1226,6 +1241,7 @@ const WalletSelector = ({
           user,
           treatCollateralTokenAsWalletBalance: false,
         });
+
 
         if (collateralToken.address !== ZeroAddress) {
           estimates[address].estAmount += costs.dexOrderAmount;
@@ -1288,14 +1304,14 @@ const WalletSelector = ({
       const isApproved = (wallet as any).isApproved?.[normalizeProtocolKey(protocol)] === true;
 
       const feeTokenApplied = Object.keys(estimate.estFeeByToken || {}).length > 0;
-      let requiredNative = estimate.estCost;
+      let requiredNative = BigInt(0);
       if (feeTokenApplied) {
-          requiredNative += BigInt(ORDER_FEE_COLLECTION_GAS_FEE[chainId] || 0);
+        requiredNative = (estimate.estCost || BigInt(0)) + BigInt(ORDER_FEE_COLLECTION_GAS_FEE[chainId] || 0);
       }
 
       return (
         isApproved &&
-        availableNative >= requiredNative &&
+        (!feeTokenApplied || availableNative >= requiredNative) &&
         availableTokens >= estimate.estAmount &&
         hasFeeTokenLiquidity
       );
